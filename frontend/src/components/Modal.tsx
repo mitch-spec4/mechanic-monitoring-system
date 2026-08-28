@@ -1,0 +1,1 @@
+export default function Modal({title,onClose,children}:{title:string,onClose:()=>void,children:any}){return <div className="overlay"><div className="modal"><div className="modalHead"><h2>{title}</h2><button onClick={onClose}>×</button></div>{children}</div></div>}
