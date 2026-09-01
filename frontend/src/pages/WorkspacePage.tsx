@@ -278,7 +278,26 @@ function ReportSummary({ summary }: any) {
     ["Cancelled", jobSummary.cancelled || 0, "cancelled"],
   ] as const;
   const total = chartItems.reduce((sum, item) => sum + item[1], 0);
-  const completedPercent = total ? Math.round((jobSummary.completed / total) * 100) : 0;
+  const pending = jobSummary.pending || 0;
+  const inProgress = jobSummary.in_progress || 0;
+  const completed = jobSummary.completed || 0;
+  
+  // Calculate angles for conic gradient
+  const pendingPercent = total ? (pending / total) * 100 : 0;
+  const progressPercent = total ? (inProgress / total) * 100 : 0;
+  const completedPercent = total ? (completed / total) * 100 : 0;
+  
+  const angle1 = (pendingPercent / 100) * 360;
+  const angle2 = angle1 + (progressPercent / 100) * 360;
+  const angle3 = angle2 + (completedPercent / 100) * 360;
+  
+  const gradient = `conic-gradient(
+    #f59e0b ${angle1}deg,
+    #3b82f6 ${angle1}deg ${angle2}deg,
+    #10b981 ${angle2}deg ${angle3}deg,
+    #e5e7eb ${angle3}deg 360deg
+  )`;
+
   return (
     <div className="reportArea">
       <div className="reportGrid">
@@ -286,7 +305,7 @@ function ReportSummary({ summary }: any) {
       </div>
       <div className="chartGrid">
         <section className="chartPanel"><div className="chartHeading"><h2>Jobs by status</h2><span>{total} total</span></div><div className="barChart">{chartItems.map(([label, value, tone]) => <div className="barItem" key={label}><div className="barValue"><span>{label}</span><b>{value}</b></div><div className="barTrack"><i className={`barFill ${tone}`} style={{ width: `${total ? Math.max((value / total) * 100, value ? 8 : 0) : 0}%` }} /></div></div>)}</div></section>
-        <section className="chartPanel completionChart"><div className="chartHeading"><h2>Completion rate</h2><span>Current workload</span></div><div className="donut" style={{ background: `conic-gradient(var(--role-color, #0969d7) ${completedPercent}%, #e8edf2 ${completedPercent}% 100%)` }}><div><strong>{completedPercent}%</strong><span>completed</span></div></div><div className="chartLegend"><span><i className="legendCompleted" /> Completed</span><span><i className="legendRemaining" /> Remaining</span></div></section>
+        <section className="chartPanel completionChart"><div className="chartHeading"><h2>Workload breakdown</h2><span>Pending, in progress, completed</span></div><div className="donut" style={{ background: gradient }}><div><strong>{total}</strong><span>total jobs</span></div></div><div className="chartLegend"><span><i className="legendPending" style={{backgroundColor: "#f59e0b"}} /> Pending ({pending})</span><span><i className="legendProgress" style={{backgroundColor: "#3b82f6"}} /> In Progress ({inProgress})</span><span><i className="legendCompleted" style={{backgroundColor: "#10b981"}} /> Completed ({completed})</span></div></section>
       </div>
     </div>
   );

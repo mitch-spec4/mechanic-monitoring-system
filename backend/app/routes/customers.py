@@ -67,3 +67,9 @@ def update_request(rid):
     customer=User.query.filter_by(company_id=r.company_id,customer_id=r.customer_id,role="customer").first()
     if customer:notify(customer.id,"Service request updated",f"Your request is now {status}.","request")
     db.session.commit(); return jsonify(ok=True,status=r.status)
+
+@bp.delete("/<int:cid>")
+@roles("boss")
+def delete_customer(cid):
+    c=Customer.query.filter_by(id=cid,company_id=get_jwt()["company_id"]).first_or_404()
+    db.session.delete(c);db.session.commit();return jsonify(ok=True)

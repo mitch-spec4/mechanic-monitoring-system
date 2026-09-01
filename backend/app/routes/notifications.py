@@ -13,3 +13,7 @@ def notifications():
 @roles("boss","mechanic","customer")
 def read(nid):
     n=Notification.query.filter_by(id=nid,user_id=int(get_jwt_identity())).first_or_404();n.is_read=True;db.session.commit();return jsonify(ok=True)
+@bp.delete("/<int:nid>")
+@roles("boss","mechanic","customer")
+def delete(nid):
+    n=Notification.query.filter_by(id=nid,user_id=int(get_jwt_identity())).first_or_404();db.session.delete(n);db.session.commit();return jsonify(ok=True)

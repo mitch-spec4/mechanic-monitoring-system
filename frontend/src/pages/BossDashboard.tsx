@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Users, ClipboardList, Wrench, Star, Trash2, CheckCircle2 } from "lucide-react";
+import { Plus, Users, ClipboardList, Wrench, Star, Trash2, CheckCircle2, UserPlus, Mail } from "lucide-react";
 import {
   customers,
   jobs,
@@ -12,12 +12,16 @@ import {
 } from "../services/api";
 import Notifications from "../components/Notifications";
 import Modal from "../components/Modal";
+import MechanicProfile from "../components/MechanicProfile";
+import CustomerProfile from "../components/CustomerProfile";
 export default function BossDashboard({ u }: { u: any }) {
   const [data, setData] = useState<any[]>([]),
     [cs, setCs] = useState<any[]>([]),
     [ms, setMs] = useState<any[]>([]),
     [rs, setRs] = useState<any[]>([]),
-    [modal, setModal] = useState("");
+    [modal, setModal] = useState(""),
+    [selectedMechanic, setSelectedMechanic] = useState(null),
+    [selectedCustomer, setSelectedCustomer] = useState(null);
   const load = () =>
     Promise.all([jobs(), customers(), mechanics(), requests()]).then(
       ([j, c, m, r]) => {
@@ -108,19 +112,19 @@ export default function BossDashboard({ u }: { u: any }) {
         <div className="panel">
           <div className="panelHead">
             <h2>Customers</h2>
-            <button className="secondary" onClick={() => setModal("invite")}>
-              Invite customer
+            <button className="primary-sm" onClick={() => setModal("invite")}>
+              <Plus size={14} /> Add customer
             </button>
           </div>
           <div className="customerGrid">
             {cs.map((c) => (
-              <div className="customer" key={c.id}>
-                <div className="avatar">{c.name[0]}</div>
-                <div>
+              <button key={c.id} className="customer-card" onClick={() => setSelectedCustomer(c)} style={{ border: "none", background: "none", cursor: "pointer" }}>
+                <div className="avatar-lg">{c.name[0]}</div>
+                <div className="customer-info">
                   <b>{c.name}</b>
                   <span>{c.email}</span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -128,8 +132,8 @@ export default function BossDashboard({ u }: { u: any }) {
           <Panel title="Upcoming jobs" action={<span className="pill">{data.filter((job) => job.status !== "Completed" && job.status !== "Cancelled").length}</span>}>
             {data.filter((job) => job.status !== "Completed" && job.status !== "Cancelled").slice(0, 5).map((job) => <div className="request" key={job.id}><div><b>{job.title}</b><span>{job.location || "Location not set"} · {job.due_date || "Date not set"}</span></div><span className="status">{job.status}</span></div>)}
           </Panel>
-          <Panel title="Team overview" action={<span className="pill">{ms.length} mechanics</span>}>
-            {ms.length === 0 ? <p className="muted">No mechanics added yet.</p> : ms.map((mechanic) => <div className="customer" key={mechanic.id}><div className="avatar">{mechanic.name[0]}</div><div><b>{mechanic.name}</b><span>{mechanic.email}</span></div><strong>{data.filter((job) => job.mechanic_id === mechanic.id && job.status !== "Completed").length} active</strong></div>)}
+          <Panel title="Team overview" action={<button className="link" onClick={() => setModal("addmech")}>+ Add mechanic</button>}>
+            {ms.length === 0 ? <p className="muted">No mechanics added yet.</p> : ms.map((mechanic) => <button key={mechanic.id} className="customer" onClick={() => setSelectedMechanic(mechanic)} style={{ border: "none", background: "none", cursor: "pointer", width: "100%", textAlign: "left" }}><div className="avatar">{mechanic.name[0]}</div><div><b>{mechanic.name}</b><span>{mechanic.email}</span></div><strong>{data.filter((job) => job.mechanic_id === mechanic.id && job.status !== "Completed").length} active</strong></button>)}
           </Panel>
         </div>
       </main>
@@ -170,18 +174,62 @@ export default function BossDashboard({ u }: { u: any }) {
         </Modal>
       )}
       {modal === "invite" && (
-        <Modal title="Invite customer" onClose={() => setModal("")}>
-          <form className="form" onSubmit={submitInvite}>
-            <input name="name" placeholder="Customer/company name" required />
-            <input
-              name="email"
-              type="email"
-              placeholder="Email address"
-              required
-            />
-            <button className="primary">Generate invitation</button>
+        <Modal title="Add New Customer" icon={<Users size={20} />} onClose={() => setModal("")}>
+          <form className="form form-upgraded" onSubmit={submitInvite}>
+            <div className="formGroup">
+              <label>Company/Organization Name</label>
+              <input name="name" placeholder="Enter customer name" required />
+            </div>
+            <div className="formGroup">
+              <label>Email Address</label>
+              <input
+                name="email"
+                type="email"
+                placeholder="customer@company.com"
+                required
+              />
+            </div>
+            <button className="primary" style={{marginTop: '10px'}}>
+              <Mail size={15} /> Generate & Send Invitation
+            </button>
           </form>
         </Modal>
+      )}
+      {modal === "addmech" && (
+        <Modal title="Add Mechanic to Team" icon={<UserPlus size={20} />} onClose={() => setModal("")}>
+          <form className="form form-upgraded" onSubmit={async (e: any) => {
+            e.preventDefault();
+            const f = new FormData(e.currentTarget);
+            const data = Object.fromEntries(f) as any;
+            data.role = "mechanic";
+            const x = await invite(data);
+            alert(`✅ Unique Invitation Code Generated\n\n${x.code}\n\nShare this code with the mechanic to join the team.`);
+            setModal("");
+          }}>
+            <div className="formGroup">
+              <label>Mechanic Full Name</label>
+              <input name="name" placeholder="Enter mechanic's name" required />
+            </div>
+            <div className="formGroup">
+              <label>Email Address</label>
+              <input
+                name="email"
+                type="email"
+                placeholder="mechanic@example.com"
+                required
+              />
+            </div>
+            <button className="primary" style={{marginTop: '10px'}}>
+              <UserPlus size={15} /> Generate Unique Code
+            </button>
+          </form>
+        </Modal>
+      )}
+      {selectedMechanic && (
+        <MechanicProfile mechanic={selectedMechanic} onClose={() => setSelectedMechanic(null)} />
+      )}
+      {selectedCustomer && (
+        <CustomerProfile customer={selectedCustomer} onClose={() => setSelectedCustomer(null)} />
       )}
     </>
   );

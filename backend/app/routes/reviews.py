@@ -29,3 +29,21 @@ def create_review():
     boss=User.query.filter_by(company_id=c["company_id"],role="boss").first()
     if boss:notify(boss.id,"New customer review",f"A customer rated a completed service {rating}/5.","review")
     db.session.commit();return jsonify(id=r.id),201
+
+@bp.patch("/<int:rid>")
+@roles("customer")
+def update_review(rid):
+    r=Review.query.filter_by(id=rid,customer_id=get_jwt()["customer_id"]).first_or_404();d=request.json or {}
+    if "rating" in d:
+        rating=int(d["rating"])
+        if rating<1 or rating>5:return jsonify(error="Rating must be 1-5"),400
+        r.rating=rating
+    if "comment" in d:r.comment=d["comment"]
+    if "advice" in d:r.advice=d["advice"]
+    db.session.commit();return jsonify(ok=True)
+
+@bp.delete("/<int:rid>")
+@roles("customer")
+def delete_review(rid):
+    r=Review.query.filter_by(id=rid,customer_id=get_jwt()["customer_id"]).first_or_404()
+    db.session.delete(r);db.session.commit();return jsonify(ok=True)
