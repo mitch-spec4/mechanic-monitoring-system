@@ -37,6 +37,7 @@ export const invite = (data: any) => api("/customers/invite", { method: "POST", 
 export const createMachine = (data: any) => api("/machines", { method: "POST", body: JSON.stringify(data) });
 export const createService = (data: any) => api("/services", { method: "POST", body: JSON.stringify(data) });
 export const createRequest = (data: any) => api("/customers/requests", { method: "POST", body: JSON.stringify(data) });
+export const updateRequest = (id: number, data: any) => api(`/customers/requests/${id}`, { method: "PATCH", body: JSON.stringify(data) });
 export const createReview = (data: any) => api("/reviews", { method: "POST", body: JSON.stringify(data) });
 export const deleteJob = (id: number) => api(`/jobs/${id}`, { method: "DELETE" });
 export const reports = () => api("/reports");
