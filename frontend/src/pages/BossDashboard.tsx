@@ -162,7 +162,7 @@ export default function BossDashboard({ u }: { u: any }) {
             </div>
             <div className="row">
               <select name="priority">
-                <option>Normal</option>
+                <option>Medium</option>
                 <option>High</option>
                 <option>Urgent</option>
               </select>

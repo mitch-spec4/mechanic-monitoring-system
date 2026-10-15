@@ -3,6 +3,8 @@ from flask_jwt_extended import get_jwt_identity,get_jwt
 from app import db
 from app.models.job import Job
 from app.models.user import User
+from app.models.customer import Customer
+from app.models.machine import Machine
 from app.services.notifications import notify
 from app.utils.auth import roles
 bp=Blueprint("jobs",__name__)
@@ -24,8 +26,15 @@ def create_job():
     priority=d.get("priority","Medium")
     if priority not in PRIORITIES:return jsonify(error="Invalid priority"),400
     mechanic_id=d.get("mechanic_id")
+    customer_id=d.get("customer_id")
+    machine_id=d.get("machine_id")
     if mechanic_id and not User.query.filter_by(id=mechanic_id,company_id=c["company_id"],role="mechanic").first():return jsonify(error="Mechanic not found"),404
-    j=Job(company_id=c["company_id"],title=d["title"],description=d["description"],priority=priority,location=d.get("location"),due_date=d.get("due_date"),customer_id=d.get("customer_id"),machine_id=d.get("machine_id"),mechanic_id=mechanic_id,status="Assigned" if mechanic_id else "Pending")
+    if customer_id and not Customer.query.filter_by(id=customer_id,company_id=c["company_id"]).first():return jsonify(error="Customer not found"),404
+    machine = Machine.query.filter_by(id=machine_id,company_id=c["company_id"]).first() if machine_id else None
+    if machine_id and not machine:return jsonify(error="Machine not found"),404
+    if machine and customer_id and machine.customer_id != customer_id:return jsonify(error="Machine does not belong to the selected customer"),400
+    if machine and not customer_id:customer_id=machine.customer_id
+    j=Job(company_id=c["company_id"],title=d["title"],description=d["description"],priority=priority,location=d.get("location"),due_date=d.get("due_date"),customer_id=customer_id,machine_id=machine.id if machine else None,mechanic_id=mechanic_id,status="Assigned" if mechanic_id else "Pending")
     db.session.add(j);db.session.flush()
     if j.mechanic_id:notify(j.mechanic_id,"New task assigned",f'{j.title} was assigned to you.',"job")
     db.session.commit();return jsonify(job=out(j)),201

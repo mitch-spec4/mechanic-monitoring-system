@@ -184,11 +184,20 @@ export default function MechanicDashboard({ u }: Props) {
       {modal && (
         <Modal title="New service record" onClose={() => setModal(null)}>
           <form onSubmit={submit} className="modalForm">
+            <select name="machine_id" defaultValue={modal?.machine_id || ""} required>
+              <option value="">Select machine</option>
+              {machineList.map((item) => (
+                <option key={item.id} value={item.id}>{item.name} ({item.serial_no})</option>
+              ))}
+            </select>
             <input name="service_type" placeholder="Service type" required />
+            <input name="problem" placeholder="Problem found" />
             <input name="work_done" placeholder="Work performed" required />
             <input name="parts_replaced" placeholder="Parts replaced" />
-            <input name="solution" placeholder="Solution or advice" />
-            <button className="primary">Save Service</button>
+            <input name="solution" placeholder="Solution" />
+            <input name="advice" placeholder="Advice / follow-up" />
+            <button className="primary" disabled={machineList.length === 0}>Save Service</button>
+            {machineList.length === 0 && <p className="muted">No company machines are available. Ask your manager to add a machine first.</p>}
           </form>
         </Modal>
       )}
