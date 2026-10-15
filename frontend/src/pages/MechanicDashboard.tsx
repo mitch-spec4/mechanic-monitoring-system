@@ -12,36 +12,37 @@ import {
   jobs,
   machines,
   services,
+  reviews as fetchReviews,
   updateJob,
 } from "../services/api";
 import Modal from "../components/Modal";
 
 type Props = { u: any };
-const fallbackMachine = {
-  name: "Generator G-102",
-  model: "CAT XQ200",
-  serial_no: "G102-88421",
-  status: "Operational",
-};
 
 export default function MechanicDashboard({ u }: Props) {
   const [jobList, setJobList] = useState<any[]>([]),
     [serviceList, setServiceList] = useState<any[]>([]),
     [machineList, setMachineList] = useState<any[]>([]),
+    [reviewList, setReviewList] = useState<any[]>([]),
     [modal, setModal] = useState<any>(null);
   const load = () =>
-    Promise.all([jobs(), services(), machines()])
-      .then(([jobData, serviceData, machineData]) => {
+    Promise.all([jobs(), services(), machines(), fetchReviews()])
+      .then(([jobData, serviceData, machineData, reviewData]) => {
         setJobList(jobData.jobs || []);
         setServiceList(serviceData.records || []);
         setMachineList(machineData.machines || []);
+        setReviewList(reviewData.reviews || []);
       })
       .catch(() => {});
   useEffect(() => {
     load();
   }, []);
-  const machine = machineList[0] || fallbackMachine;
+  const machine = machineList[0] || null;
   const completed = jobList.filter((job) => job.status === "Completed").length;
+  const ratingAverage = reviewList.length
+    ? (reviewList.reduce((total, review) => total + Number(review.rating || 0), 0) / reviewList.length).toFixed(1)
+    : "—";
+  const latestService = serviceList[0] || null;
   const pendingJobs = jobList.filter((job) => job.status !== "Completed");
   const change = async (id: number, status: string) => {
     await updateJob(id, { status });
@@ -89,9 +90,9 @@ export default function MechanicDashboard({ u }: Props) {
         <Kpi
           icon={<Star />}
           color="violet"
-          number="4.8"
+          number={ratingAverage}
           label="Rating"
-          detail="From 96 reviews"
+          detail={`From ${reviewList.length} reviews`}
         />
       </div>
       <section id="my-jobs" className="pendingPanel">
@@ -162,7 +163,7 @@ export default function MechanicDashboard({ u }: Props) {
       </section>
       <section className="dashboardGrid">
         <Panel title="Today's Schedule" icon={<MapPin />} className="schedulePanel">
-          <Schedule />
+          <Schedule jobs={jobList} machines={machineList} />
         </Panel>
         <Panel title="Recent Work" icon={<FileText />} className="recentPanel">
           <RecentWork jobs={jobList} />
@@ -172,10 +173,10 @@ export default function MechanicDashboard({ u }: Props) {
           <button className="blueAction" onClick={() => setModal({})}><Plus size={14} /> New Service Record</button>
         </Panel>
         <Panel id="customer-review" title="Latest Customer Feedback" icon={<Star />} className="reviewPanel">
-          <Review />
+          <Review reviews={reviewList} />
         </Panel>
         <Panel title="Advice & Follow-up" icon={<Wrench />} className="advicePanel">
-          <Advice />
+          <Advice service={latestService} />
         </Panel>
         <Panel title="Documents" icon={<FileText />} className="documentsPanel">
           <div className="documentEmpty"><FileText size={20} /><strong>No documents yet</strong><span>Service reports and inspection files will appear here.</span></div>
@@ -230,152 +231,108 @@ function Panel({ id, title, icon, children, className = "", action }: any) {
     </section>
   );
 }
-function Schedule() {
+function Schedule({ jobs, machines }: any) {
+  const scheduled = jobs.filter((job: any) => !["Completed", "Cancelled"].includes(job.status)).slice(0, 4);
+  if (!scheduled.length) return <p className="muted">No active jobs are scheduled yet.</p>;
   return (
     <div className="schedule">
-      <ScheduleRow
-        time="09:00 AM"
-        customer="ABC Engineering"
-        machine="Generator G-102"
-        city="Nairobi"
-      />
-      <ScheduleRow
-        time="02:00 PM"
-        customer="Kenya Motors"
-        machine="Air Compressor C-44"
-        city="Nairobi"
-      />
-      <ScheduleRow
-        time="06:00 PM"
-        customer="XYZ Factory"
-        machine="Hydraulic Pump H-21"
-        city="Kiambu"
-      />
-    </div>
-  );
-}
-function ScheduleRow({ time, customer, machine, city }: any) {
-  return (
-    <div className="scheduleRow">
-      <b>{time}</b>
-      <div>
-        <strong>{customer}</strong>
-        <span>{machine}</span>
-        <i>CONFIRMED</i>
-        <small>
-          <MapPin size={10} /> {city}
-        </small>
-      </div>
+      {scheduled.map((job: any) => {
+        const machine = machines.find((item: any) => item.id === job.machine_id);
+        return (
+          <div className="scheduleRow" key={job.id}>
+            <b>{job.due_date || "Date not set"}</b>
+            <div>
+              <strong>{job.title}</strong>
+              <span>{machine ? machine.name : job.description}</span>
+              <i>{job.status}</i>
+              <small><MapPin size={10} /> {job.location || "Location not set"}</small>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 function RecentWork({ jobs }: any) {
-  const items = jobs.length
-    ? jobs.slice(0, 4)
-    : [
-        { title: "ABC Engineering", description: "Generator G-102" },
-        { title: "Kenya Motors", description: "Air Compressor C-44" },
-        { title: "XYZ Factory", description: "Hydraulic Pump H-21" },
-      ];
+  const items = jobs.filter((job: any) => job.status === "Completed").slice(0, 4);
+  if (!items.length) return <p className="muted">Completed jobs will appear here.</p>;
   return (
     <div className="recentWork">
-      {items.map((job: any, i: number) => (
-        <div key={job.id || i}>
+      {items.map((job: any) => (
+        <div key={job.id}>
           <div>
-            <strong>{job.title || "Service visit"}</strong>
+            <strong>{job.title}</strong>
             <span>{job.description || "Completed service"}</span>
           </div>
-          <small>{25 - i * 7} Aug 2026</small>
+          <small>{job.due_date || "Date not recorded"}</small>
           <em>● Completed</em>
         </div>
       ))}
-      <button className="textAction">View All Work History</button>
     </div>
   );
 }
 function MachineHistory({ machine, records }: any) {
-  const items = records.length
-    ? records.slice(0, 4)
-    : [
-        { service_type: "Repair", work_done: "Overheating after 2 hours." },
-        { service_type: "Repair", work_done: "Leaking radiator hose." },
-        { service_type: "Maintenance", work_done: "Routine service done." },
-      ];
+  const items = records.slice(0, 4);
   return (
     <>
-      <div className="machineSummary">
-        <div className="machineImage">
-          <Wrench size={34} />
-        </div>
-        <div>
-          <strong>{machine.name}</strong>
-          <span>Customer &nbsp; ABC Engineering</span>
-          <span>Model &nbsp; {machine.model}</span>
-          <span>Serial No. &nbsp; {machine.serial_no}</span>
-          <span>Total Services &nbsp; {records.length || 8}</span>
-          <span>Last Service &nbsp; 25 Aug 2026</span>
-        </div>
-        <aside>
-          <b>Quick Stats</b>
-          <span>
-            Repairs <strong>4</strong>
-          </span>
-          <span>
-            Parts Replaced <strong>12</strong>
-          </span>
-          <span>
-            First Service <strong>18 Nov 2025</strong>
-          </span>
-        </aside>
-      </div>
-      <div className="historyRows">
-        <b>Date</b>
-        <b>Service Type</b>
-        <b>Problem / Work Summary</b>
-        <b>Parts Replaced</b>
-        {items.map((record: any, index: number) => (
-          <div key={record.id || index}>
-            <span>{25 - index * 11} Aug 2026</span>
-            <span>{record.service_type}</span>
-            <span>{record.work_done}</span>
-            <span>
-              Thermostat x1 <strong>★★★★★</strong>
-            </span>
+      {!machine ? (
+        <p className="muted">Machine details will appear when a machine is assigned to your company.</p>
+      ) : (
+        <div className="machineSummary">
+          <div className="machineImage"><Wrench size={34} /></div>
+          <div>
+            <strong>{machine.name}</strong>
+            <span>Model &nbsp; {machine.model || "Not recorded"}</span>
+            <span>Serial No. &nbsp; {machine.serial_no}</span>
+            <span>Status &nbsp; {machine.status}</span>
+            <span>Service records &nbsp; {records.length}</span>
           </div>
-        ))}
-      </div>
+          <aside>
+            <b>Latest service</b>
+            <span>{items[0]?.service_type || "No service yet"}</span>
+            <span>{items[0]?.service_date ? new Date(items[0].service_date).toLocaleDateString() : "Date not recorded"}</span>
+            <span>Parts replaced <strong>{items.filter((record: any) => record.parts_replaced).length}</strong></span>
+          </aside>
+        </div>
+      )}
+      {items.length ? (
+        <div className="historyRows">
+          <b>Date</b><b>Service Type</b><b>Problem / Work Summary</b><b>Parts Replaced</b>
+          {items.map((record: any) => (
+            <div key={record.id}>
+              <span>{record.service_date ? new Date(record.service_date).toLocaleDateString() : "Not recorded"}</span>
+              <span>{record.service_type}</span>
+              <span>{record.work_done || record.problem || "No summary recorded"}</span>
+              <span>{record.parts_replaced || "None recorded"}</span>
+            </div>
+          ))}
+        </div>
+      ) : <p className="muted">No service records have been saved yet.</p>}
     </>
   );
 }
-function Review() {
+function Review({ reviews }: any) {
+  const review = reviews[0];
+  if (!review) return <p className="muted">Customer feedback will appear here after a review is submitted.</p>;
   return (
     <div className="reviewContent">
-      <div className="stars">
-        ★★★★★ <b>5.0</b>
-      </div>
-      <small>25 Aug 2026</small>
-      <blockquote>
-        “Mitch explained the problem clearly and fixed it quickly. Very
-        professional and friendly.”
-      </blockquote>
-      <label>Advice / Request for Next Visit</label>
-      <p>Please check the radiator again during the next service.</p>
+      <div className="stars">{"★".repeat(Number(review.rating) || 0)}{"☆".repeat(5 - (Number(review.rating) || 0))} <b>{review.rating}/5</b></div>
+      <small>{review.created_at ? new Date(review.created_at).toLocaleDateString() : "Date not recorded"}</small>
+      <blockquote>{review.comment || "No written comment was provided."}</blockquote>
+      {review.advice && <><label>Advice / Request for Next Visit</label><p>{review.advice}</p></>}
     </div>
   );
 }
-function Advice() {
+function Advice({ service }: any) {
+  if (!service || (!service.advice && !service.solution)) {
+    return <p className="muted">Advice and follow-up notes will appear after a service record is saved.</p>;
+  }
   return (
     <div className="adviceContent">
-      <small>25 Aug 2026</small>
-      <h3>Check coolant level weekly.</h3>
-      <p>
-        Inspect radiator every 3 months.
-        <br />
-        Monitor operating temperature.
-      </p>
-      <div className="tip">
-        <Wrench size={15} /> Preventive care keeps every visit shorter.
-      </div>
+      <small>{service.service_date ? new Date(service.service_date).toLocaleDateString() : "Latest service"}</small>
+      <h3>{service.advice || "No follow-up advice recorded"}</h3>
+      {service.solution && <p>{service.solution}</p>}
+      {service.parts_replaced && <div className="tip"><Wrench size={15} /> Parts recorded: {service.parts_replaced}</div>}
     </div>
   );
 }
