@@ -9,6 +9,7 @@ import {
   requests,
   updateJob,
   deleteJob,
+  updateRequest,
 } from "../services/api";
 import Notifications from "../components/Notifications";
 import Modal from "../components/Modal";
@@ -36,6 +37,11 @@ export default function BossDashboard({ u }: { u: any }) {
     const t = setInterval(load, 7000);
     return () => clearInterval(t);
   }, []);
+  const changeRequestStatus = async (id: number, status: string) => {
+    await updateRequest(id, { status });
+    load();
+  };
+  const activeRequestCount = rs.filter((x) => !["Completed", "Cancelled"].includes(x.status)).length;
   const submitJob = async (e: any) => {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -65,7 +71,7 @@ export default function BossDashboard({ u }: { u: any }) {
         </div>
         <div className="stats">
           <Stat icon={<ClipboardList />} n={data.length} t="Total jobs" />
-          <Stat icon={<ClipboardList />} n={rs.filter((x) => x.status === "Open").length} t="Pending requests" />
+          <Stat icon={<ClipboardList />} n={activeRequestCount} t="Pending requests" />
           <Stat icon={<Wrench />} n={data.filter((x) => ["In Progress", "Paused"].includes(x.status)).length} t="In progress" />
           <Stat icon={<CheckCircle2 />} n={data.filter((x) => x.status === "Completed").length} t="Completed jobs" />
         </div>
@@ -94,7 +100,7 @@ export default function BossDashboard({ u }: { u: any }) {
             title="Customer requests"
             action={
               <span className="pill">
-                {rs.filter((x) => x.status === "Open").length} open
+                {activeRequestCount} open
               </span>
             }
           >
@@ -104,7 +110,18 @@ export default function BossDashboard({ u }: { u: any }) {
                   <b>{r.subject}</b>
                   <span>{r.description}</span>
                 </div>
-                <span className="priority">{r.priority}</span>
+                <div className="requestActions">
+                  <span className="priority">{r.priority}</span>
+                  <select
+                    aria-label={`Status for ${r.subject}`}
+                    value={r.status === "Open" ? "Submitted" : r.status}
+                    onChange={(e) => changeRequestStatus(r.id, e.target.value)}
+                  >
+                    {["Submitted", "Received", "Reviewing", "Approved", "Mechanic Assigned", "Scheduled", "In Progress", "Completed", "Cancelled"].map((status) => (
+                      <option key={status} value={status}>{status}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             ))}
           </Panel>
