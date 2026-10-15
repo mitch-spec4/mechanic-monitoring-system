@@ -23,13 +23,15 @@ export default function MechanicDashboard({ u }: Props) {
   const [jobList, setJobList] = useState<any[]>([]),
     [serviceList, setServiceList] = useState<any[]>([]),
     [machineList, setMachineList] = useState<any[]>([]),
+    [reviewList, setReviewList] = useState<any[]>([]),
     [modal, setModal] = useState<any>(null);
   const load = () =>
-    Promise.all([jobs(), services(), machines()])
-      .then(([jobData, serviceData, machineData]) => {
+    Promise.all([jobs(), services(), machines(), fetchReviews()])
+      .then(([jobData, serviceData, machineData, reviewData]) => {
         setJobList(jobData.jobs || []);
         setServiceList(serviceData.records || []);
         setMachineList(machineData.machines || []);
+        setReviewList(reviewData.reviews || []);
       })
       .catch(() => {});
   useEffect(() => {
