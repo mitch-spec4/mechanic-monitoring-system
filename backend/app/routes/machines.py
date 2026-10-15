@@ -2,6 +2,7 @@ from flask import Blueprint,jsonify,request
 from flask_jwt_extended import get_jwt
 from app import db
 from app.models.machine import Machine
+from app.models.customer import Customer
 from app.utils.auth import roles
 bp=Blueprint("machines",__name__)
 STATUSES={"Operational","Under Maintenance","Under Repair","Retired"}
@@ -16,8 +17,14 @@ def machines():
 def create():
     d=request.json or {}
     if not d.get("name") or not d.get("serial_no"):return jsonify(error="Name and serial_no are required"),400
+    company_id=get_jwt()["company_id"]
+    customer_id=d.get("customer_id")
+    if not customer_id:return jsonify(error="Customer is required"),400
+    if not Customer.query.filter_by(id=customer_id,company_id=company_id).first():return jsonify(error="Customer not found"),404
     if Machine.query.filter_by(serial_no=d["serial_no"]).first():return jsonify(error="Serial number already exists"),409
-    m=Machine(company_id=get_jwt()["company_id"],name=d["name"],model=d.get("model"),serial_no=d["serial_no"],customer_id=d["customer_id"],status=d.get("status","Operational"))
+    status=d.get("status","Operational")
+    if status not in STATUSES:return jsonify(error="Invalid status"),400
+    m=Machine(company_id=company_id,name=d["name"],model=d.get("model"),serial_no=d["serial_no"],customer_id=customer_id,status=status)
     db.session.add(m);db.session.commit();return jsonify(id=m.id),201
 @bp.patch("/<int:mid>")
 @roles("boss")
