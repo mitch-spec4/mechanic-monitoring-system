@@ -1259,3 +1259,17 @@ body {
 .closeBtn:hover {
   color: #1f2937;
 }
+.profileModal {
+  padding: 0;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.inviteCode {
+  display: block;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f0f6fc;
+  font-size: 20px;
+  letter-spacing: 1px;
+  text-align: center;
+}

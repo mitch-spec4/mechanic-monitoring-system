@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Login from "./pages/Login";
 import BossDashboard from "./pages/BossDashboard";
 import MechanicDashboard from "./pages/MechanicDashboard";
@@ -6,6 +6,7 @@ import CustomerDashboard from "./pages/CustomerDashboard";
 import WorkspacePage from "./pages/WorkspacePage";
 import Profile from "./components/Profile";
 import Sidebar from "./components/Sidebar";
+import { clearSession, SESSION_EXPIRED_EVENT } from "./services/api";
 import "./style.css";
 import "./components/DashboardShell.css";
 
@@ -17,11 +18,15 @@ export default function App() {
 	const [active, setActive] = useState("Dashboard");
 
 	const logout = () => {
-		localStorage.removeItem("token");
-		localStorage.removeItem("user");
+		clearSession();
 		setUser(null);
 		setActive("Dashboard");
 	};
+
+	useEffect(() => {
+		window.addEventListener(SESSION_EXPIRED_EVENT, logout);
+		return () => window.removeEventListener(SESSION_EXPIRED_EVENT, logout);
+	}, []);
 
 	if (!user) {
 		return (

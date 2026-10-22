@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Wrench, Plus, Star, ClipboardList } from "lucide-react";
 import {
   jobs,
@@ -11,38 +11,45 @@ import {
 } from "../services/api";
 import Notifications from "../components/Notifications";
 import Modal from "../components/Modal";
+import { errorMessage } from "../lib/format";
+import { usePolling } from "../lib/usePolling";
 export default function CustomerDashboard({ u }: { u: any }) {
   const [j, setJ] = useState<any[]>([]),
     [m, setM] = useState<any[]>([]),
     [s, setS] = useState<any[]>([]),
     [r, setR] = useState<any[]>([]),
     [q, setQ] = useState<any[]>([]),
-    [modal, setModal] = useState<any>(null);
+    [modal, setModalState] = useState<any>(null),
+    [formError, setFormError] = useState("");
   const load = () =>
-    Promise.all([jobs(), machines(), services(), reviews(), requests()]).then(
-      ([a, b, c, d, e]) => {
+    Promise.all([jobs(), machines(), services(), reviews(), requests()])
+      .then(([a, b, c, d, e]) => {
         setJ(a.jobs);
         setM(b.machines);
         setS(c.records);
         setR(d.reviews);
         setQ(e.requests);
-      },
-    );
-  useEffect(() => {
-    load();
-  }, []);
-  const req = async (e: any) => {
-    e.preventDefault();
-    await createRequest(Object.fromEntries(new FormData(e.currentTarget)));
-    setModal(null);
-    load();
+      })
+      .catch(() => {});
+  usePolling(load, 60000);
+  const setModal = (value: any) => {
+    setFormError("");
+    setModalState(value);
   };
-  const rev = async (e: any) => {
+  const submit = (send: (data: any) => Promise<unknown>) => async (e: any) => {
     e.preventDefault();
-    await createReview(Object.fromEntries(new FormData(e.currentTarget)));
-    setModal(null);
-    load();
+    setFormError("");
+    try {
+      await send(Object.fromEntries(new FormData(e.currentTarget)));
+      setModal(null);
+      load();
+    } catch (error) {
+      setFormError(errorMessage(error));
+    }
   };
+  const req = submit(createRequest);
+  const rev = submit(createReview);
+  const openJobs = j.filter((x) => !["Completed", "Cancelled"].includes(x.status));
   return (
     <>
       <Header u={u} />
@@ -81,14 +88,14 @@ export default function CustomerDashboard({ u }: { u: any }) {
           </div>
           <div className="stat">
             <div>
-              <b>{j.filter((x) => x.status !== "Completed").length}</b>
+              <b>{openJobs.length}</b>
               <span>Open jobs</span>
             </div>
           </div>
           <div className="stat">
             <Star />
             <div>
-              <b>{r.length ? "★★★★★" : "—"}</b>
+              <b>{r.length}</b>
               <span>Your reviews</span>
             </div>
           </div>
@@ -114,7 +121,7 @@ export default function CustomerDashboard({ u }: { u: any }) {
             <div className="panelHead"><h2>Active requests</h2><span className="pill">{q.filter((x) => !["Completed", "Cancelled"].includes(x.status)).length} open</span></div>
             {q.length === 0 ? <p className="muted">No active service requests.</p> : q.slice(0, 5).map((request) => <div className="request" key={request.id}><div><b>{request.subject}</b><span>{request.status} · {request.description}</span></div><span className="priority">{request.priority}</span></div>)}
           </section>
-          <section className="panel"><div className="panelHead"><h2>Upcoming services</h2></div>{j.filter((x) => x.status !== "Completed").slice(0, 5).map((job) => <div className="request" key={job.id}><div><b>{job.title}</b><span>{job.location || "Location not set"}</span></div><span className="status">{job.status}</span></div>)}{j.length === 0 && <p className="muted">No upcoming services.</p>}</section>
+          <section className="panel"><div className="panelHead"><h2>Upcoming services</h2></div>{openJobs.slice(0, 5).map((job) => <div className="request" key={job.id}><div><b>{job.title}</b><span>{job.location || "Location not set"}</span></div><span className="status">{job.status}</span></div>)}{openJobs.length === 0 && <p className="muted">No upcoming services.</p>}</section>
         </div>
         <section className="panel">
           <div className="panelHead">
@@ -147,10 +154,12 @@ export default function CustomerDashboard({ u }: { u: any }) {
       {modal === "request" && (
         <Modal title="Request a service" onClose={() => setModal(null)}>
           <form className="form" onSubmit={req}>
+            {formError && <div className="error">{formError}</div>}
+            {m.length === 0 && <p className="muted">No machines are registered to your account yet. Ask your service company to add them.</p>}
             <select name="machine_id" required>
               <option value="">Select machine</option>
               {m.map((x) => (
-                <option value={x.id}>{x.name}</option>
+                <option key={x.id} value={x.id}>{x.name}</option>
               ))}
             </select>
             <input name="subject" placeholder="What do you need?" required />
@@ -159,8 +168,9 @@ export default function CustomerDashboard({ u }: { u: any }) {
               placeholder="Describe the issue"
               required
             />
-            <select name="priority">
-              <option>Normal</option>
+            <select name="priority" defaultValue="Medium">
+              <option>Low</option>
+              <option>Medium</option>
               <option>High</option>
               <option>Urgent</option>
             </select>
@@ -171,6 +181,7 @@ export default function CustomerDashboard({ u }: { u: any }) {
       {modal && modal !== "request" && (
         <Modal title="Review service" onClose={() => setModal(null)}>
           <form className="form" onSubmit={rev}>
+            {formError && <div className="error">{formError}</div>}
             <input type="hidden" name="service_record_id" value={modal.id} />
             <select name="rating">
               <option value="5">★★★★★ Excellent</option>

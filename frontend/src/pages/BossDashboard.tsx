@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
-import { Plus, Users, ClipboardList, Wrench, Star, Trash2, CheckCircle2, UserPlus, Mail } from "lucide-react";
+import { useState } from "react";
+import { Plus, Users, ClipboardList, Wrench, Trash2, CheckCircle2, UserPlus, Mail } from "lucide-react";
 import {
   customers,
   jobs,
+  machines,
   mechanics,
   createJob,
   invite,
@@ -15,54 +16,80 @@ import Notifications from "../components/Notifications";
 import Modal from "../components/Modal";
 import MechanicProfile from "../components/MechanicProfile";
 import CustomerProfile from "../components/CustomerProfile";
+import { errorMessage, formatDate, greeting } from "../lib/format";
+import { usePolling } from "../lib/usePolling";
 export default function BossDashboard({ u }: { u: any }) {
   const [data, setData] = useState<any[]>([]),
     [cs, setCs] = useState<any[]>([]),
     [ms, setMs] = useState<any[]>([]),
     [rs, setRs] = useState<any[]>([]),
-    [modal, setModal] = useState(""),
+    [machineList, setMachineList] = useState<any[]>([]),
+    [jobCustomer, setJobCustomer] = useState(""),
+    [modal, setModalState] = useState(""),
+    [formError, setFormError] = useState(""),
     [selectedMechanic, setSelectedMechanic] = useState(null),
     [selectedCustomer, setSelectedCustomer] = useState(null);
   const load = () =>
-    Promise.all([jobs(), customers(), mechanics(), requests()]).then(
-      ([j, c, m, r]) => {
+    Promise.all([jobs(), customers(), mechanics(), requests(), machines()])
+      .then(([j, c, m, r, mc]) => {
         setData(j.jobs);
         setCs(c.customers);
         setMs(m.mechanics);
         setRs(r.requests);
-      },
-    );
-  useEffect(() => {
-    load();
-    const t = setInterval(load, 7000);
-    return () => clearInterval(t);
-  }, []);
-  const changeRequestStatus = async (id: number, status: string) => {
-    await updateRequest(id, { status });
+        setMachineList(mc.machines);
+      })
+      .catch(() => {});
+  usePolling(load, 30000);
+  const setModal = (name: string) => {
+    setFormError("");
+    setJobCustomer("");
+    setModalState(name);
+  };
+  // Runs a change, reloads, and reports failures instead of failing silently.
+  const act = async (change: () => Promise<unknown>) => {
+    try {
+      await change();
+    } catch (error) {
+      alert(errorMessage(error));
+    }
     load();
   };
+  const changeRequestStatus = (id: number, status: string) => act(() => updateRequest(id, { status }));
   const activeRequestCount = rs.filter((x) => !["Completed", "Cancelled"].includes(x.status)).length;
   const submitJob = async (e: any) => {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    await createJob(Object.fromEntries(f));
-    setModal("");
-    load();
+    setFormError("");
+    try {
+      await createJob(Object.fromEntries(new FormData(e.currentTarget)));
+      setModal("");
+      load();
+    } catch (error) {
+      setFormError(errorMessage(error));
+    }
   };
-  const submitInvite = async (e: any) => {
+  const submitInvite = async (e: any, role: "customer" | "mechanic") => {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    const x = await invite(Object.fromEntries(f));
-    alert(`Invitation code: ${x.code}`);
-    setModal("");
+    setFormError("");
+    try {
+      const x = await invite({ ...Object.fromEntries(new FormData(e.currentTarget)), role });
+      alert(
+        role === "mechanic"
+          ? `✅ Unique Invitation Code Generated\n\n${x.code}\n\nShare this code with the mechanic to join the team. It expires in 7 days.`
+          : `Invitation code: ${x.code}\n\nShare this code with the customer. It expires in 7 days.`,
+      );
+      setModal("");
+    } catch (error) {
+      setFormError(errorMessage(error));
+    }
   };
+  const customerMachines = machineList.filter((m) => !jobCustomer || String(m.customer_id) === jobCustomer);
   return (
     <>
       <Header u={u} />
       <main className="page">
         <div className="welcome">
           <div>
-            <h1>Good morning, {u.name.split(" ")[0]}.</h1>
+            <h1>{greeting()}, {u.name.split(" ")[0]}.</h1>
             <p>Here's what's happening across your service team.</p>
           </div>
           <button className="primary" onClick={() => setModal("job")}>
@@ -89,10 +116,8 @@ export default function BossDashboard({ u }: { u: any }) {
                 key={j.id}
                 j={j}
                 mechanics={ms}
-                onAssign={async (id: number, mechanic_id: number) => {
-                  await updateJob(id, { mechanic_id });
-                  load();
-                }}
+                onAssign={(id: number, mechanic_id: number) => act(() => updateJob(id, { mechanic_id }))}
+                onDelete={(id: number) => act(() => deleteJob(id))}
               />
             ))}
           </Panel>
@@ -114,7 +139,7 @@ export default function BossDashboard({ u }: { u: any }) {
                   <span className="priority">{r.priority}</span>
                   <select
                     aria-label={`Status for ${r.subject}`}
-                    value={r.status === "Open" ? "Submitted" : r.status}
+                    value={r.status}
                     onChange={(e) => changeRequestStatus(r.id, e.target.value)}
                   >
                     {["Submitted", "Received", "Reviewing", "Approved", "Mechanic Assigned", "Scheduled", "In Progress", "Completed", "Cancelled"].map((status) => (
@@ -147,16 +172,17 @@ export default function BossDashboard({ u }: { u: any }) {
         </div>
         <div className="dashboardGrid bossOverviewGrid">
           <Panel title="Upcoming jobs" action={<span className="pill">{data.filter((job) => job.status !== "Completed" && job.status !== "Cancelled").length}</span>}>
-            {data.filter((job) => job.status !== "Completed" && job.status !== "Cancelled").slice(0, 5).map((job) => <div className="request" key={job.id}><div><b>{job.title}</b><span>{job.location || "Location not set"} · {job.due_date || "Date not set"}</span></div><span className="status">{job.status}</span></div>)}
+            {data.filter((job) => job.status !== "Completed" && job.status !== "Cancelled").slice(0, 5).map((job) => <div className="request" key={job.id}><div><b>{job.title}</b><span>{job.location || "Location not set"} · {formatDate(job.due_date) || "Date not set"}</span></div><span className="status">{job.status}</span></div>)}
           </Panel>
           <Panel title="Team overview" action={<button className="link" onClick={() => setModal("addmech")}>+ Add mechanic</button>}>
-            {ms.length === 0 ? <p className="muted">No mechanics added yet.</p> : ms.map((mechanic) => <button key={mechanic.id} className="customer" onClick={() => setSelectedMechanic(mechanic)} style={{ border: "none", background: "none", cursor: "pointer", width: "100%", textAlign: "left" }}><div className="avatar">{mechanic.name[0]}</div><div><b>{mechanic.name}</b><span>{mechanic.email}</span></div><strong>{data.filter((job) => job.mechanic_id === mechanic.id && job.status !== "Completed").length} active</strong></button>)}
+            {ms.length === 0 ? <p className="muted">No mechanics added yet.</p> : ms.map((mechanic) => <button key={mechanic.id} className="customer" onClick={() => setSelectedMechanic(mechanic)} style={{ border: "none", background: "none", cursor: "pointer", width: "100%", textAlign: "left" }}><div className="avatar">{mechanic.name[0]}</div><div><b>{mechanic.name}</b><span>{mechanic.email}</span></div><strong>{data.filter((job) => job.mechanic_id === mechanic.id && !["Completed", "Cancelled"].includes(job.status)).length} active</strong></button>)}
           </Panel>
         </div>
       </main>
       {modal === "job" && (
         <Modal title="Create service job" onClose={() => setModal("")}>
           <form className="form" onSubmit={submitJob}>
+            {formError && <div className="error">{formError}</div>}
             <input name="title" placeholder="Job title" required />
             <textarea
               name="description"
@@ -164,35 +190,45 @@ export default function BossDashboard({ u }: { u: any }) {
               required
             />
             <div className="row">
-              <select name="customer_id">
+              <select name="customer_id" value={jobCustomer} onChange={(e) => setJobCustomer(e.target.value)}>
                 <option value="">Customer</option>
                 {cs.map((c) => (
-                  <option value={c.id}>{c.name}</option>
+                  <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
               <select name="mechanic_id">
                 <option value="">Assign mechanic</option>
                 {ms.map((m) => (
-                  <option value={m.id}>{m.name}</option>
+                  <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
               </select>
             </div>
             <div className="row">
-              <select name="priority">
+              <select name="priority" defaultValue="Medium">
+                <option>Low</option>
                 <option>Medium</option>
                 <option>High</option>
                 <option>Urgent</option>
               </select>
               <input name="location" placeholder="Job site" />
             </div>
-            <input name="due_date" placeholder="Due date" />
+            <div className="row">
+              <select name="machine_id">
+                <option value="">Machine (optional)</option>
+                {customerMachines.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name} ({m.serial_no})</option>
+                ))}
+              </select>
+              <input name="due_date" type="date" aria-label="Due date" title="Due date" />
+            </div>
             <button className="primary">Create & notify mechanic</button>
           </form>
         </Modal>
       )}
       {modal === "invite" && (
         <Modal title="Add New Customer" icon={<Users size={20} />} onClose={() => setModal("")}>
-          <form className="form form-upgraded" onSubmit={submitInvite}>
+          <form className="form form-upgraded" onSubmit={(e) => submitInvite(e, "customer")}>
+            {formError && <div className="error">{formError}</div>}
             <div className="formGroup">
               <label>Company/Organization Name</label>
               <input name="name" placeholder="Enter customer name" required />
@@ -207,22 +243,15 @@ export default function BossDashboard({ u }: { u: any }) {
               />
             </div>
             <button className="primary" style={{marginTop: '10px'}}>
-              <Mail size={15} /> Generate & Send Invitation
+              <Mail size={15} /> Generate Invitation Code
             </button>
           </form>
         </Modal>
       )}
       {modal === "addmech" && (
         <Modal title="Add Mechanic to Team" icon={<UserPlus size={20} />} onClose={() => setModal("")}>
-          <form className="form form-upgraded" onSubmit={async (e: any) => {
-            e.preventDefault();
-            const f = new FormData(e.currentTarget);
-            const data = Object.fromEntries(f) as any;
-            data.role = "mechanic";
-            const x = await invite(data);
-            alert(`✅ Unique Invitation Code Generated\n\n${x.code}\n\nShare this code with the mechanic to join the team.`);
-            setModal("");
-          }}>
+          <form className="form form-upgraded" onSubmit={(e) => submitInvite(e, "mechanic")}>
+            {formError && <div className="error">{formError}</div>}
             <div className="formGroup">
               <label>Mechanic Full Name</label>
               <input name="name" placeholder="Enter mechanic's name" required />
@@ -289,7 +318,7 @@ function Panel({ title, action, children }: any) {
     </section>
   );
 }
-function Job({ j, mechanics, onAssign }: any) {
+function Job({ j, mechanics, onAssign, onDelete }: any) {
   return (
     <div className="job">
       <div className="jobMain">
@@ -303,7 +332,7 @@ function Job({ j, mechanics, onAssign }: any) {
         </div>
         <p>{j.description}</p>
         <small>
-          📍 {j.location || "No location"} · Due {j.due_date || "Not set"}
+          📍 {j.location || "No location"} · Due {formatDate(j.due_date) || "Not set"}
         </small>
       </div>
       <select
@@ -314,17 +343,14 @@ function Job({ j, mechanics, onAssign }: any) {
       >
         <option value="">Assign</option>
         {mechanics.map((m: any) => (
-          <option value={m.id}>{m.name}</option>
+          <option key={m.id} value={m.id}>{m.name}</option>
         ))}
       </select>
       <button
         className="iconButton"
         title="Delete job"
         onClick={async () => {
-          if (confirm("Delete this job?")) {
-            await deleteJob(j.id);
-            location.reload();
-          }
+          if (confirm("Delete this job?")) onDelete(j.id);
         }}
       >
         <Trash2 size={15} />
