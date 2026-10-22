@@ -1,19 +1,56 @@
-from flask import Blueprint,jsonify
-from flask_jwt_extended import get_jwt_identity
+from flask import Blueprint, jsonify
+
 from app import db
 from app.models.notification import Notification
-from app.utils.auth import roles
-bp=Blueprint("notifications",__name__)
+from app.utils.auth import current_user, roles
+
+bp = Blueprint("notifications", __name__)
+
+
+def out(notification):
+    return {
+        "id": notification.id,
+        "title": notification.title,
+        "message": notification.message,
+        "type": notification.type,
+        "is_read": notification.is_read,
+        "created_at": notification.created_at.isoformat(),
+    }
+
+
 @bp.get("")
-@roles("boss","mechanic","customer")
+@roles("boss", "mechanic", "customer")
 def notifications():
-    uid=int(get_jwt_identity());n=Notification.query.filter_by(user_id=uid).order_by(Notification.id.desc()).all()
-    return jsonify(notifications=[{"id":x.id,"title":x.title,"message":x.message,"type":x.type,"is_read":x.is_read,"created_at":x.created_at.isoformat()} for x in n])
+    rows = (
+        Notification.query.filter_by(user_id=current_user().id)
+        .order_by(Notification.id.desc())
+        .limit(100)
+        .all()
+    )
+    return jsonify(notifications=[out(row) for row in rows])
+
+
+@bp.patch("/read-all")
+@roles("boss", "mechanic", "customer")
+def read_all():
+    Notification.query.filter_by(user_id=current_user().id, is_read=False).update({"is_read": True})
+    db.session.commit()
+    return jsonify(ok=True)
+
+
 @bp.patch("/<int:nid>/read")
-@roles("boss","mechanic","customer")
+@roles("boss", "mechanic", "customer")
 def read(nid):
-    n=Notification.query.filter_by(id=nid,user_id=int(get_jwt_identity())).first_or_404();n.is_read=True;db.session.commit();return jsonify(ok=True)
+    notification = Notification.query.filter_by(id=nid, user_id=current_user().id).first_or_404()
+    notification.is_read = True
+    db.session.commit()
+    return jsonify(ok=True)
+
+
 @bp.delete("/<int:nid>")
-@roles("boss","mechanic","customer")
+@roles("boss", "mechanic", "customer")
 def delete(nid):
-    n=Notification.query.filter_by(id=nid,user_id=int(get_jwt_identity())).first_or_404();db.session.delete(n);db.session.commit();return jsonify(ok=True)
+    notification = Notification.query.filter_by(id=nid, user_id=current_user().id).first_or_404()
+    db.session.delete(notification)
+    db.session.commit()
+    return jsonify(ok=True)

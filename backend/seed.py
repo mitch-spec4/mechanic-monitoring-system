@@ -1,9 +1,16 @@
-from datetime import datetime, timedelta
+"""Load demo data for local development. Refuses to run in production."""
+from datetime import date
+
+from flask_migrate import upgrade
 
 from app import create_app, db
 from app.models import Company, Customer, Job, Machine, Notification, Review, ServiceRecord, ServiceRequest, User
 
+DEMO_PASSWORD = "password"
+
 app = create_app()
+if app.config["IS_PRODUCTION"]:
+    raise SystemExit("seed.py creates demo accounts with a shared password and must not run in production.")
 
 
 def get_or_create_user(name, email, role, company_id, customer_id=None):
@@ -17,7 +24,7 @@ def get_or_create_user(name, email, role, company_id, customer_id=None):
         company_id=company_id,
         customer_id=customer_id,
     )
-    user.set_password("password")
+    user.set_password(DEMO_PASSWORD)
     db.session.add(user)
     db.session.flush()
     return user
@@ -119,6 +126,7 @@ def add_notification(user, title, message, notification_type, is_read=False):
 
 
 with app.app_context():
+    upgrade()
     company = Company.query.first()
     if not company:
         company = Company(name="DK Engineering", location="Nairobi")
@@ -126,7 +134,7 @@ with app.app_context():
         db.session.flush()
 
     boss = get_or_create_user("James Mwangi", "james@mechanicpro.test", "boss", company.id)
-    mitch = get_or_create_user("Mitch Kamau", "mitch@gmail.com", "mechanic", company.id)
+    mitch = get_or_create_user("Mitch Kamau", "mitch@mechanicpro.test", "mechanic", company.id)
     amina = get_or_create_user("Amina Otieno", "amina@mechanicpro.test", "mechanic", company.id)
     brian = get_or_create_user("Brian Kariuki", "brian@mechanicpro.test", "mechanic", company.id)
 
@@ -145,12 +153,12 @@ with app.app_context():
     conveyor = get_or_create_machine("Conveyor Line CL-4", "Dorner 2200", "CL4-99120", xyz.id, company.id)
     mixer = get_or_create_machine("Industrial Mixer MX-08", "Hobart H600", "MX08-11987", xyz.id, company.id)
 
-    add_job("Service Generator G-102", "Generator overheating after two hours of operation.", "High", "In Progress", "Nairobi Industrial Area", "27 Aug 2026", company.id, abc, generator, mitch)
-    add_job("Inspect Excavator EX-01", "Hydraulic pressure drops during heavy lifting.", "Urgent", "Assigned", "Mombasa Road", "29 Aug 2026", company.id, abc, excavator, amina)
-    add_job("Compressor C-55 maintenance", "Complete the scheduled oil change and inspection.", "Medium", "Accepted", "Westlands, Nairobi", "30 Aug 2026", company.id, kenya, compressor, mitch)
-    add_job("Repair Hydraulic Pump H-21", "Investigate oil leak near the main seal.", "High", "Pending", "Thika Road", "02 Sep 2026", company.id, kenya, pump, None)
-    add_job("Conveyor Line CL-4 inspection", "Routine belt alignment and safety inspection.", "Low", "Completed", "Athi River", "20 Aug 2026", company.id, xyz, conveyor, brian)
-    add_job("Industrial Mixer MX-08 repair", "Mixer produces abnormal vibration under load.", "High", "Paused", "Nairobi South", "01 Sep 2026", company.id, xyz, mixer, brian)
+    add_job("Service Generator G-102", "Generator overheating after two hours of operation.", "High", "In Progress", "Nairobi Industrial Area", date(2026, 8, 27), company.id, abc, generator, mitch)
+    add_job("Inspect Excavator EX-01", "Hydraulic pressure drops during heavy lifting.", "Urgent", "Assigned", "Mombasa Road", date(2026, 8, 29), company.id, abc, excavator, amina)
+    add_job("Compressor C-55 maintenance", "Complete the scheduled oil change and inspection.", "Medium", "Accepted", "Westlands, Nairobi", date(2026, 8, 30), company.id, kenya, compressor, mitch)
+    add_job("Repair Hydraulic Pump H-21", "Investigate oil leak near the main seal.", "High", "Pending", "Thika Road", date(2026, 9, 2), company.id, kenya, pump, None)
+    add_job("Conveyor Line CL-4 inspection", "Routine belt alignment and safety inspection.", "Low", "Completed", "Athi River", date(2026, 8, 20), company.id, xyz, conveyor, brian)
+    add_job("Industrial Mixer MX-08 repair", "Mixer produces abnormal vibration under load.", "High", "Paused", "Nairobi South", date(2026, 9, 1), company.id, xyz, mixer, brian)
 
     generator_service = add_service("Preventive maintenance", "Overheating after two hours.", "Inspected cooling system and cleaned radiator.", "Coolant filter", "Improved coolant flow.", "Check coolant level weekly.", company.id, abc, generator, mitch)
     excavator_service = add_service("Hydraulic system repair", "Hydraulic pressure drops under load.", "Replaced worn pressure hose and tested the system.", "High-pressure hose", "Restored normal hydraulic pressure.", "Inspect hose fittings every month.", company.id, abc, excavator, amina)
@@ -165,7 +173,7 @@ with app.app_context():
     if excavator_service and not Review.query.filter_by(service_record_id=excavator_service.id).first():
         db.session.add(Review(customer_id=abc.id, mechanic_id=amina.id, machine_id=excavator.id, company_id=company.id, service_record_id=excavator_service.id, rating=5, comment="The excavator is working smoothly again.", advice="Keep the current inspection schedule."))
 
-    add_request("Generator G-203 overheating issue", "The generator overheats and vibrates after extended use.", "High", "Open", company.id, abc, generator)
+    add_request("Generator G-102 overheating issue", "The generator overheats and vibrates after extended use.", "High", "Submitted", company.id, abc, generator)
     add_request("Hydraulic leak inspection", "Please inspect the hydraulic line before the next production run.", "Medium", "Reviewing", company.id, kenya, pump)
     add_request("Mixer vibration check", "The mixer vibrates when processing heavier batches.", "High", "Approved", company.id, xyz, mixer)
 

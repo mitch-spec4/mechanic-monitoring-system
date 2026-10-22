@@ -1,49 +1,97 @@
-from flask import Blueprint,request,jsonify
-from flask_jwt_extended import get_jwt,get_jwt_identity
+from flask import Blueprint, jsonify
+
 from app import db
 from app.models.review import Review
 from app.models.service_record import ServiceRecord
-from app.models.user import User
-from app.services.notifications import notify
-from app.utils.auth import roles
-bp=Blueprint("reviews",__name__)
+from app.services.notifications import notify, notify_bosses
+from app.utils.auth import current_user, roles
+from app.utils.validation import ValidationError, integer, json_body, text
+
+bp = Blueprint("reviews", __name__)
+
+
+def out(review):
+    return {
+        "id": review.id,
+        "rating": review.rating,
+        "comment": review.comment,
+        "advice": review.advice,
+        "mechanic_id": review.mechanic_id,
+        "machine_id": review.machine_id,
+        "service_record_id": review.service_record_id,
+        "created_at": review.created_at.isoformat(),
+    }
+
+
+def read_rating(data):
+    return integer(data, "rating", "Rating", required=True, minimum=1, maximum=5)
+
 
 @bp.get("")
-@roles("boss","mechanic","customer")
+@roles("boss", "mechanic", "customer")
 def list_reviews():
-    c=get_jwt();q=Review.query.filter_by(company_id=c["company_id"])
-    if c["role"]=="customer":q=q.filter_by(customer_id=c["customer_id"])
-    if c["role"]=="mechanic":q=q.filter_by(mechanic_id=int(get_jwt_identity()))
-    return jsonify(reviews=[{"id":r.id,"rating":r.rating,"comment":r.comment,"advice":r.advice,"mechanic_id":r.mechanic_id,"service_record_id":r.service_record_id,"created_at":r.created_at.isoformat()} for r in q.order_by(Review.id.desc()).all()])
+    user = current_user()
+    query = Review.query.filter_by(company_id=user.company_id)
+    if user.role == "customer":
+        query = query.filter_by(customer_id=user.customer_id)
+    if user.role == "mechanic":
+        query = query.filter_by(mechanic_id=user.id)
+    return jsonify(reviews=[out(review) for review in query.order_by(Review.id.desc()).all()])
+
 
 @bp.post("")
 @roles("customer")
 def create_review():
-    d=request.json or {}; c=get_jwt(); s=ServiceRecord.query.filter_by(id=d.get("service_record_id"),customer_id=c["customer_id"],company_id=c["company_id"]).first()
-    if not s:return jsonify(error="Service record not found"),404
-    if Review.query.filter_by(service_record_id=s.id,customer_id=c["customer_id"]).first():return jsonify(error="This service has already been reviewed"),409
-    rating=int(d.get("rating",0))
-    if rating<1 or rating>5:return jsonify(error="Rating must be 1-5"),400
-    r=Review(customer_id=c["customer_id"],mechanic_id=s.mechanic_id,machine_id=s.machine_id,company_id=c["company_id"],service_record_id=s.id,rating=rating,comment=d.get("comment"),advice=d.get("advice"))
-    db.session.add(r);db.session.flush(); notify(s.mechanic_id,"New customer review",f"You received a {rating}/5 review.","review")
-    boss=User.query.filter_by(company_id=c["company_id"],role="boss").first()
-    if boss:notify(boss.id,"New customer review",f"A customer rated a completed service {rating}/5.","review")
-    db.session.commit();return jsonify(id=r.id),201
+    user = current_user()
+    data = json_body()
+    record_id = integer(data, "service_record_id", "Service record", required=True)
+    record = ServiceRecord.query.filter_by(
+        id=record_id, customer_id=user.customer_id, company_id=user.company_id
+    ).first()
+    if not record:
+        raise ValidationError("Service record not found", 404)
+    if Review.query.filter_by(service_record_id=record.id).first():
+        raise ValidationError("This service has already been reviewed", 409)
+    rating = read_rating(data)
+
+    review = Review(
+        customer_id=user.customer_id,
+        mechanic_id=record.mechanic_id,
+        machine_id=record.machine_id,
+        company_id=user.company_id,
+        service_record_id=record.id,
+        rating=rating,
+        comment=text(data, "comment"),
+        advice=text(data, "advice"),
+    )
+    db.session.add(review)
+    notify(record.mechanic_id, "New customer review", f"You received a {rating}/5 review.", "review")
+    notify_bosses(user.company_id, "New customer review", f"A customer rated a completed service {rating}/5.", "review")
+    db.session.commit()
+    return jsonify(id=review.id), 201
+
 
 @bp.patch("/<int:rid>")
 @roles("customer")
 def update_review(rid):
-    r=Review.query.filter_by(id=rid,customer_id=get_jwt()["customer_id"]).first_or_404();d=request.json or {}
-    if "rating" in d:
-        rating=int(d["rating"])
-        if rating<1 or rating>5:return jsonify(error="Rating must be 1-5"),400
-        r.rating=rating
-    if "comment" in d:r.comment=d["comment"]
-    if "advice" in d:r.advice=d["advice"]
-    db.session.commit();return jsonify(ok=True)
+    user = current_user()
+    review = Review.query.filter_by(id=rid, customer_id=user.customer_id, company_id=user.company_id).first_or_404()
+    data = json_body()
+    if "rating" in data:
+        review.rating = read_rating(data)
+    if "comment" in data:
+        review.comment = text(data, "comment")
+    if "advice" in data:
+        review.advice = text(data, "advice")
+    db.session.commit()
+    return jsonify(ok=True)
+
 
 @bp.delete("/<int:rid>")
 @roles("customer")
 def delete_review(rid):
-    r=Review.query.filter_by(id=rid,customer_id=get_jwt()["customer_id"]).first_or_404()
-    db.session.delete(r);db.session.commit();return jsonify(ok=True)
+    user = current_user()
+    review = Review.query.filter_by(id=rid, customer_id=user.customer_id, company_id=user.company_id).first_or_404()
+    db.session.delete(review)
+    db.session.commit()
+    return jsonify(ok=True)

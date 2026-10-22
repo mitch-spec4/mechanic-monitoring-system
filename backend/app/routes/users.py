@@ -1,36 +1,74 @@
-from flask import Blueprint,jsonify,request
-from flask_jwt_extended import get_jwt,get_jwt_identity
+from flask import Blueprint, jsonify
+
 from app import db
+from app.models.job import Job
+from app.models.notification import Notification
+from app.models.review import Review
+from app.models.service_record import ServiceRecord
 from app.models.user import User
-from app.utils.auth import roles
-bp=Blueprint("users",__name__)
+from app.utils.auth import current_user, roles
+from app.utils.validation import ValidationError, json_body, text
+from app.utils.validation import email as read_email
+
+bp = Blueprint("users", __name__)
+
+
+def out(user):
+    return {"id": user.id, "name": user.name, "email": user.email, "role": user.role}
+
+
 @bp.get("")
 @roles("boss")
 def list_users():
-    us=User.query.filter_by(company_id=get_jwt()["company_id"]).all()
-    return jsonify(users=[{"id":u.id,"name":u.name,"email":u.email,"role":u.role} for u in us])
+    users = User.query.filter_by(company_id=current_user().company_id).order_by(User.name).all()
+    return jsonify(users=[out(user) for user in users])
+
+
 @bp.get("/mechanics")
 @roles("boss")
 def mechanics():
-    us=User.query.filter_by(company_id=get_jwt()["company_id"],role="mechanic").all()
-    return jsonify(mechanics=[{"id":u.id,"name":u.name,"email":u.email} for u in us])
+    users = User.query.filter_by(company_id=current_user().company_id, role="mechanic").order_by(User.name).all()
+    return jsonify(mechanics=[{"id": user.id, "name": user.name, "email": user.email} for user in users])
+
+
 @bp.get("/me")
-@roles("boss","mechanic","customer")
+@roles("boss", "mechanic", "customer")
 def me():
-    u=User.query.get_or_404(int(get_jwt_identity()))
-    return jsonify(user={"id":u.id,"name":u.name,"email":u.email,"role":u.role,"company_id":u.company_id})
+    user = current_user()
+    return jsonify(user={**out(user), "company_id": user.company_id, "customer_id": user.customer_id})
+
+
 @bp.patch("/<int:uid>")
 @roles("boss")
 def update_user(uid):
-    u=User.query.filter_by(id=uid,company_id=get_jwt()["company_id"]).first_or_404();d=request.json or {}
-    if "name" in d:u.name=d["name"]
-    if "email" in d:
-        if User.query.filter_by(email=d["email"].lower()).filter(User.id!=uid).first():return jsonify(error="Email already exists"),409
-        u.email=d["email"].lower()
-    db.session.commit();return jsonify(ok=True)
+    user = User.query.filter_by(id=uid, company_id=current_user().company_id).first_or_404()
+    data = json_body()
+    if "name" in data:
+        user.name = text(data, "name", "Name", required=True, max_length=120)
+    if "email" in data:
+        email = read_email(data)
+        if User.query.filter(User.email == email, User.id != uid).first():
+            raise ValidationError("That email address cannot be used", 409)
+        user.email = email
+    db.session.commit()
+    return jsonify(ok=True, user=out(user))
+
+
 @bp.delete("/<int:uid>")
 @roles("boss")
 def delete_user(uid):
-    if uid==int(get_jwt_identity()):return jsonify(error="Cannot delete your own account"),400
-    u=User.query.filter_by(id=uid,company_id=get_jwt()["company_id"]).first_or_404()
-    db.session.delete(u);db.session.commit();return jsonify(ok=True)
+    if uid == current_user().id:
+        return jsonify(error="You cannot delete your own account"), 400
+    user = User.query.filter_by(id=uid, company_id=current_user().company_id).first_or_404()
+    if user.role == "mechanic":
+        has_history = (
+            Job.query.filter_by(mechanic_id=user.id).first()
+            or ServiceRecord.query.filter_by(mechanic_id=user.id).first()
+            or Review.query.filter_by(mechanic_id=user.id).first()
+        )
+        if has_history:
+            return jsonify(error="This mechanic has jobs or service history and cannot be deleted."), 409
+    Notification.query.filter_by(user_id=user.id).delete()
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify(ok=True)

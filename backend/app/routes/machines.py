@@ -1,42 +1,103 @@
-from flask import Blueprint,jsonify,request
-from flask_jwt_extended import get_jwt
+from flask import Blueprint, jsonify
+
 from app import db
-from app.models.machine import Machine
+from app.models.constants import MACHINE_STATUSES
 from app.models.customer import Customer
-from app.utils.auth import roles
-bp=Blueprint("machines",__name__)
-STATUSES={"Operational","Under Maintenance","Under Repair","Retired"}
+from app.models.job import Job
+from app.models.machine import Machine
+from app.models.request import ServiceRequest
+from app.models.review import Review
+from app.models.service_record import ServiceRecord
+from app.utils.auth import current_user, roles
+from app.utils.validation import ValidationError, choice, integer, json_body, text
+
+bp = Blueprint("machines", __name__)
+
+
+def out(machine):
+    return {
+        "id": machine.id,
+        "name": machine.name,
+        "model": machine.model,
+        "serial_no": machine.serial_no,
+        "customer_id": machine.customer_id,
+        "status": machine.status,
+    }
+
+
+def serial_taken(company_id, serial_no, exclude_id=None):
+    query = Machine.query.filter_by(company_id=company_id, serial_no=serial_no)
+    if exclude_id:
+        query = query.filter(Machine.id != exclude_id)
+    return query.first() is not None
+
+
 @bp.get("")
-@roles("boss","mechanic","customer")
+@roles("boss", "mechanic", "customer")
 def machines():
-    c=get_jwt();q=Machine.query.filter_by(company_id=c["company_id"])
-    if c["role"]=="customer":q=q.filter_by(customer_id=c["customer_id"])
-    return jsonify(machines=[{"id":m.id,"name":m.name,"model":m.model,"serial_no":m.serial_no,"customer_id":m.customer_id,"status":m.status} for m in q.all()])
+    user = current_user()
+    query = Machine.query.filter_by(company_id=user.company_id)
+    if user.role == "customer":
+        query = query.filter_by(customer_id=user.customer_id)
+    return jsonify(machines=[out(machine) for machine in query.order_by(Machine.name).all()])
+
+
 @bp.post("")
 @roles("boss")
 def create():
-    d=request.json or {}
-    if not d.get("name") or not d.get("serial_no"):return jsonify(error="Name and serial_no are required"),400
-    company_id=get_jwt()["company_id"]
-    customer_id=d.get("customer_id")
-    if not customer_id:return jsonify(error="Customer is required"),400
-    if not Customer.query.filter_by(id=customer_id,company_id=company_id).first():return jsonify(error="Customer not found"),404
-    if Machine.query.filter_by(serial_no=d["serial_no"]).first():return jsonify(error="Serial number already exists"),409
-    status=d.get("status","Operational")
-    if status not in STATUSES:return jsonify(error="Invalid status"),400
-    m=Machine(company_id=company_id,name=d["name"],model=d.get("model"),serial_no=d["serial_no"],customer_id=customer_id,status=status)
-    db.session.add(m);db.session.commit();return jsonify(id=m.id),201
+    company_id = current_user().company_id
+    data = json_body()
+    name = text(data, "name", "Name", required=True, max_length=150)
+    serial_no = text(data, "serial_no", "Serial number", required=True, max_length=120)
+    customer_id = integer(data, "customer_id", "Customer", required=True)
+    if not Customer.query.filter_by(id=customer_id, company_id=company_id).first():
+        raise ValidationError("Customer not found", 404)
+    if serial_taken(company_id, serial_no):
+        raise ValidationError("A machine with this serial number already exists", 409)
+
+    machine = Machine(
+        company_id=company_id,
+        name=name,
+        model=text(data, "model", "Model", max_length=100),
+        serial_no=serial_no,
+        customer_id=customer_id,
+        status=choice(data, "status", MACHINE_STATUSES, "Status", default="Operational"),
+    )
+    db.session.add(machine)
+    db.session.commit()
+    return jsonify(id=machine.id, machine=out(machine)), 201
+
+
 @bp.patch("/<int:mid>")
 @roles("boss")
 def update(mid):
-    m=Machine.query.filter_by(id=mid,company_id=get_jwt()["company_id"]).first_or_404();d=request.json or {}
-    if "name" in d:m.name=d["name"]
-    if "model" in d:m.model=d["model"]
-    if "status" in d and d["status"] not in STATUSES:return jsonify(error="Invalid status"),400
-    if "status" in d:m.status=d["status"]
-    db.session.commit();return jsonify(ok=True)
+    machine = Machine.query.filter_by(id=mid, company_id=current_user().company_id).first_or_404()
+    data = json_body()
+    if "name" in data:
+        machine.name = text(data, "name", "Name", required=True, max_length=150)
+    if "model" in data:
+        machine.model = text(data, "model", "Model", max_length=100)
+    if "serial_no" in data:
+        serial_no = text(data, "serial_no", "Serial number", required=True, max_length=120)
+        if serial_taken(machine.company_id, serial_no, exclude_id=machine.id):
+            raise ValidationError("A machine with this serial number already exists", 409)
+        machine.serial_no = serial_no
+    if "status" in data:
+        machine.status = choice(data, "status", MACHINE_STATUSES, "Status", default=machine.status)
+    db.session.commit()
+    return jsonify(ok=True, machine=out(machine))
+
+
 @bp.delete("/<int:mid>")
 @roles("boss")
 def delete(mid):
-    m=Machine.query.filter_by(id=mid,company_id=get_jwt()["company_id"]).first_or_404()
-    db.session.delete(m);db.session.commit();return jsonify(ok=True)
+    machine = Machine.query.filter_by(id=mid, company_id=current_user().company_id).first_or_404()
+    has_history = any(
+        model.query.filter_by(machine_id=machine.id).first()
+        for model in (Job, ServiceRecord, ServiceRequest, Review)
+    )
+    if has_history:
+        return jsonify(error="This machine has service history and cannot be deleted. Mark it as Retired instead."), 409
+    db.session.delete(machine)
+    db.session.commit()
+    return jsonify(ok=True)

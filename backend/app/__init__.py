@@ -1,53 +1,129 @@
 import os
+from datetime import timedelta
 
 from dotenv import load_dotenv
-from flask import Flask
+from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import MetaData, event
+from sqlalchemy.engine import Engine
+from werkzeug.exceptions import HTTPException
 
-db = SQLAlchemy()
+# Named constraints keep future migrations portable between SQLite and Postgres.
+NAMING_CONVENTION = {
+    "ix": "ix_%(column_0_label)s",
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s",
+}
+
+db = SQLAlchemy(metadata=MetaData(naming_convention=NAMING_CONVENTION))
 jwt = JWTManager()
+migrate = Migrate()
+limiter = Limiter(key_func=get_remote_address, default_limits=[])
+
+DEV_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+PLACEHOLDER_SECRETS = {"change-me", "change-this-too", "replace-with-a-long-random-value"}
 
 
-def create_app():
+@event.listens_for(Engine, "connect")
+def _enable_sqlite_foreign_keys(dbapi_connection, _record):
+    # SQLite ignores foreign keys unless asked; enforce them so local behaviour matches Postgres.
+    if dbapi_connection.__class__.__module__.startswith("sqlite3"):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+
+def normalize_database_url(url):
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg://" + url[len(prefix):]
+    return url
+
+
+def _minutes(name, default):
+    return timedelta(minutes=int(os.getenv(name, default)))
+
+
+def build_config():
+    """Read settings from the environment. Production (the default) fails closed."""
+    env = os.getenv("APP_ENV", "production").strip().lower()
+    is_production = env not in {"development", "test"}
+
+    secret_key = os.getenv("SECRET_KEY", "")
+    jwt_secret_key = os.getenv("JWT_SECRET_KEY", "")
+    origins = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "").split(",") if origin.strip()]
+    database_url = os.getenv("DATABASE_URL", "")
+
+    if is_production:
+        problems = []
+        for name, value in (("SECRET_KEY", secret_key), ("JWT_SECRET_KEY", jwt_secret_key)):
+            if len(value) < 32 or value in PLACEHOLDER_SECRETS:
+                problems.append(f"{name} must be a random value of at least 32 characters")
+        if not origins or "*" in origins:
+            problems.append("CORS_ORIGINS must list your frontend origin(s); '*' is not allowed")
+        if not database_url:
+            problems.append("DATABASE_URL must be set")
+        if problems:
+            raise RuntimeError(
+                "Refusing to start in production mode (set APP_ENV=development for local work):\n- "
+                + "\n- ".join(problems)
+            )
+    else:
+        secret_key = secret_key or "local-development-secret-not-for-production"
+        jwt_secret_key = jwt_secret_key or "local-development-jwt-secret-not-for-production"
+        origins = origins or DEV_ORIGINS
+        database_url = database_url or "sqlite:///mechanic_pro.db"
+
+    return {
+        "APP_ENV": env,
+        "IS_PRODUCTION": is_production,
+        "SECRET_KEY": secret_key,
+        "JWT_SECRET_KEY": jwt_secret_key,
+        "JWT_ACCESS_TOKEN_EXPIRES": _minutes("JWT_ACCESS_MINUTES", 30),
+        "JWT_REFRESH_TOKEN_EXPIRES": _minutes("JWT_REFRESH_MINUTES", 60 * 24 * 7),
+        "SQLALCHEMY_DATABASE_URI": normalize_database_url(database_url),
+        "SQLALCHEMY_TRACK_MODIFICATIONS": False,
+        "CORS_ORIGINS": origins,
+        "RATELIMIT_STORAGE_URI": os.getenv("RATELIMIT_STORAGE_URI", "memory://"),
+        "RATELIMIT_HEADERS_ENABLED": True,
+        "LOGIN_RATE_LIMIT": os.getenv("LOGIN_RATE_LIMIT", "10 per minute;50 per hour"),
+    }
+
+
+def create_app(overrides=None):
     load_dotenv()
     app = Flask(__name__)
-    is_production = os.getenv("APP_ENV", "development").lower() == "production"
+    app.config.update(build_config())
+    if overrides:
+        app.config.update(overrides)
 
-    secret_key = os.getenv("SECRET_KEY")
-    jwt_secret_key = os.getenv("JWT_SECRET_KEY")
-    if is_production and (not secret_key or not jwt_secret_key):
-        raise RuntimeError("SECRET_KEY and JWT_SECRET_KEY must be set in production.")
-
-    app.config["SECRET_KEY"] = secret_key or "dev-secret-change-before-deployment"
-    app.config["JWT_SECRET_KEY"] = jwt_secret_key or "jwt-dev-secret-change-before-deployment"
-    database_url = os.getenv("DATABASE_URL", "sqlite:///mechanic_pro.db")
-    if database_url.startswith("postgres://"):
-        database_url = database_url.replace("postgres://", "postgresql://", 1)
-    app.config["SQLALCHEMY_DATABASE_URI"] = database_url
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
-    configured_origins = os.getenv("CORS_ORIGINS", "").strip()
-    if is_production and not configured_origins:
-        raise RuntimeError("Set CORS_ORIGINS to your deployed frontend origin in production.")
-    origins = [origin.strip() for origin in configured_origins.split(",") if origin.strip()]
-    CORS(app, origins=origins if origins else "*")
-
+    CORS(app, origins=app.config["CORS_ORIGINS"])
     db.init_app(app)
     jwt.init_app(app)
+    migrate.init_app(app, db, render_as_batch=True)
+    limiter.init_app(app)
 
+    from app import models  # noqa: F401  (register models for migrations)
     from app.routes.auth import bp as auth
-    from app.routes.jobs import bp as jobs
+    from app.routes.company import bp as company
     from app.routes.customers import bp as customers
+    from app.routes.jobs import bp as jobs
     from app.routes.machines import bp as machines
-    from app.routes.services import bp as services
     from app.routes.notifications import bp as notifications
-    from app.routes.reviews import bp as reviews
-    from app.routes.users import bp as users
     from app.routes.reports import bp as reports
+    from app.routes.reviews import bp as reviews
+    from app.routes.services import bp as services
+    from app.routes.users import bp as users
 
     app.register_blueprint(auth, url_prefix="/api/auth")
+    app.register_blueprint(company, url_prefix="/api/company")
     app.register_blueprint(jobs, url_prefix="/api/jobs")
     app.register_blueprint(customers, url_prefix="/api/customers")
     app.register_blueprint(machines, url_prefix="/api/machines")
@@ -57,11 +133,41 @@ def create_app():
     app.register_blueprint(users, url_prefix="/api/users")
     app.register_blueprint(reports, url_prefix="/api/reports")
 
-    with app.app_context():
-        db.create_all()
+    register_error_handlers(app)
 
     @app.get("/api/health")
     def health():
         return {"status": "ok"}
 
     return app
+
+
+def register_error_handlers(app):
+    from app.utils.validation import ValidationError
+
+    @app.errorhandler(ValidationError)
+    def validation_error(error):
+        db.session.rollback()
+        return jsonify(error=error.message), error.status
+
+    @app.errorhandler(HTTPException)
+    def http_error(error):
+        return jsonify(error=error.description), error.code
+
+    @app.errorhandler(Exception)
+    def unexpected_error(error):
+        db.session.rollback()
+        app.logger.exception("Unhandled error")
+        return jsonify(error="Something went wrong. Please try again."), 500
+
+    @jwt.expired_token_loader
+    def expired(_header, _payload):
+        return jsonify(error="Your session has expired. Please sign in again."), 401
+
+    @jwt.invalid_token_loader
+    def invalid(reason):
+        return jsonify(error="Invalid session. Please sign in again."), 401
+
+    @jwt.unauthorized_loader
+    def missing(reason):
+        return jsonify(error="Please sign in to continue."), 401
