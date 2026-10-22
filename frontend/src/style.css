@@ -1259,3 +1259,35 @@ body {
 .closeBtn:hover {
   color: #1f2937;
 }
+.profileModal {
+  padding: 0;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.inviteCode {
+  display: block;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f0f6fc;
+  font-size: 20px;
+  letter-spacing: 1px;
+  text-align: center;
+}
+.inviteActions > .secondary {
+  font-size: 13px;
+}
+.inviteEmail {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+}
+.changePassword {
+  max-width: 420px;
+  margin-top: 22px;
+}
+.changePassword h3 {
+  margin: 0;
+  font-size: 14px;
+}

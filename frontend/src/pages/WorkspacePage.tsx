@@ -2,14 +2,12 @@ import { useEffect, useState } from "react";
 import {
   BarChart3,
   Bell,
-  CalendarDays,
   CheckCircle2,
   ClipboardList,
   Cog,
   FileText,
   HelpCircle,
   MessageSquare,
-  Package,
   Plus,
   Search,
   Star,
@@ -18,13 +16,25 @@ import {
   Wrench,
 } from "lucide-react";
 import {
+  changePassword,
+  company,
+  createMachine,
   customers,
   jobs,
   machines,
+  mechanics,
+  notifications,
   reports,
+  requests,
   reviews,
   services,
+  updateCustomer,
+  updateMachine,
 } from "../services/api";
+import InviteForm from "../components/InviteForm";
+import ResetPassword from "../components/ResetPassword";
+import Modal from "../components/Modal";
+import { errorMessage, formatDate } from "../lib/format";
 
 type Props = { title: string; user: any };
 type Resource = {
@@ -32,7 +42,9 @@ type Resource = {
   icon: any;
   load?: () => Promise<any>;
   key?: string;
+  filter?: (item: any) => boolean;
 };
+const isActiveJob = (job: any) => !["Completed", "Cancelled"].includes(job.status);
 const resources: Record<string, Resource> = {
   "Jobs / Requests": {
     label: "Jobs / requests",
@@ -46,6 +58,7 @@ const resources: Record<string, Resource> = {
     icon: ClipboardList,
     load: jobs,
     key: "jobs",
+    filter: isActiveJob,
   },
   Customers: {
     label: "Customers",
@@ -53,7 +66,7 @@ const resources: Record<string, Resource> = {
     load: customers,
     key: "customers",
   },
-  Mechanics: { label: "Mechanics", icon: Users },
+  Mechanics: { label: "Mechanics", icon: Users, load: mechanics, key: "mechanics" },
   Machines: {
     label: "Machines",
     icon: Wrench,
@@ -73,18 +86,16 @@ const resources: Record<string, Resource> = {
     key: "records",
   },
   Reviews: { label: "Reviews", icon: Star, load: reviews, key: "reviews" },
-  Notifications: { label: "Notifications", icon: Bell },
+  Notifications: { label: "Notifications", icon: Bell, load: notifications, key: "notifications" },
   "My Machines": {
     label: "My machines",
     icon: Wrench,
     load: machines,
     key: "machines",
   },
-  "Service Requests": { label: "Service requests", icon: ClipboardList },
-  "My Company": { label: "My company", icon: Users },
+  "Service Requests": { label: "Service requests", icon: ClipboardList, load: requests, key: "requests" },
+  "My Company": { label: "My company", icon: Users, load: company, key: "company" },
   Reports: { label: "Reports", icon: BarChart3, load: reports, key: "report" },
-  Schedule: { label: "Schedule", icon: CalendarDays },
-  Parts: { label: "Parts", icon: Package },
   Messages: { label: "Messages", icon: MessageSquare },
   Settings: { label: "Settings", icon: Cog },
   Profile: { label: "Profile", icon: UserRound },
@@ -97,27 +108,63 @@ export default function WorkspacePage({ title, user }: Props) {
   const [items, setItems] = useState<any[]>([]);
   const [summary, setSummary] = useState<any>(null);
   const [query, setQuery] = useState("");
+  const [companyInfo, setCompanyInfo] = useState<any>(null);
   const [error, setError] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<any>(null);
+  const [resetting, setResetting] = useState<{ id: number; name: string } | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     setItems([]);
     setSummary(null);
+    setCompanyInfo(null);
     setError("");
+    setAdding(false);
+    setQuery("");
     if (!resource.load) return;
     resource
       .load()
       .then((data) => {
         if (resource.key === "report") setSummary(data);
-        else setItems(data[resource.key!] || []);
+        else if (resource.key === "company") setCompanyInfo(data.company);
+        else {
+          const rows = data[resource.key!] || [];
+          setItems(resource.filter ? rows.filter(resource.filter) : rows);
+        }
       })
       .catch((errorValue) => setError(errorValue.message));
-  }, [title]);
+  }, [title, reloadKey]);
 
   const filtered = items.filter((item) =>
     JSON.stringify(item).toLowerCase().includes(query.toLowerCase()),
   );
   const canAdd =
-    user.role === "boss" && ["Customers", "Machines", "Parts"].includes(title);
+    user.role === "boss" && ["Customers", "Machines", "Mechanics"].includes(title);
+  const added = () => {
+    setAdding(false);
+    setEditing(null);
+    setReloadKey((key) => key + 1);
+  };
+  const isBoss = user.role === "boss";
+  const rowActions = (item: any) => {
+    if (!isBoss) return null;
+    const resetId = title === "Mechanics" ? item.id : title === "Customers" ? item.user_id : null;
+    return (
+      <>
+        {(title === "Machines" || title === "Customers") && (
+          <button className="listAction" onClick={() => setEditing(item)}>
+            Edit
+          </button>
+        )}
+        {resetId && (
+          <button className="listAction" onClick={() => setResetting({ id: resetId, name: item.name })}>
+            Reset password
+          </button>
+        )}
+      </>
+    );
+  };
   return (
     <main className="subPage">
       <div className="subPageHeading">
@@ -134,7 +181,7 @@ export default function WorkspacePage({ title, user }: Props) {
       </div>
       {summary ? (
         <ReportSummary summary={summary} />
-      ) : (
+      ) : !resource.load || resource.key === "company" ? null : (
         <div className="subPageStats">
           <div>
             <Icon size={20} />
@@ -166,7 +213,7 @@ export default function WorkspacePage({ title, user }: Props) {
               </label>
             )}
             {canAdd && (
-              <button className="primary">
+              <button className="primary" onClick={() => setAdding(true)}>
                 <Plus size={14} /> Add {resource.label.slice(0, -1)}
               </button>
             )}
@@ -174,24 +221,23 @@ export default function WorkspacePage({ title, user }: Props) {
         </div>
         {error ? (
           <Empty title="Unable to load data" text={error} />
-        ) : title === "Schedule" ? (
-          <Schedule
-            items={
-              user.role === "boss" || user.role === "mechanic" ? items : []
-            }
+        ) : title === "My Company" ? (
+          companyInfo ? <CompanyView company={companyInfo} /> : <Empty title="Loading" text="Fetching your company details." />
+        ) : title === "Help & Support" ? (
+          <Empty
+            title="Need help?"
+            text="Contact your company manager for access, invitations, or questions about a job. Use the sidebar to move between your jobs, records, and notifications."
           />
         ) : title === "Messages" ? (
           <Empty
             title="Messaging is not connected"
             text="Conversation storage and permissions will appear here when the messaging service is enabled."
           />
-        ) : title === "Parts" ? (
-          <Empty
-            title="Inventory is not connected"
-            text="Parts management is available to bosses once the inventory service is enabled."
-          />
         ) : title === "Settings" || title === "Profile" ? (
-          <Settings user={user} />
+          <>
+            <Settings user={user} />
+            <ChangePassword />
+          </>
         ) : filtered.length ? (
           <div className="subPageList">
             {filtered.map((item, index) => (
@@ -200,6 +246,7 @@ export default function WorkspacePage({ title, user }: Props) {
                 item={item}
                 title={title}
                 Icon={Icon}
+                actions={rowActions(item)}
               />
             ))}
           </div>
@@ -210,7 +257,205 @@ export default function WorkspacePage({ title, user }: Props) {
           />
         )}
       </section>
+      {adding && title === "Machines" && <AddMachine onClose={() => setAdding(false)} onAdded={added} />}
+      {adding && (title === "Customers" || title === "Mechanics") && (
+        <InviteForm role={title === "Customers" ? "customer" : "mechanic"} onClose={() => setAdding(false)} onDone={added} />
+      )}
+      {editing && title === "Machines" && <EditMachine machine={editing} onClose={() => setEditing(null)} onSaved={added} />}
+      {editing && title === "Customers" && <EditCustomer customer={editing} onClose={() => setEditing(null)} onSaved={added} />}
+      {resetting && <ResetPassword userId={resetting.id} name={resetting.name} onClose={() => setResetting(null)} />}
     </main>
+  );
+}
+
+function AddMachine({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
+  const [customerList, setCustomerList] = useState<any[]>([]);
+  const [formError, setFormError] = useState("");
+  useEffect(() => {
+    customers().then((data) => setCustomerList(data.customers)).catch((e) => setFormError(errorMessage(e)));
+  }, []);
+  const submit = async (event: any) => {
+    event.preventDefault();
+    setFormError("");
+    try {
+      await createMachine(Object.fromEntries(new FormData(event.currentTarget)));
+      onAdded();
+    } catch (e) {
+      setFormError(errorMessage(e));
+    }
+  };
+  return (
+    <Modal title="Add machine" icon={<Wrench size={20} />} onClose={onClose}>
+      <form className="form form-upgraded" onSubmit={submit}>
+        {formError && <div className="error">{formError}</div>}
+        <div className="formGroup">
+          <label htmlFor="field-customer_id">Customer</label>
+          <select id="field-customer_id" name="customer_id" required>
+            <option value="">Select customer</option>
+            {customerList.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="formGroup">
+          <label htmlFor="field-name">Machine name</label>
+          <input id="field-name" name="name" placeholder="e.g. Generator G-102" required />
+        </div>
+        <div className="formGroup">
+          <label htmlFor="field-model">Model</label>
+          <input id="field-model" name="model" placeholder="e.g. CAT XQ200" />
+        </div>
+        <div className="formGroup">
+          <label htmlFor="field-serial_no">Serial number</label>
+          <input id="field-serial_no" name="serial_no" placeholder="Serial number" required />
+        </div>
+        <div className="formGroup">
+          <label htmlFor="field-status">Status</label>
+          <select id="field-status" name="status" defaultValue="Operational">
+            {["Operational", "Under Maintenance", "Under Repair", "Retired"].map((status) => (
+              <option key={status}>{status}</option>
+            ))}
+          </select>
+        </div>
+        <button className="primary">
+          <Plus size={15} /> Add machine
+        </button>
+      </form>
+    </Modal>
+  );
+}
+
+function EditForm({ title, onClose, save, children }: any) {
+  const [formError, setFormError] = useState("");
+  const submit = async (event: any) => {
+    event.preventDefault();
+    setFormError("");
+    try {
+      await save(Object.fromEntries(new FormData(event.currentTarget)));
+    } catch (e) {
+      setFormError(errorMessage(e));
+    }
+  };
+  return (
+    <Modal title={title} icon={<Wrench size={20} />} onClose={onClose}>
+      <form className="form form-upgraded" onSubmit={submit}>
+        {formError && <div className="error">{formError}</div>}
+        {children}
+        <button className="primary">Save changes</button>
+      </form>
+    </Modal>
+  );
+}
+
+function EditMachine({ machine, onClose, onSaved }: any) {
+  return (
+    <EditForm title="Edit machine" onClose={onClose} save={async (data: any) => { await updateMachine(machine.id, data); onSaved(); }}>
+      <div className="formGroup">
+        <label htmlFor="field-name">Machine name</label>
+        <input id="field-name" name="name" defaultValue={machine.name} required />
+      </div>
+      <div className="formGroup">
+        <label htmlFor="field-model">Model</label>
+        <input id="field-model" name="model" defaultValue={machine.model || ""} />
+      </div>
+      <div className="formGroup">
+        <label htmlFor="field-serial_no">Serial number</label>
+        <input id="field-serial_no" name="serial_no" defaultValue={machine.serial_no} required />
+      </div>
+      <div className="formGroup">
+        <label htmlFor="field-status">Status</label>
+        <select id="field-status" name="status" defaultValue={machine.status}>
+          {["Operational", "Under Maintenance", "Under Repair", "Retired"].map((status) => (
+            <option key={status}>{status}</option>
+          ))}
+        </select>
+      </div>
+    </EditForm>
+  );
+}
+
+function EditCustomer({ customer, onClose, onSaved }: any) {
+  return (
+    <EditForm title="Edit customer" onClose={onClose} save={async (data: any) => { await updateCustomer(customer.id, data); onSaved(); }}>
+      <div className="formGroup">
+        <label htmlFor="field-name">Company/Organization Name</label>
+        <input id="field-name" name="name" defaultValue={customer.name} required />
+      </div>
+      <div className="formGroup">
+        <label htmlFor="field-email">Contact email</label>
+        <input id="field-email" name="email" type="email" defaultValue={customer.email} required />
+      </div>
+      <div className="formGroup">
+        <label htmlFor="field-phone">Phone</label>
+        <input id="field-phone" name="phone" defaultValue={customer.phone || ""} />
+      </div>
+    </EditForm>
+  );
+}
+
+function ChangePassword() {
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const submit = async (event: any) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = Object.fromEntries(new FormData(form)) as Record<string, string>;
+    setError("");
+    setMessage("");
+    if (data.new_password !== data.confirm_password) {
+      setError("The new passwords do not match");
+      return;
+    }
+    try {
+      await changePassword({ current_password: data.current_password, new_password: data.new_password });
+      form.reset();
+      setMessage("Password changed. You've been signed out on your other devices.");
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  };
+  return (
+    <form className="form form-upgraded changePassword" onSubmit={submit}>
+      <h3>Change password</h3>
+      {error && <div className="error">{error}</div>}
+      {message && <div className="success">{message}</div>}
+      <div className="formGroup">
+        <label htmlFor="field-current_password">Current password</label>
+        <input id="field-current_password" name="current_password" type="password" autoComplete="current-password" required />
+      </div>
+      <div className="formGroup">
+        <label htmlFor="field-new_password">New password</label>
+        <input id="field-new_password" name="new_password" type="password" autoComplete="new-password" minLength={8} required />
+      </div>
+      <div className="formGroup">
+        <label htmlFor="field-confirm_password">Confirm new password</label>
+        <input id="field-confirm_password" name="confirm_password" type="password" autoComplete="new-password" minLength={8} required />
+      </div>
+      <button className="primary">Update password</button>
+    </form>
+  );
+}
+
+function CompanyView({ company }: any) {
+  return (
+    <div className="settingsView">
+      <div>
+        <span>Company</span>
+        <strong>{company.name}</strong>
+      </div>
+      <div>
+        <span>Location</span>
+        <strong>{company.location || "Not recorded"}</strong>
+      </div>
+      {company.contacts.map((contact: any) => (
+        <div key={contact.email}>
+          <span>Manager</span>
+          <strong>
+            {contact.name} · {contact.email}
+          </strong>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -224,8 +469,13 @@ function description(title: string) {
         "Service Records": "A searchable history of completed service work.",
         Reviews: "Ratings and feedback visible according to your role.",
         Reports: "Operational performance for the data you are allowed to see.",
-        Schedule: "Upcoming jobs and scheduled service visits.",
-        Parts: "Workshop parts and stock levels.",
+        Mechanics: "The mechanics on your service team.",
+        Notifications: "Updates about your jobs, requests, and reviews.",
+        "Service Requests": "Service you have requested and its current status.",
+        "Service History": "Every service visit recorded on your machines.",
+        "My Machines": "Machines registered to your account.",
+        "My Company": "The service company that looks after your machines.",
+        "Assigned Jobs": "Jobs assigned to you that are not finished yet.",
         Messages: "Company conversations and job communication.",
         Settings: "Workspace preferences and account controls.",
         Profile: "Your account details and access.",
@@ -234,22 +484,25 @@ function description(title: string) {
     )[title] || "Service operations workspace."
   );
 }
-function ResourceRow({ item, title, Icon }: any) {
+function ResourceRow({ item, title, Icon, actions }: any) {
+  const isJob = ["My Jobs", "Assigned Jobs", "Jobs / Requests"].includes(title);
   const heading =
     item.title ||
     item.name ||
     item.service_type ||
     item.subject ||
     `${title} item`;
-  const detail =
-    title === "My Jobs"
-      ? `${item.status} · ${item.priority || "Medium"} · ${item.location || "No location"}`
-      : item.email ||
-        item.work_done ||
-        item.description ||
-        item.comment ||
-        item.model ||
-        "No additional details";
+  const detail = isJob
+    ? [item.priority || "Medium", item.location || "No location", item.due_date ? `Due ${formatDate(item.due_date)}` : ""]
+        .filter(Boolean)
+        .join(" · ")
+    : item.email ||
+      item.message ||
+      item.work_done ||
+      item.description ||
+      item.comment ||
+      item.model ||
+      "No additional details";
   return (
     <article>
       <span className="listIcon">
@@ -264,8 +517,10 @@ function ResourceRow({ item, title, Icon }: any) {
           .replace(/ /g, "")
           .toLowerCase()}`}
       >
-        {item.status || (title === "Reviews" ? `${item.rating}/5` : "Active")}
+        {item.status ||
+          (title === "Reviews" ? `${item.rating}/5` : title === "Notifications" ? (item.is_read ? "Read" : "New") : "Active")}
       </span>
+      {actions}
     </article>
   );
 }
@@ -308,25 +563,6 @@ function ReportSummary({ summary }: any) {
         <section className="chartPanel completionChart"><div className="chartHeading"><h2>Workload breakdown</h2><span>Pending, in progress, completed</span></div><div className="donut" style={{ background: gradient }}><div><strong>{total}</strong><span>total jobs</span></div></div><div className="chartLegend"><span><i className="legendPending" style={{backgroundColor: "#f59e0b"}} /> Pending ({pending})</span><span><i className="legendProgress" style={{backgroundColor: "#3b82f6"}} /> In Progress ({inProgress})</span><span><i className="legendCompleted" style={{backgroundColor: "#10b981"}} /> Completed ({completed})</span></div></section>
       </div>
     </div>
-  );
-}
-function Schedule({ items }: { items: any[] }) {
-  return items.length ? (
-    <div className="subPageList">
-      {items.map((item, index) => (
-        <ResourceRow
-          key={item.id || index}
-          item={item}
-          title="My Jobs"
-          Icon={CalendarDays}
-        />
-      ))}
-    </div>
-  ) : (
-    <Empty
-      title="No scheduled jobs"
-      text="Scheduled jobs created by the boss will appear here."
-    />
   );
 }
 function Settings({ user }: any) {

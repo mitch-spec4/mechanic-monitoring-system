@@ -25,8 +25,8 @@ export default function MechanicProfile({ mechanic, onClose }: Props) {
     : null;
 
   return (
-    <div className="modal" onClick={onClose}>
-      <div className="modalContent" onClick={(e) => e.stopPropagation()}>
+    <div className="overlay" onClick={onClose}>
+      <div className="modal profileModal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <div className="modalHeader">
           <h2>Mechanic Profile</h2>
           <button className="closeBtn" onClick={onClose}>

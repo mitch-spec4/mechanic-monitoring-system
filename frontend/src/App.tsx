@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Login from "./pages/Login";
 import BossDashboard from "./pages/BossDashboard";
 import MechanicDashboard from "./pages/MechanicDashboard";
@@ -6,8 +6,10 @@ import CustomerDashboard from "./pages/CustomerDashboard";
 import WorkspacePage from "./pages/WorkspacePage";
 import Profile from "./components/Profile";
 import Sidebar from "./components/Sidebar";
+import { clearSession, logout as endSession, SESSION_EXPIRED_EVENT } from "./services/api";
 import "./style.css";
 import "./components/DashboardShell.css";
+import "./components/Buttons.css";
 
 export default function App() {
 	const [user, setUser] = useState<any>(() => {
@@ -16,12 +18,20 @@ export default function App() {
 	});
 	const [active, setActive] = useState("Dashboard");
 
-	const logout = () => {
-		localStorage.removeItem("token");
-		localStorage.removeItem("user");
+	const signedOut = () => {
+		clearSession();
 		setUser(null);
 		setActive("Dashboard");
 	};
+	const logout = () => {
+		endSession();
+		signedOut();
+	};
+
+	useEffect(() => {
+		window.addEventListener(SESSION_EXPIRED_EVENT, signedOut);
+		return () => window.removeEventListener(SESSION_EXPIRED_EVENT, signedOut);
+	}, []);
 
 	if (!user) {
 		return (

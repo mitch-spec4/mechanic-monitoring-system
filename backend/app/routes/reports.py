@@ -1,20 +1,65 @@
-from flask import Blueprint,jsonify
-from flask_jwt_extended import get_jwt,get_jwt_identity
-from app.models.job import Job
-from app.models.review import Review
-from app.utils.auth import roles
+from flask import Blueprint, jsonify
 
-bp=Blueprint("reports",__name__)
+from app.models.customer import Customer
+from app.models.job import Job
+from app.models.machine import Machine
+from app.models.request import ServiceRequest
+from app.models.review import Review
+from app.models.service_record import ServiceRecord
+from app.utils.auth import current_user, roles
+
+bp = Blueprint("reports", __name__)
+
 
 @bp.get("")
-@roles("boss","mechanic","customer")
+@roles("boss", "mechanic", "customer")
 def report():
-    claims=get_jwt(); query=Job.query.filter_by(company_id=claims["company_id"])
-    if claims["role"]=="mechanic": query=query.filter_by(mechanic_id=int(get_jwt_identity()))
-    if claims["role"]=="customer": query=query.filter_by(customer_id=claims["customer_id"])
-    jobs=query.all()
-    review_query=Review.query.filter_by(company_id=claims["company_id"])
-    if claims["role"]=="mechanic": review_query=review_query.filter_by(mechanic_id=int(get_jwt_identity()))
-    if claims["role"]=="customer": review_query=review_query.filter_by(customer_id=claims["customer_id"])
-    ratings=[review.rating for review in review_query.all()]
-    return jsonify(jobs={"total":len(jobs),"completed":sum(job.status=="Completed" for job in jobs),"pending":sum(job.status in {"Pending","Assigned","Accepted"} for job in jobs),"in_progress":sum(job.status in {"In Progress","Paused"} for job in jobs),"cancelled":sum(job.status=="Cancelled" for job in jobs)},rating=sum(ratings)/len(ratings) if ratings else None)
+    user = current_user()
+    jobs = Job.query.filter_by(company_id=user.company_id)
+    reviews = Review.query.filter_by(company_id=user.company_id)
+    records = ServiceRecord.query.filter_by(company_id=user.company_id)
+    if user.role == "mechanic":
+        jobs = jobs.filter_by(mechanic_id=user.id)
+        reviews = reviews.filter_by(mechanic_id=user.id)
+        records = records.filter_by(mechanic_id=user.id)
+    if user.role == "customer":
+        jobs = jobs.filter_by(customer_id=user.customer_id)
+        reviews = reviews.filter_by(customer_id=user.customer_id)
+        records = records.filter_by(customer_id=user.customer_id)
+
+    job_rows = jobs.all()
+    ratings = [review.rating for review in reviews.all()]
+    record_rows = records.all()
+
+    if user.role == "boss":
+        totals = {
+            "customers": Customer.query.filter_by(company_id=user.company_id).count(),
+            "machines": Machine.query.filter_by(company_id=user.company_id).count(),
+        }
+    elif user.role == "mechanic":
+        totals = {
+            "customers": len({record.customer_id for record in record_rows}),
+            "machines": len({record.machine_id for record in record_rows}),
+        }
+    else:
+        totals = {
+            "machines": Machine.query.filter_by(company_id=user.company_id, customer_id=user.customer_id).count(),
+            "open_requests": ServiceRequest.query.filter_by(company_id=user.company_id, customer_id=user.customer_id)
+            .filter(ServiceRequest.status.notin_(["Completed", "Cancelled"]))
+            .count(),
+        }
+
+    return jsonify(
+        jobs={
+            "total": len(job_rows),
+            "completed": sum(job.status == "Completed" for job in job_rows),
+            "pending": sum(job.status in {"Pending", "Assigned", "Accepted"} for job in job_rows),
+            "in_progress": sum(job.status in {"In Progress", "Paused"} for job in job_rows),
+            "cancelled": sum(job.status == "Cancelled" for job in job_rows),
+        },
+        # Customers see mechanic ratings elsewhere, not an average of their own reviews.
+        rating=(sum(ratings) / len(ratings)) if ratings and user.role != "customer" else None,
+        review_count=len(ratings),
+        service_records=len(record_rows),
+        totals=totals,
+    )

@@ -1,0 +1,245 @@
+/*
+ * Button system. Loaded after the other stylesheets; only changes how buttons look and move,
+ * never their size or layout. Every colour comes from the role theme (--role-color /
+ * --role-soft), so boss (blue), mechanic (green) and customer (red) each keep their identity.
+ */
+:is(.appShell, .login) {
+  --btn: var(--role-color, #0969d7);
+  --btn-soft: var(--role-soft, #eaf3ff);
+  --btn-light: color-mix(in srgb, var(--btn) 82%, #fff);
+  --btn-dark: color-mix(in srgb, var(--btn) 72%, #000);
+  --btn-glow: color-mix(in srgb, var(--btn) 55%, transparent);
+  --btn-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* ---------- Primary: glossy gradient, coloured glow, light sweep on hover ---------- */
+:is(.appShell, .login) :is(.primary, .primary-sm, .blueAction) {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  color: #fff;
+  border: 1px solid var(--btn-dark);
+  background: linear-gradient(135deg, var(--btn-light) 0%, var(--btn) 48%, var(--btn-dark) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 1px 2px rgba(15, 23, 42, 0.12),
+    0 6px 16px -8px var(--btn-glow);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
+  letter-spacing: 0.01em;
+  transition:
+    transform 0.18s var(--btn-ease),
+    box-shadow 0.25s var(--btn-ease),
+    filter 0.2s ease;
+}
+:is(.appShell, .login) :is(.primary, .primary-sm, .blueAction)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.38) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 0.75s var(--btn-ease);
+  pointer-events: none;
+}
+:is(.appShell, .login) :is(.primary, .primary-sm, .blueAction):hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--btn-light) 0%, var(--btn) 48%, var(--btn-dark) 100%);
+  filter: saturate(1.12) brightness(1.04);
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    0 2px 4px rgba(15, 23, 42, 0.12),
+    0 12px 26px -10px var(--btn-glow);
+}
+:is(.appShell, .login) :is(.primary, .primary-sm, .blueAction):hover:not(:disabled)::after {
+  transform: translateX(120%);
+}
+:is(.appShell, .login) :is(.primary, .primary-sm, .blueAction):active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.22),
+    0 2px 6px -4px var(--btn-glow);
+}
+
+/* ---------- Secondary: tinted glass that warms up on hover ---------- */
+:is(.appShell, .login) .secondary {
+  color: var(--btn);
+  border: 1px solid color-mix(in srgb, var(--btn) 22%, transparent);
+  background: linear-gradient(180deg, #fff, var(--btn-soft));
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  text-decoration: none;
+  transition:
+    transform 0.18s var(--btn-ease),
+    box-shadow 0.25s var(--btn-ease),
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+:is(.appShell, .login) .secondary:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--btn) 45%, transparent);
+  background: linear-gradient(180deg, var(--btn-soft), color-mix(in srgb, var(--btn) 16%, #fff));
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px -10px var(--btn-glow);
+}
+:is(.appShell, .login) .secondary:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+}
+
+/* ---------- Icons inside buttons come alive on hover ---------- */
+:is(.appShell, .login) :is(.primary, .primary-sm, .blueAction, .secondary) svg {
+  transition: transform 0.3s var(--btn-ease);
+}
+:is(.appShell, .login) :is(.primary, .primary-sm, .blueAction, .secondary):hover:not(:disabled) svg {
+  transform: translateX(2px);
+}
+:is(.appShell, .login) :is(.primary, .primary-sm, .blueAction, .secondary):hover:not(:disabled) svg.lucide-plus {
+  transform: rotate(90deg) scale(1.1);
+}
+
+/* ---------- Job row icon buttons (edit / cancel / delete) ---------- */
+.appShell .iconButton {
+  display: grid;
+  place-items: center;
+  flex: none;
+  align-self: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 11px;
+  border: 1px solid #dde5ef;
+  background: linear-gradient(180deg, #fff, #f6f8fb);
+  color: #55657a;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  transition:
+    transform 0.18s var(--btn-ease),
+    color 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.25s var(--btn-ease);
+}
+.appShell .iconButton svg {
+  transition: transform 0.35s var(--btn-ease);
+}
+.appShell .iconButton:hover {
+  --tone: var(--btn);
+  color: var(--tone);
+  border-color: color-mix(in srgb, var(--tone) 40%, transparent);
+  background: color-mix(in srgb, var(--tone) 10%, #fff);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px -10px color-mix(in srgb, var(--tone) 70%, transparent);
+}
+.appShell .iconButton[title="Edit job"]:hover svg {
+  transform: rotate(-14deg) scale(1.08);
+}
+.appShell .iconButton[title="Cancel job"]:hover {
+  --tone: #c27803;
+}
+.appShell .iconButton[title="Cancel job"]:hover svg {
+  transform: rotate(90deg);
+}
+.appShell .iconButton[title="Delete job"]:hover {
+  --tone: #d03535;
+}
+.appShell .iconButton[title="Delete job"]:hover svg {
+  animation: btn-shake 0.4s var(--btn-ease);
+}
+.appShell .iconButton:active {
+  transform: translateY(0) scale(0.92);
+}
+
+/* ---------- List row actions (Edit, Reset password) ---------- */
+.appShell .listAction {
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--btn) 30%, transparent);
+  background: #fff;
+  color: var(--btn);
+  font-weight: 700;
+  transition:
+    transform 0.18s var(--btn-ease),
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.25s var(--btn-ease);
+}
+.appShell .listAction:hover {
+  color: #fff;
+  border-color: var(--btn);
+  background: linear-gradient(135deg, var(--btn-light), var(--btn-dark));
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px -8px var(--btn-glow);
+}
+
+/* ---------- Text links: an underline that draws itself ---------- */
+:is(.appShell, .login) :is(.link, .loginSwitch, .markAll) {
+  color: var(--btn);
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 0 1.5px;
+  transition: background-size 0.3s var(--btn-ease), color 0.2s ease;
+}
+:is(.appShell, .login) :is(.link, .loginSwitch, .markAll):hover {
+  background-size: 100% 1.5px;
+  color: var(--btn-dark);
+}
+
+/* ---------- Header buttons: notification bell and close (×) ---------- */
+.appShell .iconBtn {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  transition: background 0.2s ease;
+}
+.appShell .iconBtn:hover {
+  background: var(--btn-soft);
+}
+.appShell .iconBtn:hover > svg {
+  animation: btn-ring 0.7s var(--btn-ease);
+  transform-origin: 50% 10%;
+}
+.appShell .closeBtn {
+  border-radius: 8px;
+  transition: transform 0.25s var(--btn-ease), background 0.2s ease, color 0.2s ease;
+}
+.appShell .closeBtn:hover {
+  background: #f1f4f8;
+  transform: rotate(90deg);
+}
+
+/* ---------- Shared states ---------- */
+:is(.appShell, .login) :is(button, a):focus-visible {
+  outline: 2px solid var(--btn);
+  outline-offset: 2px;
+}
+:is(.appShell, .login) :is(.primary, .primary-sm, .blueAction, .secondary, .listAction, .iconButton):disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  filter: grayscale(0.35);
+  transform: none;
+  box-shadow: none;
+}
+
+@keyframes btn-shake {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-12deg); }
+  50% { transform: rotate(10deg); }
+  75% { transform: rotate(-6deg); }
+}
+@keyframes btn-ring {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(16deg); }
+  40% { transform: rotate(-14deg); }
+  60% { transform: rotate(8deg); }
+  80% { transform: rotate(-4deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.appShell, .login) :is(button, a, svg),
+  :is(.appShell, .login) :is(button, a)::after {
+    transition: none !important;
+    animation: none !important;
+  }
+  :is(.appShell, .login) :is(button, a):hover,
+  :is(.appShell, .login) :is(button, a):hover svg {
+    transform: none !important;
+  }
+}

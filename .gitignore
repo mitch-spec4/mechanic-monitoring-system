@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+
+# Build output and caches
+frontend/dist/
+*.tsbuildinfo
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local databases
+backend/instance/
+*.db
+*.sqlite3
+
+# Environment files (keep the .env.example templates)
+.env
+.env.*
+!.env.example
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Personal notes
+notes.odt
+
+# Design mockups (kept locally, not published)
+docs/mockups/
+
+# Playwright output
+frontend/test-results/
+frontend/playwright-report/

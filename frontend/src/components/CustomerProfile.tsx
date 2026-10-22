@@ -25,8 +25,8 @@ export default function CustomerProfile({ customer, onClose }: Props) {
   const completed = jobsData.filter((x) => x.status === "Completed").length;
 
   return (
-    <div className="modal" onClick={onClose}>
-      <div className="modalContent" onClick={(e) => e.stopPropagation()}>
+    <div className="overlay" onClick={onClose}>
+      <div className="modal profileModal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <div className="modalHeader">
           <h2>Customer Profile</h2>
           <button className="closeBtn" onClick={onClose}>
