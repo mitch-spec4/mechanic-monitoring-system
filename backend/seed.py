@@ -11,6 +11,7 @@ from app.models import (
     Customer,
     Job,
     JobChecklistItem,
+    JobFile,
     LocationPoint,
     JobEvent,
     JobPart,
@@ -23,6 +24,7 @@ from app.models import (
     User,
     WorkEntry,
 )
+from app.services.storage import storage
 from app.services.worksheet import copy_checklist, fill_service_record
 from app.utils.time import utcnow
 
@@ -206,6 +208,32 @@ def stamp(user, shift, kind, place, at, job=None):
     )
 
 
+def add_signature(job, mechanic, name):
+    """The customer's sign-off on a completed demo job: a drawn signature stored like a real one."""
+    if job.signed_at:
+        return
+    import io
+    import math
+
+    from PIL import Image, ImageDraw
+
+    image = Image.new("RGBA", (480, 160), (255, 255, 255, 0))
+    pen = ImageDraw.Draw(image)
+    points = [(30 + x * 4, 95 - 38 * math.sin(x / 7) * math.exp(-x / 160) - (x % 23)) for x in range(105)]
+    pen.line(points, fill=(23, 32, 51, 255), width=4, joint="curve")
+    out = io.BytesIO()
+    image.save(out, "PNG")
+    key = f"{job.company_id}/jobs/{job.id}/signature-demo.png"
+    storage().put(key, out.getvalue(), "image/png")
+    db.session.add(
+        JobFile(company_id=job.company_id, job_id=job.id, uploaded_by=mechanic.id, kind="signature", content_type="image/png",
+                size_bytes=len(out.getvalue()), storage_key=key, original_name="signature.png", status="ready")
+    )
+    job.signed_by_name = name
+    job.signed_at = utcnow() - timedelta(hours=70)
+    db.session.add(JobEvent(job_id=job.id, user_id=mechanic.id, action="signed", note=f"Signed by {name}", created_at=job.signed_at))
+
+
 def add_request(subject, description, priority, status, company_id, customer, machine):
     if ServiceRequest.query.filter_by(subject=subject, company_id=company_id).first():
         return
@@ -322,6 +350,8 @@ with app.app_context():
         now = utcnow()
         stamp(mitch, today, "job_start", (-1.3083, 36.8506), now - timedelta(hours=1), generator_job)
         stamp(mitch, today, "live", (-1.3085, 36.8503), now - timedelta(minutes=4), generator_job)
+
+    add_signature(job_named("Conveyor Line CL-4 inspection"), brian, "Grace Wanjiru")
 
     add_request("Generator G-102 overheating issue", "The generator overheats and vibrates after extended use.", "High", "Submitted", company.id, abc, generator)
     add_request("Hydraulic leak inspection", "Please inspect the hydraulic line before the next production run.", "Medium", "Reviewing", company.id, kenya, pump)

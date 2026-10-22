@@ -160,11 +160,11 @@ export function ShiftProvider({ children }: { children: any }) {
 }
 
 /** Change a job's status; a mechanic's Start, Resume and Complete carry their position. */
-export async function changeJobStatus(jobId: number, status: string, role: string) {
+export async function changeJobStatus(jobId: number, status: string, role: string, extra: Record<string, unknown> = {}) {
   if (role === "mechanic" && (status === "In Progress" || status === "Completed")) {
-    return updateJob(jobId, { status, ...(await getPosition(10000)) });
+    return updateJob(jobId, { status, ...extra, ...(await getPosition(10000)) });
   }
-  return updateJob(jobId, { status });
+  return updateJob(jobId, { status, ...extra });
 }
 
 function ConsentModal({ onAgree, onClose }: { onAgree: () => void; onClose: () => void }) {

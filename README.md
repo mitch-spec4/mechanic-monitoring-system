@@ -12,6 +12,7 @@ Built with React + TypeScript (Vite) on the frontend and Flask, SQLAlchemy, Alem
 - **Job worksheets.** Start, Pause and Resume run a timer automatically; mechanics log work done, parts used (name and quantity) and the job type's checklist, on a phone-friendly screen. A job can't be completed until work is described and every required checklist item is ticked.
 - **Clock in and out, with location.** Mechanics clock in to start work, with their location shared only while clocked in, after they agree to it, and with a "Location on" sign always visible. Start, resume and complete are stamped with a position. Managers see a map of clocked-in mechanics and every shift's hours, and can correct a forgotten clock-out.
 - **Machines by customer.** Each customer's page lists their machines with the ones that need work first, and why: an open job, an open service request, or a status of Under Maintenance or Under Repair. Managers can create a job for a machine in one click. The Machines page groups machines under their customer, with a "Needs work only" filter.
+- **Photos, videos and customer sign-off.** Mechanics add before and after photos (shrunk on the phone before upload) and short videos while they work. Completing a job takes the customer's signature on the phone, or a recorded reason they couldn't sign. Every completed job has a PDF report that can be shared straight from the phone. Files are stored on disk or in any S3-compatible bucket (Cloudflare R2, Backblaze B2, AWS S3).
 - **Job history.** Every status change, assignment, edit, part, checklist tick and note is logged with who and when, and managers see it as a timeline.
 - **Permanent service history.** Records, reviews and customer service requests can't be deleted; finished jobs lock their worksheet.
 - **Notifications** for assignments, status changes, requests and reviews.
@@ -33,7 +34,8 @@ Then open http://localhost:5173.
 ## Project structure
 
 - `backend/app/models`: SQLAlchemy models
-- `backend/app/routes`: REST API (auth, jobs and worksheets, checklists, shifts and location, customers and requests, machines, service records, reviews, notifications, users, company, reports)
+- `backend/app/routes`: REST API (auth, jobs and worksheets, checklists, shifts and location, photos and files, customers and requests, machines, service records, reviews, notifications, users, company, reports)
+- `backend/app/services`: rules shared by the routes (worksheets, location, file storage, signatures, the PDF report)
 - `backend/app/utils`: role checks and input validation
 - `backend/migrations`: Alembic database migrations
 - `backend/tests`: pytest suite

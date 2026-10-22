@@ -1,8 +1,10 @@
 from flask import Blueprint, jsonify
 
+from app import db
 from app.models.customer import Customer
 from app.models.job import Job
 from app.models.machine import Machine
+from app.models.media import JobFile
 from app.models.request import ServiceRequest
 from app.models.review import Review
 from app.models.service_record import ServiceRecord
@@ -35,6 +37,10 @@ def report():
         totals = {
             "customers": Customer.query.filter_by(company_id=user.company_id).count(),
             "machines": Machine.query.filter_by(company_id=user.company_id).count(),
+            # Photos, videos and signatures stored for the company (for plan limits later).
+            "storage_bytes": db.session.query(db.func.coalesce(db.func.sum(JobFile.size_bytes), 0))
+            .filter(JobFile.company_id == user.company_id, JobFile.status == "ready")
+            .scalar(),
         }
     elif user.role == "mechanic":
         totals = {

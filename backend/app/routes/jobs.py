@@ -4,10 +4,14 @@ from app import db
 from app.models.constants import DEFAULT_PRIORITY, PRIORITIES
 from app.models.customer import Customer
 from app.models.job import Job
+from app.models.location import LocationPoint
 from app.models.machine import Machine
+from app.models.media import JobFile
 from app.models.user import User
+from app.models.worksheet import WorkEntry
 from app.services.location import open_shift, stamp_job
 from app.services.notifications import notify, notify_bosses
+from app.services.signature import SIGNATURE_FIELDS, SIGNATURE_PROBLEM, apply_signature, read_signature
 from app.services.worksheet import (
     completion_problems,
     copy_checklist,
@@ -147,7 +151,7 @@ def update_job(jid):
     if user.role == "mechanic":
         if job.mechanic_id != user.id:
             return jsonify(error="Forbidden"), 403
-        if set(data) - ({"status"} | LOCATION_FIELDS) or "status" not in data:
+        if set(data) - ({"status"} | LOCATION_FIELDS | SIGNATURE_FIELDS) or "status" not in data:
             return jsonify(error="Mechanics can only update job status"), 403
 
     if user.role == "boss":
@@ -170,11 +174,23 @@ def update_job(jid):
                 raise ValidationError("Assign a mechanic first", 409)
             if new_status == "In Progress":
                 require_clocked_in(job, user)
+            sign_off = None
             if new_status == "Completed":
                 problems = completion_problems(job)
+                sign_off = read_signature(data)
+                if not sign_off:
+                    problems.append(SIGNATURE_PROBLEM)
                 if problems:
-                    raise ValidationError("Can't complete yet: " + "; ".join(problems) + ".", 409)
+                    raise ValidationError(
+                        "Can't complete yet: " + "; ".join(problems) + ".",
+                        409,
+                        blockers=problems,
+                        # Only the customer's sign-off is missing: the app opens the signature pad.
+                        needs_signature=problems == [SIGNATURE_PROBLEM],
+                    )
             change_status(job, user, new_status)
+            if sign_off:
+                apply_signature(job, user, sign_off)
             if new_status in STAMPED:
                 stamp_job(user, job, STAMPED[new_status], data)
 
@@ -259,11 +275,16 @@ def assign_mechanic(job, mechanic_id, user):
         record_event(job, user, "unassigned", from_status=old_status, to_status=job.status)
 
 
+def has_recorded_work(job):
+    return any(model.query.filter_by(job_id=job.id).first() for model in (WorkEntry, LocationPoint, JobFile))
+
+
 @bp.delete("/<int:jid>")
 @roles("boss")
 def delete_job(jid):
     job = Job.query.filter_by(id=jid, company_id=current_user().company_id).first_or_404()
-    if job.status not in DELETABLE:
+    # A paused job that was reassigned is "Assigned" again, but its recorded work must stay.
+    if job.status not in DELETABLE or has_recorded_work(job):
         return jsonify(error="Only jobs that have not started can be deleted. Cancel this job instead."), 409
     delete_job_children(job)
     db.session.delete(job)

@@ -7,10 +7,12 @@ EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 class ValidationError(Exception):
-    def __init__(self, message, status=400):
+    def __init__(self, message, status=400, **extra):
         super().__init__(message)
         self.message = message
         self.status = status
+        # Extra fields for the JSON error body (e.g. what still blocks completing a job).
+        self.extra = extra
 
 
 def json_body():

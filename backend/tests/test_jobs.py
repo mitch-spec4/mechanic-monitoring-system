@@ -2,6 +2,7 @@ import pytest
 
 from app import db
 from app.models import Job, Notification
+from conftest import SIGNED
 
 
 def boss(auth):
@@ -13,7 +14,9 @@ def mech(auth):
 
 
 def set_status(client, headers, job_id, status):
-    return client.patch(f"/api/jobs/{job_id}", headers=headers, json={"status": status})
+    # Completing includes the customer's signature, as the app sends it.
+    extra = SIGNED if status == "Completed" else {}
+    return client.patch(f"/api/jobs/{job_id}", headers=headers, json={"status": status, **extra})
 
 
 def test_mechanic_can_take_assigned_job_to_completed(client, data, auth):

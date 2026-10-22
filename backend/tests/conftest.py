@@ -12,6 +12,12 @@ from app.models import Company, Customer, Job, Machine, ServiceRecord, Shift, Us
 from app.utils.time import utcnow  # noqa: E402
 
 PASSWORD = "correct-horse-battery"
+# A real 1x1 PNG, as the signature pad sends it.
+SIGNATURE_PNG = (
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+)
+# Completing a job needs the customer's sign-off.
+SIGNED = {"signature": {"name": "Jane Customer", "image": SIGNATURE_PNG}}
 
 
 @pytest.fixture
@@ -19,7 +25,14 @@ def app(tmp_path):
     # TEST_DATABASE_URL runs the suite against another database (CI uses PostgreSQL); its
     # tables are dropped and recreated for every test.
     database_url = normalize_database_url(os.getenv("TEST_DATABASE_URL") or f"sqlite:///{tmp_path / 'test.db'}")
-    app = create_app({"SQLALCHEMY_DATABASE_URI": database_url, "RATELIMIT_ENABLED": False, "TESTING": True})
+    app = create_app(
+        {
+            "SQLALCHEMY_DATABASE_URI": database_url,
+            "RATELIMIT_ENABLED": False,
+            "TESTING": True,
+            "STORAGE_LOCAL_DIR": str(tmp_path / "uploads"),
+        }
+    )
     with app.app_context():
         db.drop_all()
         db.create_all()

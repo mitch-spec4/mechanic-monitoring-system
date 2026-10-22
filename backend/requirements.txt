@@ -9,3 +9,6 @@ alembic==1.13.3
 python-dotenv==1.0.1
 Werkzeug==3.0.6
 psycopg[binary]==3.3.6
+boto3==1.43.117
+fpdf2==2.8.9
+Pillow==13.0.0

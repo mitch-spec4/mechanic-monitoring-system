@@ -4,13 +4,18 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Clock,
+  Camera,
+  Download,
+  Film,
   FileText,
   History,
   MapPin,
   Package,
   Pause,
   Play,
+  PenLine,
   Plus,
+  Share2,
   Trash2,
   Wrench,
 } from "lucide-react";
@@ -23,7 +28,12 @@ import {
   saveRecord,
   updateChecklistItem,
   updateEntry,
+  apiUrl,
+  deleteFile,
+  downloadReport,
 } from "../services/api";
+import SignatureModal, { SignOff } from "../components/SignatureModal";
+import { uploadMedia } from "../lib/media";
 import { changeJobStatus } from "../components/Shift";
 import { mapLink } from "../lib/location";
 import { errorMessage, formatDate } from "../lib/format";
@@ -63,6 +73,10 @@ const HISTORY_TEXT: Record<string, (event: any) => string> = {
   checked: (e) => `ticked "${e.note}"`,
   unchecked: (e) => `unticked "${e.note}"`,
   note: () => "added a note",
+  file_added: (e) => (e.note || "added a file").replace(/^Added/, "added"),
+  file_removed: (e) => (e.note || "removed a file").replace(/^Removed/, "removed"),
+  signed: (e) => `recorded the customer's signature (${(e.note || "").replace(/^Signed by /, "")})`,
+  not_signed: (e) => `completed without a signature: ${e.note}`,
 };
 
 export default function JobPage({ jobId, user, onBack }: Props) {
@@ -70,6 +84,8 @@ export default function JobPage({ jobId, user, onBack }: Props) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const [signing, setSigning] = useState(false);
+  const [signError, setSignError] = useState("");
 
   const load = () =>
     jobDetail(jobId)
@@ -117,6 +133,20 @@ export default function JobPage({ jobId, user, onBack }: Props) {
     .reduce((sum: number, entry: any) => sum + entry.hours * 3600, 0);
   const liveSeconds = closedSeconds + (running ? Math.max(0, (now - asDate(running.started_at).getTime()) / 1000) : 0);
   const setStatus = (status: string) => run(() => changeJobStatus(job.id, status, user.role));
+  // Completing asks for the customer's sign-off first; it is sent with the completion.
+  const complete = async (signOff: SignOff) => {
+    setSignError("");
+    setBusy(true);
+    try {
+      await changeJobStatus(job.id, "Completed", user.role, signOff);
+      setSigning(false);
+      await load();
+    } catch (e) {
+      setSignError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <main className={`jobPage status-${job.status.replace(/ /g, "").toLowerCase()}`}>
@@ -177,7 +207,10 @@ export default function JobPage({ jobId, user, onBack }: Props) {
                 <button
                   className="primary"
                   disabled={busy || job.completion_blockers.length > 0}
-                  onClick={() => setStatus("Completed")}
+                  onClick={() => {
+                    setSignError("");
+                    setSigning(true);
+                  }}
                 >
                   <CheckCircle2 size={16} /> Complete job
                 </button>
@@ -188,6 +221,7 @@ export default function JobPage({ jobId, user, onBack }: Props) {
             )}
           </div>
         )}
+        {job.report_url && <ReportActions job={job} onError={setError} />}
       </section>
 
       {error && (
@@ -323,6 +357,23 @@ export default function JobPage({ jobId, user, onBack }: Props) {
           )}
         </Card>
 
+        <MediaCard job={job} busy={busy} run={run} />
+
+        {job.signature && (
+          <Card title="Customer sign-off" icon={<PenLine size={16} />}>
+            {job.signature.not_signed_reason ? (
+              <p className="signOffNote">Not signed: {job.signature.not_signed_reason}</p>
+            ) : (
+              <div className="signOffView">
+                {job.signature.url && <img src={apiUrl(job.signature.url)} alt={`Signature of ${job.signature.name}`} />}
+                <span>
+                  Signed by <b>{job.signature.name}</b> · {stamp(job.signature.signed_at)}
+                </span>
+              </div>
+            )}
+          </Card>
+        )}
+
         {!isCustomer && job.locations?.length > 0 && (
           <Card title="Locations" icon={<MapPin size={16} />} wide>
             <ul className="stampList">
@@ -363,6 +414,9 @@ export default function JobPage({ jobId, user, onBack }: Props) {
           </Card>
         )}
       </div>
+      {signing && (
+        <SignatureModal jobTitle={job.title} busy={busy} error={signError} onSubmit={complete} onClose={() => setSigning(false)} />
+      )}
     </main>
   );
 }
@@ -375,6 +429,142 @@ const MISSING_TEXT: Record<string, string> = {
   unsupported: "not supported",
   not_sent: "not sent",
 };
+
+const KIND_LABEL: Record<string, string> = { before: "Before", after: "After", other: "Photo", video: "Video" };
+
+function MediaCard({ job, busy, run }: any) {
+  const [uploading, setUploading] = useState("");
+  const [problem, setProblem] = useState("");
+  const photos = job.files.filter((file: any) => file.kind !== "video");
+  const videos = job.files.filter((file: any) => file.kind === "video");
+  const canUpload = Boolean(job.can_upload);
+  if (!canUpload && job.files.length === 0) {
+    const finished = job.status === "Completed" || job.status === "Cancelled";
+    return (
+      <Card title="Photos & videos" icon={<Camera size={16} />}>
+        <Empty text={finished ? "No photos or videos were added." : "Photos and videos can be added once work starts."} />
+      </Card>
+    );
+  }
+  const pick = async (kind: string, input: HTMLInputElement) => {
+    const files = Array.from(input.files || []);
+    input.value = "";
+    if (!files.length) return;
+    setProblem("");
+    for (const [index, file] of files.entries()) {
+      setUploading(files.length > 1 ? `Uploading ${index + 1} of ${files.length}…` : "Uploading…");
+      try {
+        const updated = await uploadMedia(job.id, kind, file, job.media_limits);
+        await run(async () => ({ job: updated }));
+      } catch (e) {
+        setProblem(errorMessage(e));
+        break;
+      }
+    }
+    setUploading("");
+  };
+  const remove = (file: any) => run(() => deleteFile(file.id));
+  return (
+    <Card title="Photos & videos" icon={<Camera size={16} />} badge={job.files.length ? String(job.files.length) : undefined} wide>
+      {problem && <div className="error">{problem}</div>}
+      {photos.length > 0 && (
+        <ul className="mediaGrid">
+          {photos.map((file: any) => (
+            <li key={file.id}>
+              <a href={apiUrl(file.url)} target="_blank" rel="noreferrer">
+                <img src={apiUrl(file.url)} alt={`${KIND_LABEL[file.kind]} photo`} loading="lazy" />
+              </a>
+              <span className={`mediaTag ${file.kind}`}>{KIND_LABEL[file.kind]}</span>
+              {canUpload && (
+                <button className="iconButton mediaRemove" title="Remove photo" aria-label="Remove photo" disabled={busy} onClick={() => remove(file)}>
+                  <Trash2 size={13} />
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {videos.length > 0 && (
+        <ul className="mediaVideos">
+          {videos.map((file: any) => (
+            <li key={file.id}>
+              <video src={apiUrl(file.url)} controls preload="metadata" playsInline />
+              {canUpload && (
+                <button className="iconButton mediaRemove" title="Remove video" aria-label="Remove video" disabled={busy} onClick={() => remove(file)}>
+                  <Trash2 size={13} />
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {canUpload && (
+        <div className="mediaActions">
+          {uploading ? (
+            <span className="mediaUploading" role="status">
+              {uploading}
+            </span>
+          ) : (
+            <div className="mediaButtons">
+              {(["before", "after", "other"] as const).map((kind) => (
+                <label key={kind} className="secondary mediaPick">
+                  <Camera size={15} /> {kind === "other" ? "Other photo" : `${KIND_LABEL[kind]} photo`}
+                  <input type="file" accept="image/*" multiple onChange={(e) => pick(kind, e.currentTarget)} />
+                </label>
+              ))}
+              <label className="secondary mediaPick">
+                <Film size={15} /> Video
+                <input type="file" accept="video/*" onChange={(e) => pick("video", e.currentTarget)} />
+              </label>
+            </div>
+          )}
+          <small className="muted">
+            Photos are shrunk on your phone before they upload. Videos: up to {job.media_limits.video_seconds} seconds and{" "}
+            {job.media_limits.video_mb} MB.
+          </small>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function ReportActions({ job, onError }: { job: any; onError: (message: string) => void }) {
+  const [working, setWorking] = useState(false);
+  const fileName = `job-${job.id}-report.pdf`;
+  // The phone's share sheet (WhatsApp, email...) when it can share files; otherwise a download.
+  const share = async () => {
+    setWorking(true);
+    try {
+      const file = new File([await downloadReport(job.report_url)], fileName, { type: "application/pdf" });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: `${job.title} service report` }).catch(() => {});
+      } else {
+        const url = URL.createObjectURL(file);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+      }
+    } catch (e) {
+      onError(errorMessage(e));
+    } finally {
+      setWorking(false);
+    }
+  };
+  return (
+    <div className="jobActions reportActions">
+      <button className="primary" disabled={working} onClick={share}>
+        <Share2 size={16} /> {working ? "Preparing…" : "Share report"}
+      </button>
+      <a className="secondary" href={apiUrl(`${job.report_url}?download=1`)} download={fileName}>
+        <Download size={16} /> Download PDF
+      </a>
+    </div>
+  );
+}
 
 function BackButton({ onBack }: { onBack: () => void }) {
   return (
