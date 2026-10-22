@@ -5,6 +5,7 @@ import pytest
 from app import db
 from app.models import ChecklistTemplate, ChecklistTemplateItem, Job, ServiceRecord, WorkEntry
 from app.utils.time import utcnow
+from conftest import SIGNED
 
 
 def boss(auth):
@@ -22,7 +23,9 @@ def detail(client, headers, job_id):
 
 
 def set_status(client, headers, job_id, status):
-    return client.patch(f"/api/jobs/{job_id}", headers=headers, json={"status": status})
+    # Completing includes the customer's signature, as the app sends it.
+    extra = SIGNED if status == "Completed" else {}
+    return client.patch(f"/api/jobs/{job_id}", headers=headers, json={"status": status, **extra})
 
 
 @pytest.fixture

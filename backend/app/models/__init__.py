@@ -11,3 +11,4 @@ from app.models.request import ServiceRequest
 from app.models.security import AuthAttempt, PasswordReset
 from app.models.worksheet import ChecklistTemplate, ChecklistTemplateItem, JobChecklistItem, JobEvent, JobPart, WorkEntry
 from app.models.location import LocationPoint, Shift
+from app.models.media import JobFile

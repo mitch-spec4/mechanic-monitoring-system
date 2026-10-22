@@ -91,6 +91,18 @@ def build_config():
         "CORS_ORIGINS": origins,
         "LOGIN_RATE_LIMIT": os.getenv("LOGIN_RATE_LIMIT", "10 per minute;50 per hour"),
         "TRUSTED_PROXY_COUNT": int(os.getenv("TRUSTED_PROXY_COUNT", "0")),
+        # Photos, videos and signatures: "local" disk (development) or "s3" (any S3-compatible
+        # bucket: Cloudflare R2, Backblaze B2, AWS S3...). See SETUP.md.
+        "STORAGE_BACKEND": os.getenv("STORAGE_BACKEND", "local").strip().lower(),
+        "STORAGE_LOCAL_DIR": os.getenv("STORAGE_LOCAL_DIR", ""),
+        "S3_BUCKET": os.getenv("S3_BUCKET", ""),
+        "S3_ENDPOINT_URL": os.getenv("S3_ENDPOINT_URL", ""),
+        "S3_REGION": os.getenv("S3_REGION", "auto"),
+        "S3_ACCESS_KEY_ID": os.getenv("S3_ACCESS_KEY_ID", ""),
+        "S3_SECRET_ACCESS_KEY": os.getenv("S3_SECRET_ACCESS_KEY", ""),
+        "MAX_PHOTO_MB": int(os.getenv("MAX_PHOTO_MB", "10")),
+        "MAX_VIDEO_MB": int(os.getenv("MAX_VIDEO_MB", "50")),
+        "MAX_VIDEO_SECONDS": int(os.getenv("MAX_VIDEO_SECONDS", "60")),
         # Sessions live in httpOnly cookies (unreadable by page scripts), with CSRF protection
         # on every state-changing request. Headers are also accepted for API clients and tests.
         "JWT_TOKEN_LOCATION": ["headers", "cookies"],
@@ -115,6 +127,9 @@ def create_app(overrides=None):
         count = app.config["TRUSTED_PROXY_COUNT"]
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=count, x_proto=count, x_host=count)
 
+    from app.services.storage import init_storage
+
+    init_storage(app)
     CORS(app, origins=app.config["CORS_ORIGINS"], supports_credentials=True)
     db.init_app(app)
     jwt.init_app(app)
@@ -127,6 +142,7 @@ def create_app(overrides=None):
     from app.routes.customers import bp as customers
     from app.routes.jobs import bp as jobs
     from app.routes.machines import bp as machines
+    from app.routes.media import bp as media
     from app.routes.notifications import bp as notifications
     from app.routes.reports import bp as reports
     from app.routes.reviews import bp as reviews
@@ -148,6 +164,7 @@ def create_app(overrides=None):
     app.register_blueprint(reviews, url_prefix="/api/reviews")
     app.register_blueprint(users, url_prefix="/api/users")
     app.register_blueprint(reports, url_prefix="/api/reports")
+    app.register_blueprint(media, url_prefix="/api")
     app.register_blueprint(shifts, url_prefix="/api/shifts")
     app.register_blueprint(location, url_prefix="/api/location")
 
@@ -159,6 +176,15 @@ def create_app(overrides=None):
         removed = purge_old_live_points()
         db.session.commit()
         print(f"Removed {removed} live location point(s) older than 30 days.")
+
+    @app.cli.command("purge-uploads")
+    def purge_uploads():
+        """Delete uploads that were started but never confirmed within a day (run daily)."""
+        from app.services.media import purge_abandoned_uploads
+
+        removed = purge_abandoned_uploads()
+        db.session.commit()
+        print(f"Removed {removed} abandoned upload(s).")
 
     register_error_handlers(app)
     if not app.config.get("TESTING") and not app.config["IS_PRODUCTION"]:
@@ -190,7 +216,7 @@ def register_error_handlers(app):
     @app.errorhandler(ValidationError)
     def validation_error(error):
         db.session.rollback()
-        return jsonify(error=error.message), error.status
+        return jsonify(error=error.message, **error.extra), error.status
 
     @app.errorhandler(HTTPException)
     def http_error(error):

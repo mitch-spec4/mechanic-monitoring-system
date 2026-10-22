@@ -23,6 +23,17 @@ function readCookie(name: string) {
   return match ? decodeURIComponent(match.slice(name.length + 1)) : "";
 }
 
+/** An API failure. `data` is the full error body (e.g. what still blocks completing a job). */
+export class ApiError extends Error {
+  status: number;
+  data: any;
+  constructor(message: string, status: number, data: any) {
+    super(message);
+    this.status = status;
+    this.data = data;
+  }
+}
+
 let refreshing: Promise<boolean> | null = null;
 
 // One refresh at a time: parallel requests that all hit 401 share the same attempt.
@@ -61,7 +72,7 @@ export async function api(path: string, options: RequestInit = {}) {
   }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.error || data.message || data.msg || `Request failed (${response.status})`);
+    throw new ApiError(data.error || data.message || data.msg || `Request failed (${response.status})`, response.status, data);
   }
   if ((options.method || "GET").toUpperCase() !== "GET") window.dispatchEvent(new Event(DATA_CHANGED_EVENT));
   return data;
@@ -133,3 +144,30 @@ export const correctShift = (id: number, clockedOutAt: string) => patch(`/shifts
 export const sendLiveLocation = (jobId: number, position: any) => post("/location/live", { job_id: jobId, ...position });
 export const teamLocations = () => api("/location/team");
 export const customerDetail = (id: number) => api(`/customers/${id}`);
+
+// Job photos, videos and reports
+export const requestUpload = (jobId: number, data: any) => post(`/jobs/${jobId}/files`, data);
+export const confirmUpload = (fileId: number) => post(`/files/${fileId}/confirm`, {});
+export const deleteFile = (fileId: number) => api(`/files/${fileId}`, { method: "DELETE" });
+/** Paths the API returns (like "/api/files/7") resolved against the configured API base. */
+export const apiUrl = (path: string) => (path.startsWith("/api/") ? `${BASE}${path.slice(4)}` : path);
+
+export type UploadTarget = { method: string; url: string; headers: Record<string, string> };
+
+/** Send a file to its signed upload link: the storage bucket, or this app in local mode. */
+export async function sendUpload(target: UploadTarget, file: Blob) {
+  const failed = "The upload failed. Check your connection and try again.";
+  const response = await fetch(apiUrl(target.url), { method: target.method, headers: target.headers, body: file }).catch(() => {
+    throw new ApiError(failed, 0, {});
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new ApiError(data.error || failed, response.status, data);
+  }
+}
+
+export async function downloadReport(path: string) {
+  const response = await fetch(apiUrl(path), { credentials: "include" });
+  if (!response.ok) throw new ApiError("Couldn't create the report. Please try again.", response.status, {});
+  return response.blob();
+}

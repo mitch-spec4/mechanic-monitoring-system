@@ -4,7 +4,7 @@ This guide covers running MechanicPro locally, running the checks, and the setti
 
 ## Requirements
 
-- Python 3.10 or newer
+- Python 3.11 or newer
 - Node.js 20 LTS or newer
 - Git
 
@@ -77,6 +77,8 @@ New mechanics and customers join by invitation. The manager creates an invitatio
 
 **Clock in and location.** Mechanics must clock in before they can start or resume a job, and clocking out pauses any job in progress. The first time they clock in, they are asked to agree to location sharing. Clocking in needs a position; clocking out never does. While clocked in, a **Location on** sign is shown. A position is recorded at clock-in and clock-out, when a job starts, resumes or completes, and every few minutes while a job is in progress and the app is open. Nothing is recorded while clocked out. Phones stop sending positions when the app is in the background; only a native app could track in the background. Managers see clocked-in mechanics under **Team Map**, and hours under **Shifts**, where they can set the clock-out time of a forgotten shift. In the demo data, Mitch and Amina are clocked in, and Brian is clocked out and hasn't agreed yet.
 
+**Photos, videos and sign-off.** While a job is in progress or paused, the mechanic adds before, after and other photos and short videos on the job's page. Photos are shrunk on the phone to 1600 px (as JPEG) before upload. Videos can be up to 60 seconds and 50 MB; the length is checked on the phone and the size on the server. **Complete job** opens a sign-off pad: the customer types their name and signs with a finger, or the mechanic ticks **Customer not present** and says why. Either way it is recorded in the job's history. A completed job's page has **Share report** and **Download PDF** for the customer's report: the work done, parts, checklist, photos and signature, without hours. In the demo data, the conveyor inspection was signed by Grace Wanjiru. Locally, files are saved in `backend/instance/uploads`.
+
 **Testing location on a real phone.** Phones only share location with secure (https) pages. With the backend running, start the frontend with `npm run dev:phone` instead of `npm run dev`. Then open the `https://<your computer's IP>:5173` address it prints, on a phone on the same Wi-Fi. The certificate is self-signed, so the phone warns once: choose to continue. Also try it with location blocked for the site, and outdoors.
 
 If someone forgets their password, the manager clicks **Reset password** next to them under **Mechanics** or **Customers**. The person enters that one-time code under **Forgot password?** on the sign-in page; it expires after 24 hours. Anyone can change their own password under **Settings**. Changing or resetting a password signs that account out everywhere else.
@@ -130,6 +132,14 @@ All backend settings live in `backend/.env` (see `backend/.env.example`).
 | `JWT_REFRESH_MINUTES` | `10080` (7 days) | Refresh token lifetime |
 | `LOGIN_RATE_LIMIT` | `10 per minute;50 per hour` | Failed sign-ins per IP and per email; invitation and reset attempts per IP. Stored in the database |
 | `TRUSTED_PROXY_COUNT` | `0` | Number of proxies/load balancers in front of the app, so rate limiting sees the real client IP |
+| `STORAGE_BACKEND` | `local` | `s3` on any host whose disk doesn't last or that runs more than one server. See [File storage](#file-storage) |
+| `STORAGE_LOCAL_DIR` | `backend/instance/uploads` | Where `local` mode keeps files |
+| `S3_BUCKET` | | **Required** with `s3` |
+| `S3_ENDPOINT_URL` | | R2: `https://<account-id>.r2.cloudflarestorage.com`; B2: `https://s3.<region>.backblazeb2.com`; empty for AWS S3 |
+| `S3_REGION` | `auto` | `auto` for R2; the bucket's region for B2 and AWS (e.g. `us-west-004`, `eu-west-1`) |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | | **Required** with `s3`. A key that can only read, write and delete objects in this bucket |
+| `MAX_PHOTO_MB` / `MAX_VIDEO_MB` | `10` / `50` | Largest photo and video accepted |
+| `MAX_VIDEO_SECONDS` | `60` | Longest video the phone will upload |
 
 Live positions taken during jobs are deleted after 30 days. The app removes old ones whenever new positions arrive; in production, also run `flask --app run.py purge-locations` once a day (for example from cron).
 
@@ -148,10 +158,43 @@ Frontend setting (`frontend/.env.local`, or the build environment):
 | `VITE_API_BASE_URL` | Optional. Defaults to `/api` on the same site. Set it only when the API is on another subdomain of the same site, e.g. `https://api.example.com/api` |
 | `VITE_PROXY_TARGET` | Development only: where Vite forwards `/api` (default `http://127.0.0.1:5000`) |
 
+## File storage
+
+Photos, videos and signatures are stored in one of two ways, chosen by `STORAGE_BACKEND`:
+
+- **`local`** (the default) saves files on the server's disk, under `backend/instance/uploads` or `STORAGE_LOCAL_DIR`. Use it for development, or a single server with a lasting disk; back that folder up with the database.
+- **`s3`** uses any S3-compatible bucket: Cloudflare R2, Backblaze B2, AWS S3 or MinIO. Use it on serverless hosts (their disks don't last, and they cap request sizes) and whenever more than one server runs the app.
+
+How an upload works, in both modes: the phone asks the app to add a file; the app checks the type and size and replies with a signed link that is valid for 15 minutes and only accepts that file. The phone uploads to the link (the bucket, in `s3` mode, so videos never pass through the app). The app then checks the stored size again before the file appears on the job. Files are only ever handed out by the app after it checks the viewer's company and role; in `s3` mode it redirects to a link that expires after 5 minutes. Keep the bucket private.
+
+Setting up a bucket:
+
+1. Create a private bucket, and an access key limited to that bucket with read and write (object) permissions.
+2. Set `STORAGE_BACKEND=s3` and the `S3_*` variables above.
+3. Allow your site to upload from the browser with a CORS rule on the bucket. For R2 (bucket **Settings → CORS policy**) and AWS S3 (bucket **Permissions → CORS**):
+
+   ```json
+   [
+     {
+       "AllowedOrigins": ["https://app.example.com"],
+       "AllowedMethods": ["PUT", "GET"],
+       "AllowedHeaders": ["Content-Type"],
+       "MaxAgeSeconds": 3600
+     }
+   ]
+   ```
+
+   For B2, add a CORS rule for the same origin that allows the `s3_put` and `s3_get` operations and the `Content-Type` header. Without the rule, uploads fail in the browser with a network error.
+
+Uploads that are started but never finished (the app was closed, the signal dropped) are removed by `flask --app run.py purge-uploads`, after a day. Run it daily in production.
+
+Photos in a format the phone's browser can't open (for example HEIC in most browsers other than Safari) are refused on the phone with a message to choose a JPEG.
+
 ## Production notes (until the deployment guide is written)
 
 - Run `flask --app run.py db upgrade` on every deploy. Never run `seed.py`.
-- Run `flask --app run.py purge-locations` daily.
+- Run `flask --app run.py purge-locations` and `flask --app run.py purge-uploads` daily.
+- Use `STORAGE_BACKEND=s3` unless the app runs on one server with a lasting disk.
 - Map tiles come from the free OpenStreetMap servers, which are not meant for heavy commercial use. Switch to a paid tile provider before launch.
 - Serve the backend with a production WSGI server (for example gunicorn), not `flask run`.
 - Build the frontend with `npm run build` and serve `frontend/dist/` as static files.

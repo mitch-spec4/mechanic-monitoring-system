@@ -3,6 +3,7 @@ from datetime import timedelta
 from app import db
 from app.models import Job, LocationPoint, Shift
 from app.utils.time import utcnow
+from conftest import SIGNED
 
 HERE = {"latitude": -1.2921, "longitude": 36.8219, "accuracy": 12}
 
@@ -107,7 +108,7 @@ def test_job_start_and_complete_are_stamped_and_hidden_from_customers(client, da
     client.patch(f"/api/jobs/{job_id}", headers=mech2(auth), json={"status": "In Progress", **HERE})
     entry = client.get(f"/api/jobs/{job_id}", headers=mech2(auth)).get_json()["job"]["entries"][0]
     client.patch(f"/api/jobs/{job_id}/entries/{entry['id']}", headers=mech2(auth), json={"work_done": "Greased"})
-    response = client.patch(f"/api/jobs/{job_id}", headers=mech2(auth), json={"status": "Completed", "location_error": "timeout"})
+    response = client.patch(f"/api/jobs/{job_id}", headers=mech2(auth), json={"status": "Completed", "location_error": "timeout", **SIGNED})
     assert response.status_code == 200, response.get_json()
 
     stamps = client.get(f"/api/jobs/{job_id}", headers=boss(auth)).get_json()["job"]["locations"]

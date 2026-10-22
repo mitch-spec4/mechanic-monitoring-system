@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { failOnPageErrors, signIn } from "./helpers";
+import { failOnPageErrors, signIn, signAndComplete } from "./helpers";
 
 // PR 2 "done when": a mechanic fills a worksheet and completes a job; the boss sees the full history.
 test.describe.configure({ mode: "serial" });
@@ -45,6 +45,7 @@ test("mechanic fills in the worksheet and completes the job", async ({ page }) =
   await expect(sheet.locator(".entryList")).toContainText("1 h 30 min");
 
   await sheet.getByRole("button", { name: "Complete job" }).click();
+  await signAndComplete(page);
   await expect(sheet.locator(".jobStatusPill")).toHaveText("Completed");
   await expect(sheet.locator(".jobTimer")).toContainText("Total time on this job");
   // Finished jobs are read-only.

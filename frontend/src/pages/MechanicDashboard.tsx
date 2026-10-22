@@ -8,12 +8,14 @@ import {
   Wrench,
 } from "lucide-react";
 import {
+  ApiError,
   jobs,
   machines,
   services,
   reviews as fetchReviews,
 } from "../services/api";
 import { ClockCard, changeJobStatus, useShift } from "../components/Shift";
+import SignatureModal, { SignOff } from "../components/SignatureModal";
 import { errorMessage, formatDate, greeting } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
 
@@ -57,13 +59,21 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
   const pendingJobs = activeJobs;
   // Start, Resume and Complete wait for a GPS fix, so the job's buttons are disabled meanwhile.
   const [changing, setChanging] = useState<number | null>(null);
-  const change = async (id: number, status: string) => {
+  // When the customer's sign-off is all that's missing, the server says so and we ask for it.
+  const [signing, setSigning] = useState<any>(null);
+  const [signError, setSignError] = useState("");
+  const change = async (id: number, status: string, signOff?: SignOff) => {
     setActionError("");
     setChanging(id);
     try {
-      await changeJobStatus(id, status, "mechanic");
+      await changeJobStatus(id, status, "mechanic", signOff || {});
+      setSigning(null);
     } catch (error) {
-      setActionError(errorMessage(error));
+      if (signOff) setSignError(errorMessage(error));
+      else if (error instanceof ApiError && error.data?.needs_signature) {
+        setSignError("");
+        setSigning(jobList.find((job) => job.id === id));
+      } else setActionError(errorMessage(error));
     } finally {
       setChanging(null);
     }
@@ -191,6 +201,15 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
         )}
       </section>
       <section className="dashboardGrid">
+        {signing && (
+          <SignatureModal
+            jobTitle={signing.title}
+            busy={changing === signing.id}
+            error={signError}
+            onSubmit={(signOff) => change(signing.id, "Completed", signOff)}
+            onClose={() => setSigning(null)}
+          />
+        )}
         <Panel title="Today's Schedule" icon={<MapPin />} className="schedulePanel">
           <Schedule jobs={jobList} machines={machineList} />
         </Panel>
