@@ -5,13 +5,12 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import MetaData, event
+from sqlalchemy import MetaData, event, inspect
 from sqlalchemy.engine import Engine
 from werkzeug.exceptions import HTTPException
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Named constraints keep future migrations portable between SQLite and Postgres.
 NAMING_CONVENTION = {
@@ -25,7 +24,6 @@ NAMING_CONVENTION = {
 db = SQLAlchemy(metadata=MetaData(naming_convention=NAMING_CONVENTION))
 jwt = JWTManager()
 migrate = Migrate()
-limiter = Limiter(key_func=get_remote_address, default_limits=[])
 
 DEV_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
 PLACEHOLDER_SECRETS = {"change-me", "change-this-too", "replace-with-a-long-random-value"}
@@ -91,9 +89,17 @@ def build_config():
         "SQLALCHEMY_DATABASE_URI": normalize_database_url(database_url),
         "SQLALCHEMY_TRACK_MODIFICATIONS": False,
         "CORS_ORIGINS": origins,
-        "RATELIMIT_STORAGE_URI": os.getenv("RATELIMIT_STORAGE_URI", "memory://"),
-        "RATELIMIT_HEADERS_ENABLED": True,
         "LOGIN_RATE_LIMIT": os.getenv("LOGIN_RATE_LIMIT", "10 per minute;50 per hour"),
+        "TRUSTED_PROXY_COUNT": int(os.getenv("TRUSTED_PROXY_COUNT", "0")),
+        # Sessions live in httpOnly cookies (unreadable by page scripts), with CSRF protection
+        # on every state-changing request. Headers are also accepted for API clients and tests.
+        "JWT_TOKEN_LOCATION": ["headers", "cookies"],
+        "JWT_COOKIE_SECURE": is_production,
+        "JWT_COOKIE_SAMESITE": "Lax",
+        "JWT_COOKIE_CSRF_PROTECT": True,
+        "JWT_ACCESS_COOKIE_PATH": "/api/",
+        "JWT_REFRESH_COOKIE_PATH": "/api/auth/",
+        "JWT_SESSION_COOKIE": False,
     }
 
 
@@ -104,11 +110,15 @@ def create_app(overrides=None):
     if overrides:
         app.config.update(overrides)
 
-    CORS(app, origins=app.config["CORS_ORIGINS"])
+    if app.config["TRUSTED_PROXY_COUNT"]:
+        # Behind a load balancer: take the client IP (used for rate limiting) from X-Forwarded-For.
+        count = app.config["TRUSTED_PROXY_COUNT"]
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=count, x_proto=count, x_host=count)
+
+    CORS(app, origins=app.config["CORS_ORIGINS"], supports_credentials=True)
     db.init_app(app)
     jwt.init_app(app)
     migrate.init_app(app, db, render_as_batch=True)
-    limiter.init_app(app)
 
     from app import models  # noqa: F401  (register models for migrations)
     from app.routes.auth import bp as auth
@@ -134,12 +144,27 @@ def create_app(overrides=None):
     app.register_blueprint(reports, url_prefix="/api/reports")
 
     register_error_handlers(app)
+    if not app.config.get("TESTING") and not app.config["IS_PRODUCTION"]:
+        check_schema(app)
 
     @app.get("/api/health")
     def health():
         return {"status": "ok"}
 
     return app
+
+
+def check_schema(app):
+    """Stop early with a clear message when the database predates migrations."""
+    with app.app_context():
+        tables = set(inspect(db.engine).get_table_names())
+    if tables and "alembic_version" not in tables:
+        raise RuntimeError(
+            "This database was created by an older version of MechanicPro without migrations. "
+            "For local development, delete backend/instance/mechanic_pro.db and run `python seed.py` again."
+        )
+    if not tables:
+        app.logger.warning("Database is empty. Run `flask --app run.py db upgrade` (or `python seed.py` locally).")
 
 
 def register_error_handlers(app):

@@ -41,6 +41,35 @@ def test_review_validation(client, data, auth):
     assert again.status_code == 409
 
 
+def test_reviews_are_permanent(client, data, auth):
+    customer = auth("cust@acme.test")
+    rid = client.post("/api/reviews", headers=customer, json={"service_record_id": data["record"], "rating": 4}).get_json()["id"]
+    assert client.delete(f"/api/reviews/{rid}", headers=customer).status_code == 405
+
+
+def test_mechanic_records_only_for_machines_on_their_jobs(client, data, auth):
+    payload = {"machine_id": data["machine"], "service_type": "Check"}
+    assert client.post("/api/services", headers=auth("mech2@acme.test"), json=payload).status_code == 403
+    assert client.post("/api/services", headers=auth("mech@acme.test"), json=payload).status_code == 201
+
+
+def test_boss_edits_customer(client, data, auth):
+    url = f"/api/customers/{data['acme_customer']}"
+    response = client.patch(url, headers=boss(auth), json={"name": "Acme Renamed", "phone": "+254 700 000 000"})
+    assert response.status_code == 200
+    assert response.get_json()["customer"]["name"] == "Acme Renamed"
+    assert client.patch(url, headers=boss(auth), json={"name": ""}).status_code == 400
+    assert client.patch(url, headers=boss(auth), json={"email": "bad"}).status_code == 400
+    assert client.patch(url, headers=auth("boss@other.test"), json={"name": "x"}).status_code == 404
+
+
+def test_boss_edits_machine(client, data, auth):
+    url = f"/api/machines/{data['machine']}"
+    response = client.patch(url, headers=boss(auth), json={"name": "Gen 2", "serial_no": "SN-1B", "status": "Retired"})
+    assert response.get_json()["machine"] == {**response.get_json()["machine"], "name": "Gen 2", "serial_no": "SN-1B", "status": "Retired"}
+    assert client.patch(url, headers=boss(auth), json={"status": "Broken"}).status_code == 400
+
+
 def test_service_history_cannot_be_deleted(client, data, auth):
     assert client.delete(f"/api/services/{data['record']}", headers=boss(auth)).status_code == 405
     assert client.delete(f"/api/services/{data['record']}", headers=auth("mech@acme.test")).status_code == 405

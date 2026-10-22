@@ -40,3 +40,13 @@ test("mechanic only sees their own machines and real stats", async ({ page }) =>
   await expect(page.locator(".sidebarStats")).not.toContainText("147");
   await expect(page.locator(".pendingJob", { hasText: "Industrial Mixer MX-08 repair" }).getByRole("button", { name: "Resume" })).toBeVisible();
 });
+
+test("service records can only be added for machines on the mechanic's jobs", async ({ page }) => {
+  await signIn(page, "mitch@mechanicpro.test");
+  await page.getByRole("button", { name: "New Service Record" }).click();
+  const options = (await page.locator(".modalForm select[name=machine_id] option").allTextContents()).join("|");
+  expect(options).toContain("Generator G-102");
+  for (const other of ["Excavator EX-01", "Conveyor Line CL-4", "Industrial Mixer MX-08", "Hydraulic Pump H-21"]) {
+    expect(options).not.toContain(other);
+  }
+});

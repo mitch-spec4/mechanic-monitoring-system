@@ -12,6 +12,7 @@ from app.models.machine import Machine
 from app.models.notification import Notification
 from app.models.request import ServiceRequest
 from app.models.review import Review
+from app.models.security import PasswordReset
 from app.models.service_record import ServiceRecord
 from app.models.user import User
 from app.services.notifications import notify, notify_bosses
@@ -25,7 +26,14 @@ INVITATION_DAYS = 7
 
 
 def customer_out(customer):
-    return {"id": customer.id, "name": customer.name, "email": customer.email, "phone": customer.phone}
+    login_user = User.query.filter_by(customer_id=customer.id, role="customer").first()
+    return {
+        "id": customer.id,
+        "name": customer.name,
+        "email": customer.email,
+        "phone": customer.phone,
+        "user_id": login_user.id if login_user else None,
+    }
 
 
 def request_out(service_request):
@@ -66,6 +74,8 @@ def invite():
     role = data.get("role") or "customer"
     if role not in {"customer", "mechanic"}:
         raise ValidationError("Only customers and mechanics can be invited")
+    if User.query.filter_by(email=email).first():
+        raise ValidationError("This email address already has an account", 409)
 
     code = "DK-" + secrets.token_hex(5).upper()
     invitation = Invitation(
@@ -79,6 +89,22 @@ def invite():
     db.session.add(invitation)
     db.session.commit()
     return jsonify(code=code, expires_at=invitation.expires_at.isoformat()), 201
+
+
+@bp.patch("/<int:cid>")
+@roles("boss")
+def update_customer(cid):
+    customer = Customer.query.filter_by(id=cid, company_id=current_user().company_id).first_or_404()
+    data = json_body()
+    if "name" in data:
+        customer.name = text(data, "name", "Name", required=True, max_length=150)
+    if "phone" in data:
+        customer.phone = text(data, "phone", "Phone", max_length=50)
+    if "email" in data:
+        # The contact email; a customer's sign-in email is managed on their user account.
+        customer.email = read_email(data)
+    db.session.commit()
+    return jsonify(ok=True, customer=customer_out(customer))
 
 
 @bp.get("/requests")
@@ -146,6 +172,7 @@ def delete_customer(cid):
 
     for customer_user in User.query.filter_by(customer_id=customer.id).all():
         Notification.query.filter_by(user_id=customer_user.id).delete()
+        PasswordReset.query.filter_by(user_id=customer_user.id).delete()
         db.session.delete(customer_user)
     db.session.flush()
     db.session.delete(customer)

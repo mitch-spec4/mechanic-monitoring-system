@@ -87,11 +87,5 @@ def update_review(rid):
     return jsonify(ok=True)
 
 
-@bp.delete("/<int:rid>")
-@roles("customer")
-def delete_review(rid):
-    user = current_user()
-    review = Review.query.filter_by(id=rid, customer_id=user.customer_id, company_id=user.company_id).first_or_404()
-    db.session.delete(review)
-    db.session.commit()
-    return jsonify(ok=True)
+
+# Reviews are part of the service history and are permanent: there is no delete endpoint.

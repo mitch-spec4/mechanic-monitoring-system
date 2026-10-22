@@ -40,7 +40,7 @@ flask --app run.py run --debug --port 5000
 
 `seed.py` applies the database migrations and then loads demo data. It is safe to run more than once. Check the backend at http://127.0.0.1:5000/api/health, which returns `{"status":"ok"}`.
 
-> **Upgrading from an older checkout?** Earlier versions created the database without migrations. Delete `backend/instance/mechanic_pro.db` and run `seed.py` again.
+> **Upgrading from an older checkout?** Earlier versions created the database without migrations. The backend now stops with a message telling you so. Delete `backend/instance/mechanic_pro.db` and run `seed.py` again.
 
 ## 2. Frontend
 
@@ -53,7 +53,7 @@ cp .env.example .env.local      # PowerShell: Copy-Item .env.example .env.local
 npm run dev
 ```
 
-Open http://localhost:5173. The frontend reads the backend URL from `VITE_API_BASE_URL` in `.env.local`. Restart Vite after changing it.
+Open http://localhost:5173. The frontend calls `/api` on its own address, and Vite forwards those calls to the backend at http://127.0.0.1:5000 (change it with `VITE_PROXY_TARGET`). Keeping one address lets the secure session cookies work.
 
 ## Demo accounts (local only)
 
@@ -72,6 +72,10 @@ Open http://localhost:5173. The frontend reads the backend URL from `VITE_API_BA
 `seed.py` refuses to run when `APP_ENV` is anything other than `development` or `test`, so these accounts can't end up in production.
 
 New mechanics and customers join by invitation. The manager creates an invitation code under **Customers** or **Mechanics**. The person then uses **Have an invitation code?** on the sign-in page. Codes work once, are tied to one email address, and expire after 7 days.
+
+If someone forgets their password, the manager clicks **Reset password** next to them under **Mechanics** or **Customers**. The person enters that one-time code under **Forgot password?** on the sign-in page; it expires after 24 hours. Anyone can change their own password under **Settings**. Changing or resetting a password signs that account out everywhere else.
+
+Until email delivery is added, both kinds of code are shared with **Copy code** or **Email this code**, which opens your own mail app with the message filled in.
 
 ## Checks
 
@@ -118,8 +122,8 @@ All backend settings live in `backend/.env` (see `backend/.env.example`).
 | `CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | **Required**, your frontend origin(s); `*` is rejected |
 | `JWT_ACCESS_MINUTES` | `30` | Access token lifetime |
 | `JWT_REFRESH_MINUTES` | `10080` (7 days) | Refresh token lifetime |
-| `LOGIN_RATE_LIMIT` | `10 per minute;50 per hour` | Login and invitation attempts per client IP |
-| `RATELIMIT_STORAGE_URI` | `memory://` | Use a shared store such as `redis://…` when running more than one server process |
+| `LOGIN_RATE_LIMIT` | `10 per minute;50 per hour` | Failed sign-ins per IP and per email; invitation and reset attempts per IP. Stored in the database |
+| `TRUSTED_PROXY_COUNT` | `0` | Number of proxies/load balancers in front of the app, so rate limiting sees the real client IP |
 
 Generate secrets with:
 
@@ -133,11 +137,14 @@ Frontend setting (`frontend/.env.local`, or the build environment):
 
 | Variable | Purpose |
 | --- | --- |
-| `VITE_API_BASE_URL` | Backend API URL, e.g. `https://api.example.com/api` |
+| `VITE_API_BASE_URL` | Optional. Defaults to `/api` on the same site. Set it only when the API is on another subdomain of the same site, e.g. `https://api.example.com/api` |
+| `VITE_PROXY_TARGET` | Development only: where Vite forwards `/api` (default `http://127.0.0.1:5000`) |
 
 ## Production notes (until the deployment guide is written)
 
 - Run `flask --app run.py db upgrade` on every deploy. Never run `seed.py`.
 - Serve the backend with a production WSGI server (for example gunicorn), not `flask run`.
 - Build the frontend with `npm run build` and serve `frontend/dist/` as static files.
+- Serve the frontend and the API from the same site over HTTPS (for example `app.example.com` with the API at `/api`). Sessions are httpOnly, `Secure` cookies with CSRF protection, so browsers won't send them to a different site.
+- Behind a load balancer, set `TRUSTED_PROXY_COUNT` so rate limiting sees real client IPs.
 - Never commit `.env` files; set the variables in your host's settings.

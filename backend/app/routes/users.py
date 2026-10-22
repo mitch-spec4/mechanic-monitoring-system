@@ -1,16 +1,23 @@
+import secrets
+from datetime import timedelta
+
 from flask import Blueprint, jsonify
 
 from app import db
 from app.models.job import Job
 from app.models.notification import Notification
 from app.models.review import Review
+from app.models.security import PasswordReset
 from app.models.service_record import ServiceRecord
 from app.models.user import User
+from app.routes.auth import hash_code
 from app.utils.auth import current_user, roles
+from app.utils.time import utcnow
 from app.utils.validation import ValidationError, json_body, text
 from app.utils.validation import email as read_email
 
 bp = Blueprint("users", __name__)
+RESET_CODE_HOURS = 24
 
 
 def out(user):
@@ -54,6 +61,27 @@ def update_user(uid):
     return jsonify(ok=True, user=out(user))
 
 
+@bp.post("/<int:uid>/reset-code")
+@roles("boss")
+def issue_reset_code(uid):
+    """Give a team member a one-time code to set a new password (until email delivery exists)."""
+    manager = current_user()
+    if uid == manager.id:
+        return jsonify(error="Use Change password in Settings for your own account"), 400
+    user = User.query.filter_by(id=uid, company_id=manager.company_id).first_or_404()
+    PasswordReset.query.filter_by(user_id=user.id, used=False).update({"used": True})
+    code = "RS-" + secrets.token_hex(5).upper()
+    reset = PasswordReset(
+        user_id=user.id,
+        code_hash=hash_code(code),
+        created_by=manager.id,
+        expires_at=utcnow() + timedelta(hours=RESET_CODE_HOURS),
+    )
+    db.session.add(reset)
+    db.session.commit()
+    return jsonify(code=code, email=user.email, name=user.name, expires_at=reset.expires_at.isoformat()), 201
+
+
 @bp.delete("/<int:uid>")
 @roles("boss")
 def delete_user(uid):
@@ -69,6 +97,7 @@ def delete_user(uid):
         if has_history:
             return jsonify(error="This mechanic has jobs or service history and cannot be deleted."), 409
     Notification.query.filter_by(user_id=user.id).delete()
+    PasswordReset.query.filter((PasswordReset.user_id == user.id) | (PasswordReset.created_by == user.id)).delete()
     db.session.delete(user)
     db.session.commit()
     return jsonify(ok=True)

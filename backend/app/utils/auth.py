@@ -10,8 +10,8 @@ from app.models.user import User
 def roles(*allowed):
     """Require a valid access token for a user who still exists with one of the allowed roles.
 
-    The user is re-read from the database on every request, so deleted accounts and role or
-    company changes take effect immediately instead of when the token expires.
+    The user is re-read from the database on every request, so deleted accounts, role or
+    company changes, and password changes take effect immediately instead of when the token expires.
     """
 
     def deco(fn):
@@ -25,6 +25,7 @@ def roles(*allowed):
                 or user.role != claims.get("role")
                 or user.company_id != claims.get("company_id")
                 or user.customer_id != claims.get("customer_id")
+                or user.token_version != claims.get("tv")
             ):
                 return jsonify(error="Your account has changed. Please sign in again."), 401
             if user.role not in allowed:

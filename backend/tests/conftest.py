@@ -111,13 +111,17 @@ def login(client, email, password=PASSWORD):
 
 @pytest.fixture
 def auth(client, data):
-    tokens = {}
+    """Bearer headers for a user. Browsers use cookies; headers keep API tests independent."""
+    from app.routes.auth import access_token_for
 
     def headers(email):
-        if email not in tokens:
-            response = login(client, email)
-            assert response.status_code == 200, response.get_json()
-            tokens[email] = response.get_json()["token"]
-        return {"Authorization": f"Bearer {tokens[email]}"}
+        user = User.query.filter_by(email=email).one()
+        return {"Authorization": f"Bearer {access_token_for(user)}"}
 
     return headers
+
+
+def cookie(client, name):
+    paths = {"access_token_cookie": "/api/", "refresh_token_cookie": "/api/auth/"}
+    found = client.get_cookie(name, path=paths.get(name, "/"))
+    return found.value if found else None

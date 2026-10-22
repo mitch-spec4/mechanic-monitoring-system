@@ -1283,3 +1283,11 @@ body {
   gap: 6px;
   text-decoration: none;
 }
+.changePassword {
+  max-width: 420px;
+  margin-top: 22px;
+}
+.changePassword h3 {
+  margin: 0;
+  font-size: 14px;
+}

@@ -1,56 +1,56 @@
-const BASE = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:5000/api").replace(/\/$/, "");
+// Same-origin "/api" by default: Vite proxies it to the backend in development, and in production
+// the API should be served from the same site so the session cookies are sent.
+const BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 
 export const SESSION_EXPIRED_EVENT = "mechanicpro:session-expired";
 // Fired after any successful change so always-visible widgets (sidebar, bell) refresh at once.
 export const DATA_CHANGED_EVENT = "mechanicpro:data-changed";
 
-export function saveSession(data: { token: string; refresh_token?: string; user?: unknown }) {
-  localStorage.setItem("token", data.token);
-  if (data.refresh_token) localStorage.setItem("refreshToken", data.refresh_token);
-  if (data.user) localStorage.setItem("user", JSON.stringify(data.user));
+// The session itself lives in httpOnly cookies that scripts cannot read. Only the public
+// profile is kept here so the app knows who is signed in after a reload.
+export function saveSession(user: unknown) {
+  localStorage.setItem("user", JSON.stringify(user));
 }
 
 export function clearSession() {
+  localStorage.removeItem("user");
   localStorage.removeItem("token");
   localStorage.removeItem("refreshToken");
-  localStorage.removeItem("user");
+}
+
+function readCookie(name: string) {
+  const match = document.cookie.split("; ").find((part) => part.startsWith(`${name}=`));
+  return match ? decodeURIComponent(match.slice(name.length + 1)) : "";
 }
 
 let refreshing: Promise<boolean> | null = null;
 
 // One refresh at a time: parallel requests that all hit 401 share the same attempt.
 function refreshSession() {
-  refreshing ??= (async () => {
-    const refreshToken = localStorage.getItem("refreshToken");
-    if (!refreshToken) return false;
-    try {
-      const response = await fetch(`${BASE}/auth/refresh`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${refreshToken}` },
-      });
-      if (!response.ok) return false;
-      saveSession(await response.json());
-      return true;
-    } catch {
-      return false;
-    }
-  })().finally(() => {
-    refreshing = null;
-  });
+  refreshing ??= fetch(`${BASE}/auth/refresh`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "X-CSRF-TOKEN": readCookie("csrf_refresh_token") },
+  })
+    .then((response) => response.ok)
+    .catch(() => false)
+    .finally(() => {
+      refreshing = null;
+    });
   return refreshing;
 }
 
-async function send(path: string, options: RequestInit) {
-  const token = localStorage.getItem("token");
+function send(path: string, options: RequestInit) {
   const headers = new Headers(options.headers);
   if (options.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  return fetch(`${BASE}${path.startsWith("/") ? path : `/${path}`}`, { ...options, headers });
+  const method = (options.method || "GET").toUpperCase();
+  if (method !== "GET") headers.set("X-CSRF-TOKEN", readCookie("csrf_access_token"));
+  return fetch(`${BASE}${path.startsWith("/") ? path : `/${path}`}`, { ...options, headers, credentials: "include" });
 }
 
 export async function api(path: string, options: RequestInit = {}) {
   let response = await send(path, options);
-  if (response.status === 401 && localStorage.getItem("token")) {
+  if (response.status === 401 && !path.startsWith("/auth/") && localStorage.getItem("user")) {
     if (await refreshSession()) {
       response = await send(path, options);
     }
@@ -71,7 +71,11 @@ const post = (path: string, data: unknown) => api(path, { method: "POST", body: 
 const patch = (path: string, data: unknown) => api(path, { method: "PATCH", body: JSON.stringify(data) });
 
 export const login = (email: string, password: string) => post("/auth/login", { email, password });
+export const logout = () => post("/auth/logout", {}).catch(() => {});
 export const acceptInvitation = (invitation: any) => post("/auth/accept-invitation", invitation);
+export const resetPassword = (data: any) => post("/auth/reset-password", data);
+export const changePassword = (data: any) => post("/auth/change-password", data);
+export const issueResetCode = (userId: number) => post(`/users/${userId}/reset-code`, {});
 
 export const jobs = () => api("/jobs");
 export const notifications = () => api("/notifications");
@@ -91,6 +95,8 @@ export const invite = (data: any) => post("/customers/invite", data);
 export const createMachine = (data: any) => post("/machines", data);
 export const createService = (data: any) => post("/services", data);
 export const createRequest = (data: any) => post("/customers/requests", data);
+export const updateMachine = (id: number, data: any) => patch(`/machines/${id}`, data);
+export const updateCustomer = (id: number, data: any) => patch(`/customers/${id}`, data);
 export const updateRequest = (id: number, data: any) => patch(`/customers/requests/${id}`, data);
 export const createReview = (data: any) => post("/reviews", data);
 export const markNotificationRead = (id: number) => patch(`/notifications/${id}/read`, {});

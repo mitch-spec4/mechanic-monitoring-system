@@ -146,3 +146,14 @@ def test_boss_cancel_notifies_assigned_mechanic(client, data, auth):
     set_status(client, mech(auth), data["job"], "In Progress")
     assert set_status(client, boss(auth), data["job"], "Cancelled").status_code == 200
     assert Notification.query.filter_by(user_id=data["mechanic"], title="Job cancelled").count() == 1
+
+
+def test_boss_edits_job_details(client, data, auth):
+    response = client.patch(
+        f"/api/jobs/{data['job']}",
+        headers=boss(auth),
+        json={"title": "Fix generator fully", "priority": "Urgent", "due_date": "2026-12-01", "location": "Site B"},
+    )
+    job = response.get_json()["job"]
+    assert (job["title"], job["priority"], job["due_date"], job["location"]) == ("Fix generator fully", "Urgent", "2026-12-01", "Site B")
+    assert client.patch(f"/api/jobs/{data['job']}", headers=boss(auth), json={"title": ""}).status_code == 400

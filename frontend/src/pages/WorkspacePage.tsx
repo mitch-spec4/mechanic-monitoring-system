@@ -16,6 +16,7 @@ import {
   Wrench,
 } from "lucide-react";
 import {
+  changePassword,
   company,
   createMachine,
   customers,
@@ -27,8 +28,11 @@ import {
   requests,
   reviews,
   services,
+  updateCustomer,
+  updateMachine,
 } from "../services/api";
 import InviteForm from "../components/InviteForm";
+import ResetPassword from "../components/ResetPassword";
 import Modal from "../components/Modal";
 import { errorMessage, formatDate } from "../lib/format";
 
@@ -107,6 +111,8 @@ export default function WorkspacePage({ title, user }: Props) {
   const [companyInfo, setCompanyInfo] = useState<any>(null);
   const [error, setError] = useState("");
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<any>(null);
+  const [resetting, setResetting] = useState<{ id: number; name: string } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -137,7 +143,27 @@ export default function WorkspacePage({ title, user }: Props) {
     user.role === "boss" && ["Customers", "Machines", "Mechanics"].includes(title);
   const added = () => {
     setAdding(false);
+    setEditing(null);
     setReloadKey((key) => key + 1);
+  };
+  const isBoss = user.role === "boss";
+  const rowActions = (item: any) => {
+    if (!isBoss) return null;
+    const resetId = title === "Mechanics" ? item.id : title === "Customers" ? item.user_id : null;
+    return (
+      <>
+        {(title === "Machines" || title === "Customers") && (
+          <button className="listAction" onClick={() => setEditing(item)}>
+            Edit
+          </button>
+        )}
+        {resetId && (
+          <button className="listAction" onClick={() => setResetting({ id: resetId, name: item.name })}>
+            Reset password
+          </button>
+        )}
+      </>
+    );
   };
   return (
     <main className="subPage">
@@ -208,7 +234,10 @@ export default function WorkspacePage({ title, user }: Props) {
             text="Conversation storage and permissions will appear here when the messaging service is enabled."
           />
         ) : title === "Settings" || title === "Profile" ? (
-          <Settings user={user} />
+          <>
+            <Settings user={user} />
+            <ChangePassword />
+          </>
         ) : filtered.length ? (
           <div className="subPageList">
             {filtered.map((item, index) => (
@@ -217,6 +246,7 @@ export default function WorkspacePage({ title, user }: Props) {
                 item={item}
                 title={title}
                 Icon={Icon}
+                actions={rowActions(item)}
               />
             ))}
           </div>
@@ -231,6 +261,9 @@ export default function WorkspacePage({ title, user }: Props) {
       {adding && (title === "Customers" || title === "Mechanics") && (
         <InviteForm role={title === "Customers" ? "customer" : "mechanic"} onClose={() => setAdding(false)} onDone={added} />
       )}
+      {editing && title === "Machines" && <EditMachine machine={editing} onClose={() => setEditing(null)} onSaved={added} />}
+      {editing && title === "Customers" && <EditCustomer customer={editing} onClose={() => setEditing(null)} onSaved={added} />}
+      {resetting && <ResetPassword userId={resetting.id} name={resetting.name} onClose={() => setResetting(null)} />}
     </main>
   );
 }
@@ -256,8 +289,8 @@ function AddMachine({ onClose, onAdded }: { onClose: () => void; onAdded: () => 
       <form className="form form-upgraded" onSubmit={submit}>
         {formError && <div className="error">{formError}</div>}
         <div className="formGroup">
-          <label>Customer</label>
-          <select name="customer_id" required>
+          <label htmlFor="field-customer_id">Customer</label>
+          <select id="field-customer_id" name="customer_id" required>
             <option value="">Select customer</option>
             {customerList.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
@@ -265,20 +298,20 @@ function AddMachine({ onClose, onAdded }: { onClose: () => void; onAdded: () => 
           </select>
         </div>
         <div className="formGroup">
-          <label>Machine name</label>
-          <input name="name" placeholder="e.g. Generator G-102" required />
+          <label htmlFor="field-name">Machine name</label>
+          <input id="field-name" name="name" placeholder="e.g. Generator G-102" required />
         </div>
         <div className="formGroup">
-          <label>Model</label>
-          <input name="model" placeholder="e.g. CAT XQ200" />
+          <label htmlFor="field-model">Model</label>
+          <input id="field-model" name="model" placeholder="e.g. CAT XQ200" />
         </div>
         <div className="formGroup">
-          <label>Serial number</label>
-          <input name="serial_no" placeholder="Serial number" required />
+          <label htmlFor="field-serial_no">Serial number</label>
+          <input id="field-serial_no" name="serial_no" placeholder="Serial number" required />
         </div>
         <div className="formGroup">
-          <label>Status</label>
-          <select name="status" defaultValue="Operational">
+          <label htmlFor="field-status">Status</label>
+          <select id="field-status" name="status" defaultValue="Operational">
             {["Operational", "Under Maintenance", "Under Repair", "Retired"].map((status) => (
               <option key={status}>{status}</option>
             ))}
@@ -289,6 +322,117 @@ function AddMachine({ onClose, onAdded }: { onClose: () => void; onAdded: () => 
         </button>
       </form>
     </Modal>
+  );
+}
+
+function EditForm({ title, onClose, save, children }: any) {
+  const [formError, setFormError] = useState("");
+  const submit = async (event: any) => {
+    event.preventDefault();
+    setFormError("");
+    try {
+      await save(Object.fromEntries(new FormData(event.currentTarget)));
+    } catch (e) {
+      setFormError(errorMessage(e));
+    }
+  };
+  return (
+    <Modal title={title} icon={<Wrench size={20} />} onClose={onClose}>
+      <form className="form form-upgraded" onSubmit={submit}>
+        {formError && <div className="error">{formError}</div>}
+        {children}
+        <button className="primary">Save changes</button>
+      </form>
+    </Modal>
+  );
+}
+
+function EditMachine({ machine, onClose, onSaved }: any) {
+  return (
+    <EditForm title="Edit machine" onClose={onClose} save={async (data: any) => { await updateMachine(machine.id, data); onSaved(); }}>
+      <div className="formGroup">
+        <label htmlFor="field-name">Machine name</label>
+        <input id="field-name" name="name" defaultValue={machine.name} required />
+      </div>
+      <div className="formGroup">
+        <label htmlFor="field-model">Model</label>
+        <input id="field-model" name="model" defaultValue={machine.model || ""} />
+      </div>
+      <div className="formGroup">
+        <label htmlFor="field-serial_no">Serial number</label>
+        <input id="field-serial_no" name="serial_no" defaultValue={machine.serial_no} required />
+      </div>
+      <div className="formGroup">
+        <label htmlFor="field-status">Status</label>
+        <select id="field-status" name="status" defaultValue={machine.status}>
+          {["Operational", "Under Maintenance", "Under Repair", "Retired"].map((status) => (
+            <option key={status}>{status}</option>
+          ))}
+        </select>
+      </div>
+    </EditForm>
+  );
+}
+
+function EditCustomer({ customer, onClose, onSaved }: any) {
+  return (
+    <EditForm title="Edit customer" onClose={onClose} save={async (data: any) => { await updateCustomer(customer.id, data); onSaved(); }}>
+      <div className="formGroup">
+        <label htmlFor="field-name">Company/Organization Name</label>
+        <input id="field-name" name="name" defaultValue={customer.name} required />
+      </div>
+      <div className="formGroup">
+        <label htmlFor="field-email">Contact email</label>
+        <input id="field-email" name="email" type="email" defaultValue={customer.email} required />
+      </div>
+      <div className="formGroup">
+        <label htmlFor="field-phone">Phone</label>
+        <input id="field-phone" name="phone" defaultValue={customer.phone || ""} />
+      </div>
+    </EditForm>
+  );
+}
+
+function ChangePassword() {
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const submit = async (event: any) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = Object.fromEntries(new FormData(form)) as Record<string, string>;
+    setError("");
+    setMessage("");
+    if (data.new_password !== data.confirm_password) {
+      setError("The new passwords do not match");
+      return;
+    }
+    try {
+      await changePassword({ current_password: data.current_password, new_password: data.new_password });
+      form.reset();
+      setMessage("Password changed. You've been signed out on your other devices.");
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  };
+  return (
+    <form className="form form-upgraded changePassword" onSubmit={submit}>
+      <h3>Change password</h3>
+      {error && <div className="error">{error}</div>}
+      {message && <div className="success">{message}</div>}
+      <div className="formGroup">
+        <label htmlFor="field-current_password">Current password</label>
+        <input id="field-current_password" name="current_password" type="password" autoComplete="current-password" required />
+      </div>
+      <div className="formGroup">
+        <label htmlFor="field-new_password">New password</label>
+        <input id="field-new_password" name="new_password" type="password" autoComplete="new-password" minLength={8} required />
+      </div>
+      <div className="formGroup">
+        <label htmlFor="field-confirm_password">Confirm new password</label>
+        <input id="field-confirm_password" name="confirm_password" type="password" autoComplete="new-password" minLength={8} required />
+      </div>
+      <button className="primary">Update password</button>
+    </form>
   );
 }
 
@@ -340,7 +484,7 @@ function description(title: string) {
     )[title] || "Service operations workspace."
   );
 }
-function ResourceRow({ item, title, Icon }: any) {
+function ResourceRow({ item, title, Icon, actions }: any) {
   const isJob = ["My Jobs", "Assigned Jobs", "Jobs / Requests"].includes(title);
   const heading =
     item.title ||
@@ -376,6 +520,7 @@ function ResourceRow({ item, title, Icon }: any) {
         {item.status ||
           (title === "Reviews" ? `${item.rating}/5` : title === "Notifications" ? (item.is_read ? "Read" : "New") : "Active")}
       </span>
+      {actions}
     </article>
   );
 }

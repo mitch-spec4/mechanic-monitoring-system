@@ -6,7 +6,7 @@ import CustomerDashboard from "./pages/CustomerDashboard";
 import WorkspacePage from "./pages/WorkspacePage";
 import Profile from "./components/Profile";
 import Sidebar from "./components/Sidebar";
-import { clearSession, SESSION_EXPIRED_EVENT } from "./services/api";
+import { clearSession, logout as endSession, SESSION_EXPIRED_EVENT } from "./services/api";
 import "./style.css";
 import "./components/DashboardShell.css";
 
@@ -17,15 +17,19 @@ export default function App() {
 	});
 	const [active, setActive] = useState("Dashboard");
 
-	const logout = () => {
+	const signedOut = () => {
 		clearSession();
 		setUser(null);
 		setActive("Dashboard");
 	};
+	const logout = () => {
+		endSession();
+		signedOut();
+	};
 
 	useEffect(() => {
-		window.addEventListener(SESSION_EXPIRED_EVENT, logout);
-		return () => window.removeEventListener(SESSION_EXPIRED_EVENT, logout);
+		window.addEventListener(SESSION_EXPIRED_EVENT, signedOut);
+		return () => window.removeEventListener(SESSION_EXPIRED_EVENT, signedOut);
 	}, []);
 
 	if (!user) {

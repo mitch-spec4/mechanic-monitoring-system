@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Ban, Plus, ClipboardList, Wrench, Trash2, CheckCircle2 } from "lucide-react";
+import { Ban, Pencil, Plus, ClipboardList, Wrench, Trash2, CheckCircle2 } from "lucide-react";
 import {
   customers,
   jobs,
@@ -28,6 +28,7 @@ export default function BossDashboard({ u }: { u: any }) {
     [modal, setModalState] = useState(""),
     [formError, setFormError] = useState(""),
     [notice, setNotice] = useState(""),
+    [editingJob, setEditingJob] = useState<any>(null),
     [selectedMechanic, setSelectedMechanic] = useState(null),
     [selectedCustomer, setSelectedCustomer] = useState(null);
   const load = () =>
@@ -111,6 +112,10 @@ export default function BossDashboard({ u }: { u: any }) {
                 onAssign={(id: number, mechanic_id: number) => act(() => updateJob(id, { mechanic_id }))}
                 onDelete={(id: number) => act(() => deleteJob(id))}
                 onCancel={(id: number) => act(() => updateJob(id, { status: "Cancelled" }))}
+                onEdit={(job: any) => {
+                  setFormError("");
+                  setEditingJob(job);
+                }}
               />
             ))}
           </Panel>
@@ -218,6 +223,39 @@ export default function BossDashboard({ u }: { u: any }) {
           </form>
         </Modal>
       )}
+      {editingJob && (
+        <Modal title="Edit job" onClose={() => setEditingJob(null)}>
+          <form
+            className="form"
+            onSubmit={async (e: any) => {
+              e.preventDefault();
+              setFormError("");
+              try {
+                await updateJob(editingJob.id, Object.fromEntries(new FormData(e.currentTarget)));
+                setEditingJob(null);
+                load();
+              } catch (error) {
+                setFormError(errorMessage(error));
+              }
+            }}
+          >
+            {formError && <div className="error">{formError}</div>}
+            <input name="title" defaultValue={editingJob.title} placeholder="Job title" required />
+            <textarea name="description" defaultValue={editingJob.description} placeholder="Problem / job description" required />
+            <div className="row">
+              <select name="priority" defaultValue={editingJob.priority}>
+                <option>Low</option>
+                <option>Medium</option>
+                <option>High</option>
+                <option>Urgent</option>
+              </select>
+              <input name="location" defaultValue={editingJob.location || ""} placeholder="Job site" />
+            </div>
+            <input name="due_date" type="date" defaultValue={editingJob.due_date || ""} aria-label="Due date" title="Due date" />
+            <button className="primary">Save changes</button>
+          </form>
+        </Modal>
+      )}
       {modal === "invite" && <InviteForm role="customer" onClose={() => setModal("")} />}
       {modal === "addmech" && <InviteForm role="mechanic" onClose={() => setModal("")} />}
       {selectedMechanic && (
@@ -270,7 +308,7 @@ function Panel({ title, action, children }: any) {
 // Jobs that have not started can be deleted; any unfinished job can be cancelled.
 const DELETABLE = ["Pending", "Assigned"];
 const CANCELLABLE = ["Pending", "Assigned", "Accepted", "In Progress", "Paused"];
-function Job({ j, mechanics, onAssign, onDelete, onCancel }: any) {
+function Job({ j, mechanics, onAssign, onDelete, onCancel, onEdit }: any) {
   return (
     <div className="job">
       <div className="jobMain">
@@ -298,6 +336,11 @@ function Job({ j, mechanics, onAssign, onDelete, onCancel }: any) {
           <option key={m.id} value={m.id}>{m.name}</option>
         ))}
       </select>
+      {CANCELLABLE.includes(j.status) && (
+        <button className="iconButton" title="Edit job" aria-label={`Edit ${j.title}`} onClick={() => onEdit(j)}>
+          <Pencil size={15} />
+        </button>
+      )}
       {CANCELLABLE.includes(j.status) && (
         <button
           className="iconButton"

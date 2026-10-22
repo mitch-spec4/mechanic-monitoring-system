@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify
 
 from app import db
+from app.models.job import Job
 from app.models.machine import Machine
 from app.models.service_record import ServiceRecord
 from app.utils.auth import current_user, roles
@@ -47,6 +48,13 @@ def create():
     machine = Machine.query.filter_by(id=machine_id, company_id=user.company_id).first()
     if not machine:
         raise ValidationError("Machine not found", 404)
+    has_job = (
+        Job.query.filter_by(machine_id=machine.id, mechanic_id=user.id, company_id=user.company_id)
+        .filter(Job.status != "Cancelled")
+        .first()
+    )
+    if not has_job:
+        raise ValidationError("You can only add service records for machines on your own jobs", 403)
     record = ServiceRecord(
         machine_id=machine.id,
         customer_id=machine.customer_id,
