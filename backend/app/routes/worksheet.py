@@ -7,6 +7,7 @@ from app import db
 from app.models.customer import Customer
 from app.models.job import Job
 from app.models.location import LocationPoint
+from app.models.media import JobFile
 from app.models.machine import Machine
 from app.models.service_record import ServiceRecord
 from app.models.user import User
@@ -76,12 +77,14 @@ def job_detail(job, user):
     checklist = JobChecklistItem.query.filter_by(job_id=job.id).order_by(JobChecklistItem.position, JobChecklistItem.id).all()
     events = JobEvent.query.filter_by(job_id=job.id).order_by(JobEvent.created_at, JobEvent.id).all()
     record = ServiceRecord.query.filter_by(job_id=job.id).first()
+    files = JobFile.query.filter_by(job_id=job.id, status="ready").order_by(JobFile.created_at, JobFile.id).all()
     names = names_for(
         [job.mechanic_id]
         + [e.mechanic_id for e in entries]
         + [e.user_id for e in events]
         + [p.added_by for p in parts]
         + [c.done_by for c in checklist]
+        + [f.uploaded_by for f in files]
     )
     machine = db.session.get(Machine, job.machine_id) if job.machine_id else None
     customer = db.session.get(Customer, job.customer_id) if job.customer_id else None
@@ -114,6 +117,22 @@ def job_detail(job, user):
             for c in checklist
         ],
         "work_done": [e.work_done for e in entries if (e.work_done or "").strip()],
+        "files": [
+            {
+                "id": f.id,
+                "kind": f.kind,
+                "content_type": f.content_type,
+                "size_bytes": f.size_bytes,
+                "url": f"/api/files/{f.id}",
+                "created_at": iso(f.created_at),
+                "uploaded_by": names.get(f.uploaded_by),
+            }
+            for f in files
+            if f.kind != "signature"
+        ],
+        "signature": signature_out(job, files),
+        # The PDF report exists once the job is completed.
+        "report_url": f"/api/jobs/{job.id}/report.pdf" if job.status == "Completed" else None,
         "record": (
             {
                 "id": record.id,
@@ -136,6 +155,8 @@ def job_detail(job, user):
             item.pop("note")
         for part in detail["parts"]:
             part.pop("added_by")
+        for file in detail["files"]:
+            file.pop("uploaded_by")
         return detail
     entry_rows = [entry_out(e, names, now) for e in entries]
     detail.update(
@@ -162,9 +183,26 @@ def job_detail(job, user):
             .all()
         ],
         can_edit=user.role == "mechanic" and job.status not in FINISHED,
+        can_upload=user.role == "mechanic" and job.status in ("In Progress", "Paused"),
+        media_limits=media_limits(),
         completion_blockers=completion_problems(job) if job.status not in FINISHED else [],
     )
     return detail
+
+
+def signature_out(job, files):
+    image = next((f for f in reversed(files) if f.kind == "signature"), None)
+    if job.signed_at:
+        return {"name": job.signed_by_name, "signed_at": iso(job.signed_at), "url": f"/api/files/{image.id}" if image else None}
+    if job.no_signature_reason:
+        return {"not_signed_reason": job.no_signature_reason}
+    return None
+
+
+def media_limits():
+    from app.routes.media import media_limits as limits
+
+    return limits()
 
 
 @bp.get("/<int:jid>")

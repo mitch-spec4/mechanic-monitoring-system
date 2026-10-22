@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { failOnPageErrors, signIn } from "./helpers";
+import { failOnPageErrors, signIn, signAndComplete } from "./helpers";
 
 test("mechanic takes an assigned job all the way to completed", async ({ page }) => {
   const noErrors = failOnPageErrors(page);
@@ -35,6 +35,7 @@ test("mechanic takes an assigned job all the way to completed", async ({ page })
   }
   await expect(sheet.locator(".jobBlockers")).toHaveCount(0);
   await sheet.getByRole("button", { name: "Complete job" }).click();
+  await signAndComplete(page);
   await expect(sheet.locator(".jobStatusPill")).toHaveText("Completed");
   await sheet.getByRole("button", { name: "Back" }).click();
   await expect(job).toHaveCount(0);

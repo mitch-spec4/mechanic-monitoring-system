@@ -18,3 +18,8 @@ class Job(db.Model):
     machine_id = db.Column(db.Integer, db.ForeignKey("machine.id"), nullable=True, index=True)
     mechanic_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+    # Customer sign-off at completion: a signature (stored as a JobFile of kind "signature")
+    # with the signer's name, or the reason nobody could sign.
+    signed_by_name = db.Column(db.String(120))
+    signed_at = db.Column(db.DateTime)
+    no_signature_reason = db.Column(db.Text)

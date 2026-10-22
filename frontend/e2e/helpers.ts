@@ -21,3 +21,21 @@ export function failOnPageErrors(page: Page) {
   page.on("pageerror", (error) => errors.push(error.message));
   return () => expect(errors, "uncaught page errors").toEqual([]);
 }
+
+/** The customer signs on the open sign-off pad, then the job is completed. */
+export async function signAndComplete(page: Page, name = "Grace Wanjiru") {
+  const dialog = page.getByRole("dialog", { name: "Customer sign-off" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel("Name of the person signing").fill(name);
+  const pad = dialog.locator("canvas");
+  const box = (await pad.boundingBox())!;
+  await page.mouse.move(box.x + 30, box.y + box.height / 2);
+  await page.mouse.down();
+  for (let step = 1; step <= 12; step++) {
+    await page.mouse.move(box.x + 30 + step * 18, box.y + box.height / 2 + (step % 2 ? -25 : 25));
+  }
+  await page.mouse.up();
+  await dialog.getByRole("button", { name: "Complete job" }).click();
+  await expect(dialog.getByRole("status")).toContainText(`Signed by ${name}`);
+  await expect(dialog).toHaveCount(0);
+}

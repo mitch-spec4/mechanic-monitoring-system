@@ -1,0 +1,678 @@
+/*
+ * Customer sign-off sheet. Colours come from the role theme (--role-color), so it stays green
+ * for mechanics. Full screen on phones, a floating card on wider screens.
+ */
+/* Doubled class: the shared .overlay rules load after this file. */
+.overlay.signOverlay {
+  --sign: var(--role-color, #168b4b);
+  --sign-soft: var(--role-soft, #eaf8ee);
+  --sign-deep: color-mix(in srgb, var(--sign) 38%, #04140e);
+  --sign-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  background: radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--sign) 30%, #061425cc), #061425dd);
+  backdrop-filter: blur(6px);
+  z-index: 60;
+}
+.signSheet {
+  position: relative;
+  width: 560px;
+  max-width: 100%;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow:
+    0 30px 80px -20px rgba(2, 12, 8, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.08);
+  animation: sign-pop 0.45s var(--sign-ease) both;
+}
+
+/* ---------- Hero: the job being signed for ---------- */
+.signHero {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  padding: 18px 20px 16px;
+  color: #fff;
+  background: linear-gradient(140deg, var(--sign-deep) 0%, color-mix(in srgb, var(--sign) 85%, #000) 55%, var(--sign) 100%);
+}
+.signAurora {
+  position: absolute;
+  inset: -60% -20% auto;
+  height: 220%;
+  z-index: -1;
+  background:
+    radial-gradient(40% 30% at 20% 40%, rgba(255, 255, 255, 0.22), transparent 70%),
+    radial-gradient(35% 28% at 80% 30%, color-mix(in srgb, var(--sign) 60%, #9dffcf), transparent 70%),
+    radial-gradient(30% 25% at 60% 80%, rgba(255, 214, 102, 0.35), transparent 70%);
+  filter: blur(18px);
+  animation: sign-aurora 9s ease-in-out infinite alternate;
+}
+.signHeroTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.signBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+.signBadge h2 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.signClose {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.2s var(--sign-ease), background 0.2s ease;
+}
+.signClose:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.24);
+  transform: rotate(90deg);
+}
+.signLead {
+  margin: 14px 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+}
+.signJob {
+  margin: 0;
+  font-size: 23px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.signFacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.signFacts li {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+.signSteps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+.signSteps li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+}
+.signSteps li + li::before {
+  content: "";
+  width: 22px;
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.28);
+}
+.signSteps li span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 11px;
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  transition: all 0.3s var(--sign-ease);
+}
+.signSteps li.done {
+  color: #fff;
+}
+.signSteps li.done span {
+  border-color: #fff;
+  background: #fff;
+  color: var(--sign);
+  transform: scale(1.1);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.18);
+}
+
+/* ---------- Body ---------- */
+.signBody {
+  display: grid;
+  gap: 12px;
+  padding: 16px 20px 20px;
+  font-size: 13px;
+}
+.signSwitch {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 4px;
+  border-radius: 14px;
+  background: #eef2f6;
+  isolation: isolate;
+}
+.signThumb {
+  position: absolute;
+  z-index: -1;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 4px 14px -6px rgba(15, 23, 42, 0.35);
+  transform: translateX(calc(var(--pos) * 100%));
+  transition: transform 0.35s var(--sign-ease);
+}
+.signSwitch button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 6px 8px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #64748b;
+  cursor: pointer;
+  transition: color 0.25s ease;
+}
+.signSwitch button[aria-pressed="true"] {
+  color: var(--sign);
+}
+.signHint {
+  margin: 0;
+  color: #64748b;
+}
+.signField {
+  display: grid;
+  gap: 6px;
+}
+.signField span {
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+}
+.signField input,
+.signField textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid #dce5ef;
+  border-radius: 14px;
+  font: inherit;
+  font-size: 16px; /* 16px stops phones zooming in on focus */
+  background: #fbfdff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.signField input:focus,
+.signField textarea:focus {
+  outline: none;
+  border-color: var(--sign);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sign) 18%, transparent);
+}
+.signField textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+/* ---------- The signing paper ---------- */
+.signPaper {
+  position: relative;
+  height: 230px;
+  border-radius: 18px;
+  overflow: hidden;
+  touch-action: none;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 33px, color-mix(in srgb, var(--sign) 7%, transparent) 33px 34px),
+    linear-gradient(180deg, #ffffff, color-mix(in srgb, var(--sign-soft) 55%, #fff));
+  border: 2px dashed color-mix(in srgb, var(--sign) 40%, #c8d3df);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.signPaper.inked {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--sign) 55%, transparent);
+  box-shadow: 0 10px 30px -18px var(--sign);
+}
+.signPaper canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+.signTip {
+  position: absolute;
+  z-index: 3;
+  top: -11px;
+  left: -11px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle, color-mix(in srgb, var(--sign) 70%, #fff) 0 18%, color-mix(in srgb, var(--sign) 35%, transparent) 40%, transparent 70%);
+  transition: opacity 0.2s ease;
+}
+.signTip.on {
+  opacity: 1;
+}
+.signGhost {
+  position: absolute;
+  inset: 20px 24px 64px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.signGhost svg {
+  width: min(100%, 300px);
+  height: auto;
+  overflow: visible;
+}
+.signGhost path {
+  fill: none;
+  stroke: color-mix(in srgb, var(--sign) 35%, #b9c6d4);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 640;
+  stroke-dashoffset: 640;
+  animation: sign-ghost 3.6s var(--sign-ease) infinite;
+}
+.signGhost b {
+  position: absolute;
+  bottom: -6px;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--sign) 55%, #94a3b8);
+}
+.signLine {
+  position: absolute;
+  z-index: 1;
+  left: 22px;
+  right: 22px;
+  bottom: 52px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--sign) 60%, #334155), color-mix(in srgb, var(--sign) 15%, #cbd5e1));
+  pointer-events: none;
+}
+.signLine span {
+  position: absolute;
+  left: 0;
+  bottom: 4px;
+  font-size: 18px;
+  font-weight: 800;
+  color: color-mix(in srgb, var(--sign) 70%, #334155);
+}
+.signCaption {
+  position: absolute;
+  z-index: 1;
+  left: 22px;
+  bottom: 26px;
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-size: 13px;
+  color: #475569;
+  pointer-events: none;
+}
+.signTools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: -2px;
+}
+.signInks,
+.signEdits {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.signInks span {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #64748b;
+  margin-right: 2px;
+}
+.signInk {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: var(--ink);
+  box-shadow: 0 0 0 1px #cbd5e1;
+  cursor: pointer;
+  transition: transform 0.2s var(--sign-ease), box-shadow 0.2s ease;
+}
+.signInk.active {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 2px var(--ink);
+}
+.signTool {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid #dbe3ec;
+  background: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+  cursor: pointer;
+  transition: transform 0.18s var(--sign-ease), color 0.2s ease, border-color 0.2s ease;
+}
+.signTool:hover:not(:disabled) {
+  color: var(--sign);
+  border-color: color-mix(in srgb, var(--sign) 40%, transparent);
+  transform: translateY(-1px);
+}
+.signTool:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.signStamp {
+  position: absolute;
+  z-index: 5;
+  right: 26px;
+  top: 22px;
+  pointer-events: none;
+  animation: sign-stamp 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+.signStamp span {
+  display: block;
+  padding: 6px 14px;
+  border: 3px solid var(--sign);
+  border-radius: 10px;
+  color: var(--sign);
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transform: rotate(-12deg);
+  background: color-mix(in srgb, var(--sign-soft) 70%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sign) 25%, transparent);
+}
+
+/* ---------- Not present ---------- */
+.signReasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.signReasons button {
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid #dbe3ec;
+  background: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s var(--sign-ease);
+}
+.signReasons button:hover:not(:disabled),
+.signReasons button.active {
+  color: var(--sign);
+  border-color: color-mix(in srgb, var(--sign) 45%, transparent);
+  background: var(--sign-soft);
+}
+
+/* ---------- Complete ---------- */
+.appShell .signBody .signSubmit,
+.signBody .signSubmit {
+  width: 100%;
+  min-height: 54px;
+  border-radius: 16px;
+  font-size: 15px;
+  gap: 9px;
+}
+.appShell .signBody .signSubmit::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.32) 50%, transparent 65%);
+  animation: sign-shine 2.8s ease-in-out infinite;
+}
+
+/* ---------- Celebration ---------- */
+.signCelebrate {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 6px;
+  text-align: center;
+  background: radial-gradient(60% 50% at 50% 45%, rgba(255, 255, 255, 0.97), rgba(255, 255, 255, 0.9));
+  animation: sign-fade 0.35s ease both;
+}
+/* When the customer signed, the stamp lands on the signature first. */
+.signCelebrate.afterStamp,
+.signCelebrate.afterStamp .signSeal,
+.signCelebrate.afterStamp .signConfetti i {
+  animation-delay: 0.6s;
+}
+.signCelebrate.afterStamp .signSeal {
+  animation-delay: 0.7s;
+}
+.signSeal {
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  margin-bottom: 8px;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--sign) 75%, #fff), var(--sign) 55%, var(--sign-deep));
+  box-shadow:
+    0 0 0 10px color-mix(in srgb, var(--sign) 14%, transparent),
+    0 18px 40px -12px var(--sign);
+  animation: sign-seal 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) 0.1s both;
+}
+.signCelebrate strong {
+  font-size: 22px;
+  color: #0f172a;
+}
+.signCelebrate > span {
+  font-size: 14px;
+  color: #475569;
+}
+.signConfetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.signConfetti i {
+  position: absolute;
+  top: 46%;
+  left: 50%;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--sign);
+  opacity: 0;
+  --angle: calc(var(--i) * 13.85deg);
+  animation: sign-confetti 1.2s cubic-bezier(0.15, 0.7, 0.3, 1) both;
+  animation-delay: calc(var(--i) * 12ms);
+}
+.signConfetti i:nth-child(3n) {
+  background: #f5b82e;
+}
+.signConfetti i:nth-child(3n + 1) {
+  background: color-mix(in srgb, var(--sign) 45%, #7dd3fc);
+  border-radius: 50%;
+  width: 9px;
+  height: 9px;
+}
+
+/* ---------- Phones: a full-screen sheet ---------- */
+@media (max-width: 640px) {
+  .overlay.signOverlay {
+    padding: 0;
+    place-items: stretch;
+  }
+  .signSheet {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-height: none;
+    height: 100dvh;
+    border-radius: 0;
+    animation-name: sign-rise;
+  }
+  .signHero {
+    flex: none;
+    padding-top: max(16px, env(safe-area-inset-top));
+  }
+  .signJob {
+    font-size: 20px;
+  }
+  /* The pad takes whatever height is left, so the customer gets as much room as possible. */
+  .signBody {
+    flex: 1 0 auto;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: max(18px, env(safe-area-inset-bottom));
+  }
+  .signPaper {
+    flex: 1 0 230px;
+    height: auto;
+  }
+  .signSwitch button {
+    flex-direction: column;
+    gap: 3px;
+    min-height: 54px;
+    font-size: 12px;
+    line-height: 1.2;
+  }
+}
+
+@keyframes sign-pop {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.96);
+  }
+}
+@keyframes sign-rise {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+}
+@keyframes sign-aurora {
+  to {
+    transform: translate(-8%, 6%) rotate(8deg) scale(1.08);
+  }
+}
+@keyframes sign-ghost {
+  0% {
+    stroke-dashoffset: 640;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  65% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+@keyframes sign-shine {
+  0%,
+  45% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(110%);
+  }
+}
+@keyframes sign-stamp {
+  from {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+}
+@keyframes sign-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sign-seal {
+  from {
+    opacity: 0;
+    transform: scale(0.3) rotate(-30deg);
+  }
+}
+@keyframes sign-confetti {
+  0% {
+    opacity: 1;
+    transform: rotate(var(--angle)) translateY(0) rotate(0);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--angle)) translateY(-190px) rotate(540deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signSheet,
+  .signAurora,
+  .signGhost path,
+  .signStamp,
+  .signSeal,
+  .signCelebrate,
+  .appShell .signBody .signSubmit::before {
+    animation: none;
+  }
+  .signGhost path {
+    stroke-dashoffset: 0;
+  }
+  .signConfetti {
+    display: none;
+  }
+}

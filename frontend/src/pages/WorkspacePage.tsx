@@ -482,6 +482,18 @@ function ResourceRow({ item, title, Icon, actions, onOpenJob, onOpenCustomer }: 
     </article>
   );
 }
+/** "0 B", "350 KB", "1.2 GB": photo and video storage used. */
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
+}
 function ReportSummary({ summary }: any) {
   const jobSummary = summary.jobs || {};
   const chartItems = [
@@ -514,7 +526,11 @@ function ReportSummary({ summary }: any) {
   return (
     <div className="reportArea">
       <div className="reportGrid">
-        {Object.entries({ ...jobSummary, rating: summary.rating == null ? "-" : Number(summary.rating).toFixed(1) }).map(([label, value]) => <div key={label}><strong>{String(value)}</strong><span>{label.replace(/_/g, " ")}</span></div>)}
+        {Object.entries({
+          ...jobSummary,
+          rating: summary.rating == null ? "-" : Number(summary.rating).toFixed(1),
+          ...(summary.totals?.storage_bytes != null ? { storage_used: formatBytes(summary.totals.storage_bytes) } : {}),
+        }).map(([label, value]) => <div key={label}><strong>{String(value)}</strong><span>{label.replace(/_/g, " ")}</span></div>)}
       </div>
       <div className="chartGrid">
         <section className="chartPanel"><div className="chartHeading"><h2>Jobs by status</h2><span>{total} total</span></div><div className="barChart">{chartItems.map(([label, value, tone]) => <div className="barItem" key={label}><div className="barValue"><span>{label}</span><b>{value}</b></div><div className="barTrack"><i className={`barFill ${tone}`} style={{ width: `${total ? Math.max((value / total) * 100, value ? 8 : 0) : 0}%` }} /></div></div>)}</div></section>
