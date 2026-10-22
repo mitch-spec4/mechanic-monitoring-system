@@ -48,9 +48,11 @@
   justify-self: start;
   font-size: 12px;
 }
-.teamRowActions {
+/* Beats ".teamRow > div" above, which lays out the text column as a grid. */
+.teamRow > .teamRowActions {
   grid-column: 2;
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 .appShell .teamRowActions .listAction {
