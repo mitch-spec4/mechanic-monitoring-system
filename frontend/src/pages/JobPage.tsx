@@ -85,7 +85,6 @@ export default function JobPage({ jobId, user, onBack }: Props) {
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [signing, setSigning] = useState(false);
-  const [signError, setSignError] = useState("");
 
   const load = () =>
     jobDetail(jobId)
@@ -134,19 +133,15 @@ export default function JobPage({ jobId, user, onBack }: Props) {
   const liveSeconds = closedSeconds + (running ? Math.max(0, (now - asDate(running.started_at).getTime()) / 1000) : 0);
   const setStatus = (status: string) => run(() => changeJobStatus(job.id, status, user.role));
   // Completing asks for the customer's sign-off first; it is sent with the completion.
-  const complete = async (signOff: SignOff) => {
-    setSignError("");
-    setBusy(true);
-    try {
-      await changeJobStatus(job.id, "Completed", user.role, signOff);
-      setSigning(false);
-      await load();
-    } catch (e) {
-      setSignError(errorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const complete = (signOff: SignOff) => changeJobStatus(job.id, "Completed", user.role, signOff);
+  const photoCount = (job.files || []).filter((file: any) => file.kind !== "video").length;
+  const signFacts = [
+    job.customer?.name,
+    job.machine?.name,
+    photoCount ? `${photoCount} photo${photoCount === 1 ? "" : "s"}` : null,
+    job.checklist.length ? `Checklist ${doneCount}/${job.checklist.length}` : null,
+    job.parts.length ? `${job.parts.length} part${job.parts.length === 1 ? "" : "s"} used` : null,
+  ].filter(Boolean) as string[];
 
   return (
     <main className={`jobPage status-${job.status.replace(/ /g, "").toLowerCase()}`}>
@@ -207,10 +202,7 @@ export default function JobPage({ jobId, user, onBack }: Props) {
                 <button
                   className="primary"
                   disabled={busy || job.completion_blockers.length > 0}
-                  onClick={() => {
-                    setSignError("");
-                    setSigning(true);
-                  }}
+                  onClick={() => setSigning(true)}
                 >
                   <CheckCircle2 size={16} /> Complete job
                 </button>
@@ -415,7 +407,16 @@ export default function JobPage({ jobId, user, onBack }: Props) {
         )}
       </div>
       {signing && (
-        <SignatureModal jobTitle={job.title} busy={busy} error={signError} onSubmit={complete} onClose={() => setSigning(false)} />
+        <SignatureModal
+          jobTitle={job.title}
+          facts={signFacts}
+          onSubmit={complete}
+          onDone={() => {
+            setSigning(false);
+            load();
+          }}
+          onClose={() => setSigning(false)}
+        />
       )}
     </main>
   );

@@ -47,6 +47,15 @@ test("mechanic adds before and after photos, the customer signs, and the report 
   }
 
   await sheet.getByRole("button", { name: "Complete job" }).click();
+  // The sheet can switch to "Customer not present" with a ready-made reason, and back.
+  const dialog = page.getByRole("dialog", { name: "Customer sign-off" });
+  await dialog.getByRole("button", { name: "Customer not present" }).click();
+  await dialog.getByRole("button", { name: "Approved by phone" }).click();
+  await expect(dialog.getByLabel("Why couldn't the customer sign?")).toHaveValue("Approved by phone");
+  await dialog.getByRole("button", { name: "Customer signs" }).click();
+  // Signing without a name is refused on the phone.
+  await dialog.getByRole("button", { name: "Complete job" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText("Enter the name of the person signing.");
   await signAndComplete(page, "Peter Otieno");
   await expect(sheet.locator(".jobStatusPill")).toHaveText("Completed");
   await expect(sheet.locator(".jobCard", { hasText: "Customer sign-off" })).toContainText("Signed by Peter Otieno");
