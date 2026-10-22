@@ -82,8 +82,9 @@ test("boss adds a machine and duplicate serials are rejected", async ({ page }) 
   await expect(page.locator(".subPageList")).toContainText("Boiler B-7");
 });
 
-test("invited customer joins with the code and signs in", async ({ page, context }) => {
-  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+test("invited customer joins with the code and signs in", async ({ page, context, browserName }) => {
+  // Only Chromium lets tests grant clipboard access; elsewhere the click itself is the user gesture.
+  if (browserName === "chromium") await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await signIn(page, "james@mechanicpro.test");
   await page.getByRole("button", { name: "Add customer" }).click();
   const form = page.locator("form.form-upgraded");
@@ -97,8 +98,9 @@ test("invited customer joins with the code and signs in", async ({ page, context
   await expect(email).toHaveAttribute("href", /^mailto:delta%40example\.com\?subject=/);
   expect(decodeURIComponent((await email.getAttribute("href")) ?? "")).toContain(code);
   await page.getByRole("button", { name: "Copy code" }).click();
-  await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(code);
+  if (browserName === "chromium") await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
+  else await expect(page.getByRole("button", { name: "Copied" }).or(page.getByText("Copy failed"))).toBeVisible();
+  if (browserName === "chromium") expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(code);
   await page.getByRole("button", { name: "Done" }).click();
 
   await page.evaluate(() => localStorage.clear());

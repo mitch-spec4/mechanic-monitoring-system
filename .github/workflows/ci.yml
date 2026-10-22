@@ -72,25 +72,18 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements*.txt
       - name: Install dependencies
-        run: pip install -r requirements.txt
-      - name: Migrate and seed PostgreSQL
-        run: python seed.py
-      - name: Smoke test against PostgreSQL
+        run: pip install -r requirements-dev.txt
+      - name: Migrate, seed, and check migrations on PostgreSQL
         run: |
-          python - <<'PY'
-          from app import create_app
-
-          client = create_app().test_client()
-          assert client.get("/api/health").get_json() == {"status": "ok"}
-          login = client.post("/api/auth/login", json={"email": "amina@mechanicpro.test", "password": "password"})
-          assert login.status_code == 200, login.get_data(as_text=True)
-          headers = {"Authorization": f"Bearer {login.get_json()['token']}"}
-          job = next(j for j in client.get("/api/jobs", headers=headers).get_json()["jobs"] if j["status"] == "Assigned")
-          for status in ("In Progress", "Paused", "In Progress", "Completed"):
-              response = client.patch(f"/api/jobs/{job['id']}", headers=headers, json={"status": status})
-              assert response.status_code == 200, response.get_data(as_text=True)
-          print("PostgreSQL migration, seed, login, and job flow passed.")
-          PY
+          python seed.py
+          python seed.py
+          flask --app run.py db check
+      - name: Run the full test suite on PostgreSQL
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mechanic_test
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -c "create database mechanic_test"
+          pytest -q
 
   e2e:
     name: e2e (${{ matrix.project }})
@@ -153,6 +146,9 @@ jobs:
       - name: Backend setup from SETUP.md
         working-directory: backend
         run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          py --version
           py -m venv .venv
           .\.venv\Scripts\Activate.ps1
           pip install -r requirements-dev.txt
@@ -162,12 +158,16 @@ jobs:
       - name: Frontend setup from SETUP.md
         working-directory: frontend
         run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
           npm ci
           Copy-Item .env.example .env.local
           npm run build
       - name: Browser tests on Windows
         working-directory: frontend
         run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
           npx playwright install chromium
           $env:E2E_PYTHON = (Resolve-Path ..\backend\.venv\Scripts\python.exe).Path
           npm run test:e2e

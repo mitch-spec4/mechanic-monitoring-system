@@ -39,7 +39,8 @@ test("an expired access token is refreshed silently", async ({ page, context }) 
 test("a failed refresh signs the user out", async ({ page, context }) => {
   await signIn(page, "abc@example.com");
   await context.clearCookies();
-  await page.locator(".sidebarLink", { hasText: "Service History" }).click();
+  // Without session cookies the next request fails, refresh fails, and the app signs out.
+  await page.reload();
   await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
 });
 

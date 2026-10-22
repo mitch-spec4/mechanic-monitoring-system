@@ -7,7 +7,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ["APP_ENV"] = "test"
 
-from app import create_app, db  # noqa: E402
+from app import create_app, db, normalize_database_url  # noqa: E402
 from app.models import Company, Customer, Job, Machine, ServiceRecord, User  # noqa: E402
 
 PASSWORD = "correct-horse-battery"
@@ -15,17 +15,16 @@ PASSWORD = "correct-horse-battery"
 
 @pytest.fixture
 def app(tmp_path):
-    app = create_app(
-        {
-            "SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp_path / 'test.db'}",
-            "RATELIMIT_ENABLED": False,
-            "TESTING": True,
-        }
-    )
+    # TEST_DATABASE_URL runs the suite against another database (CI uses PostgreSQL); its
+    # tables are dropped and recreated for every test.
+    database_url = normalize_database_url(os.getenv("TEST_DATABASE_URL") or f"sqlite:///{tmp_path / 'test.db'}")
+    app = create_app({"SQLALCHEMY_DATABASE_URI": database_url, "RATELIMIT_ENABLED": False, "TESTING": True})
     with app.app_context():
+        db.drop_all()
         db.create_all()
         yield app
         db.session.remove()
+        db.drop_all()
 
 
 @pytest.fixture
