@@ -9,6 +9,7 @@ import Sidebar from "./components/Sidebar";
 import { clearSession, logout as endSession, SESSION_EXPIRED_EVENT } from "./services/api";
 import "./style.css";
 import "./components/DashboardShell.css";
+import "./components/Buttons.css";
 
 export default function App() {
 	const [user, setUser] = useState<any>(() => {
