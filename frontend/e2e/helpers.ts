@@ -24,7 +24,7 @@ export function failOnPageErrors(page: Page) {
 
 /** The customer signs on the open sign-off pad, then the job is completed. */
 export async function signAndComplete(page: Page, name = "Grace Wanjiru") {
-  const dialog = page.locator(".modal", { hasText: "Customer sign-off" });
+  const dialog = page.getByRole("dialog", { name: "Customer sign-off" });
   await expect(dialog).toBeVisible();
   await dialog.getByLabel("Name of the person signing").fill(name);
   const pad = dialog.locator("canvas");
@@ -36,5 +36,6 @@ export async function signAndComplete(page: Page, name = "Grace Wanjiru") {
   }
   await page.mouse.up();
   await dialog.getByRole("button", { name: "Complete job" }).click();
+  await expect(dialog.getByRole("status")).toContainText(`Signed by ${name}`);
   await expect(dialog).toHaveCount(0);
 }

@@ -61,19 +61,14 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
   const [changing, setChanging] = useState<number | null>(null);
   // When the customer's sign-off is all that's missing, the server says so and we ask for it.
   const [signing, setSigning] = useState<any>(null);
-  const [signError, setSignError] = useState("");
-  const change = async (id: number, status: string, signOff?: SignOff) => {
+  const change = async (id: number, status: string) => {
     setActionError("");
     setChanging(id);
     try {
-      await changeJobStatus(id, status, "mechanic", signOff || {});
-      setSigning(null);
+      await changeJobStatus(id, status, "mechanic");
     } catch (error) {
-      if (signOff) setSignError(errorMessage(error));
-      else if (error instanceof ApiError && error.data?.needs_signature) {
-        setSignError("");
-        setSigning(jobList.find((job) => job.id === id));
-      } else setActionError(errorMessage(error));
+      if (error instanceof ApiError && error.data?.needs_signature) setSigning(jobList.find((job) => job.id === id));
+      else setActionError(errorMessage(error));
     } finally {
       setChanging(null);
     }
@@ -204,9 +199,12 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
         {signing && (
           <SignatureModal
             jobTitle={signing.title}
-            busy={changing === signing.id}
-            error={signError}
-            onSubmit={(signOff) => change(signing.id, "Completed", signOff)}
+            facts={[machineList.find((item) => item.id === signing.machine_id)?.name, signing.location].filter(Boolean)}
+            onSubmit={(signOff: SignOff) => changeJobStatus(signing.id, "Completed", "mechanic", signOff)}
+            onDone={() => {
+              setSigning(null);
+              load();
+            }}
             onClose={() => setSigning(null)}
           />
         )}
