@@ -157,6 +157,8 @@ def update_job(jid):
 
     if old_status != job.status and user.role == "mechanic":
         notify_bosses(job.company_id, "Job status updated", f"{job.title} is now {job.status}.", "status")
+    if old_status != job.status and job.status == "Cancelled" and job.mechanic_id:
+        notify(job.mechanic_id, "Job cancelled", f"{job.title} was cancelled by your manager.", "job")
     db.session.commit()
     return jsonify(job=out(job))
 

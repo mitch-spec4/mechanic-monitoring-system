@@ -28,13 +28,33 @@ test("boss creates and assigns a job with a real due date", async ({ page }) => 
   noErrors();
 });
 
-test("deleting a started job is refused with an inline message", async ({ page }) => {
+test("started jobs can be cancelled but not deleted", async ({ page }) => {
   await signIn(page, "james@mechanicpro.test");
+  // Mitch's accepted compressor job: started, so it can be cancelled but not deleted.
+  const started = page.locator(".job", { hasText: "Compressor C-55 maintenance" });
+  await expect(started).toContainText("Accepted");
+  await expect(started.getByTitle("Delete job")).toHaveCount(0);
+  await expect(page.locator(".job", { hasText: "Repair Hydraulic Pump H-21" }).getByTitle("Delete job")).toBeVisible();
+  await expect(page.locator(".job", { hasText: "Conveyor Line CL-4 inspection" }).getByTitle("Cancel job")).toHaveCount(0);
+
   page.once("dialog", (dialog) => dialog.accept());
-  const started = page.locator(".job", { hasText: "Service Generator G-102" });
-  await started.getByTitle("Delete job").click();
-  await expect(page.getByRole("alert")).toContainText("Cancel this job instead");
-  await expect(started).toBeVisible();
+  await started.getByTitle("Cancel job").click();
+  await expect(started.locator(".status")).toHaveText("Cancelled");
+  await expect(started.getByTitle("Cancel job")).toHaveCount(0);
+});
+
+test("deleting a started job through the API is still refused", async ({ page }) => {
+  await signIn(page, "james@mechanicpro.test");
+  const message = await page.evaluate(async () => {
+    const jobs = await (await fetch("http://127.0.0.1:5000/api/jobs", { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } })).json();
+    const started = jobs.jobs.find((job: any) => job.status === "In Progress");
+    const response = await fetch(`http://127.0.0.1:5000/api/jobs/${started.id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
+    return `${response.status} ${(await response.json()).error}`;
+  });
+  expect(message).toContain("409");
 });
 
 test("customer profile opens as an overlay", async ({ page }) => {

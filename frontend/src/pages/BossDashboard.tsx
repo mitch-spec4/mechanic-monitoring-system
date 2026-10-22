@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, ClipboardList, Wrench, Trash2, CheckCircle2 } from "lucide-react";
+import { Ban, Plus, ClipboardList, Wrench, Trash2, CheckCircle2 } from "lucide-react";
 import {
   customers,
   jobs,
@@ -110,6 +110,7 @@ export default function BossDashboard({ u }: { u: any }) {
                 mechanics={ms}
                 onAssign={(id: number, mechanic_id: number) => act(() => updateJob(id, { mechanic_id }))}
                 onDelete={(id: number) => act(() => deleteJob(id))}
+                onCancel={(id: number) => act(() => updateJob(id, { status: "Cancelled" }))}
               />
             ))}
           </Panel>
@@ -266,7 +267,10 @@ function Panel({ title, action, children }: any) {
     </section>
   );
 }
-function Job({ j, mechanics, onAssign, onDelete }: any) {
+// Jobs that have not started can be deleted; any unfinished job can be cancelled.
+const DELETABLE = ["Pending", "Assigned"];
+const CANCELLABLE = ["Pending", "Assigned", "Accepted", "In Progress", "Paused"];
+function Job({ j, mechanics, onAssign, onDelete, onCancel }: any) {
   return (
     <div className="job">
       <div className="jobMain">
@@ -294,15 +298,30 @@ function Job({ j, mechanics, onAssign, onDelete }: any) {
           <option key={m.id} value={m.id}>{m.name}</option>
         ))}
       </select>
-      <button
-        className="iconButton"
-        title="Delete job"
-        onClick={async () => {
-          if (confirm("Delete this job?")) onDelete(j.id);
-        }}
-      >
-        <Trash2 size={15} />
-      </button>
+      {CANCELLABLE.includes(j.status) && (
+        <button
+          className="iconButton"
+          title="Cancel job"
+          aria-label={`Cancel ${j.title}`}
+          onClick={() => {
+            if (confirm("Cancel this job? The assigned mechanic will be notified.")) onCancel(j.id);
+          }}
+        >
+          <Ban size={15} />
+        </button>
+      )}
+      {DELETABLE.includes(j.status) && (
+        <button
+          className="iconButton"
+          title="Delete job"
+          aria-label={`Delete ${j.title}`}
+          onClick={() => {
+            if (confirm("Delete this job?")) onDelete(j.id);
+          }}
+        >
+          <Trash2 size={15} />
+        </button>
+      )}
     </div>
   );
 }

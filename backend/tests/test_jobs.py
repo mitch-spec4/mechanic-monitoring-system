@@ -140,3 +140,9 @@ def test_job_lists_are_scoped(client, data, auth):
     assert len(client.get("/api/jobs", headers=auth("cust@acme.test")).get_json()["jobs"]) == 1
     assert client.patch(f"/api/jobs/{other_job.id}", headers=boss(auth), json={"title": "x"}).status_code == 404
     assert client.delete(f"/api/jobs/{other_job.id}", headers=boss(auth)).status_code == 404
+
+
+def test_boss_cancel_notifies_assigned_mechanic(client, data, auth):
+    set_status(client, mech(auth), data["job"], "In Progress")
+    assert set_status(client, boss(auth), data["job"], "Cancelled").status_code == 200
+    assert Notification.query.filter_by(user_id=data["mechanic"], title="Job cancelled").count() == 1
