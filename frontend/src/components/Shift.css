@@ -1,0 +1,193 @@
+/* Clock in/out card, consent dialog and the "Location on" sign. */
+.clockCard {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 11px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid #e1e8f0;
+  background: linear-gradient(180deg, #fff, #fbfcfe);
+}
+.clockCard.on {
+  border-color: #bfe6cf;
+  background: linear-gradient(180deg, #f6fdf9, #fff);
+}
+.clockIcon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--role-soft, #e8f2ff);
+  color: var(--role-color, #0969d7);
+}
+.clockCard.on .clockIcon {
+  background: #e3f7ec;
+  color: #15803d;
+}
+.clockText {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.clockText strong {
+  font-size: 15px;
+  color: #172033;
+}
+.clockText span {
+  font-size: 12px;
+  color: #68768a;
+}
+.appMain .clockCard .clockButton {
+  width: auto;
+  min-width: 132px;
+  min-height: 44px;
+  justify-content: center;
+}
+.clockProblem {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff7e8;
+  border: 1px solid #f6d79b;
+  color: #8a5300;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.clockProblem svg {
+  flex: none;
+  margin-top: 1px;
+}
+.clockProblem span {
+  flex: 1;
+}
+
+.locationPill {
+  position: fixed;
+  top: 22px;
+  right: 210px;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid #bfe6cf;
+  background: #effbf4;
+  color: #15803d;
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: 0 4px 14px #1720330d;
+}
+.locationPill.blocked {
+  border-color: #f6d79b;
+  background: #fff7e8;
+  color: #8a5300;
+}
+.locationDot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #16a34a;
+}
+.locationDot::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid #16a34a;
+  opacity: 0;
+  animation: location-ping 1.8s ease-out infinite;
+}
+@keyframes location-ping {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .locationDot::after {
+    animation: none;
+  }
+}
+
+.consent {
+  display: grid;
+  gap: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #334155;
+}
+.consent p {
+  margin: 0;
+}
+.consent ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+}
+.consentActions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.appMain .consentActions button,
+.consentActions button {
+  width: auto;
+}
+
+.locationSettings {
+  display: grid;
+  gap: 8px;
+  margin: 0 18px 18px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid #e1e8f0;
+}
+.locationSettings h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 14px;
+}
+.locationSettings p {
+  margin: 0;
+  font-size: 13px;
+  color: #475569;
+}
+.locationSettings button {
+  justify-self: start;
+  width: auto;
+}
+
+@media (max-width: 760px) {
+  .clockCard {
+    grid-template-columns: auto 1fr;
+  }
+  .appMain .clockCard .clockButton {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  /* On phones the header is crowded, so the sign sits at the bottom of the screen. */
+  .locationPill {
+    top: auto;
+    bottom: 14px;
+    right: 14px;
+    padding: 8px 13px;
+    font-size: 12px;
+    box-shadow: 0 8px 24px #17203326;
+  }
+}

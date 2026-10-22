@@ -131,6 +131,8 @@ def create_app(overrides=None):
     from app.routes.reports import bp as reports
     from app.routes.reviews import bp as reviews
     from app.routes.services import bp as services
+    from app.routes.shifts import bp as shifts
+    from app.routes.shifts import location_bp as location
     from app.routes.users import bp as users
     from app.routes.worksheet import bp as worksheet
 
@@ -146,6 +148,17 @@ def create_app(overrides=None):
     app.register_blueprint(reviews, url_prefix="/api/reviews")
     app.register_blueprint(users, url_prefix="/api/users")
     app.register_blueprint(reports, url_prefix="/api/reports")
+    app.register_blueprint(shifts, url_prefix="/api/shifts")
+    app.register_blueprint(location, url_prefix="/api/location")
+
+    @app.cli.command("purge-locations")
+    def purge_locations():
+        """Delete live positions older than 30 days (run daily in production)."""
+        from app.services.location import purge_old_live_points
+
+        removed = purge_old_live_points()
+        db.session.commit()
+        print(f"Removed {removed} live location point(s) older than 30 days.")
 
     register_error_handlers(app)
     if not app.config.get("TESTING") and not app.config["IS_PRODUCTION"]:

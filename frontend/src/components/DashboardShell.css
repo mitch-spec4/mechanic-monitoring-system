@@ -741,6 +741,11 @@
   display: flex;
   gap: 7px;
   flex: none;
+  /* A fieldset, so the buttons can be disabled together: drop its default box. */
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
 }
 .emptyPending {
   display: grid;

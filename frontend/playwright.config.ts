@@ -16,6 +16,9 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:5173",
     screenshot: "only-on-failure",
+    // A fixed phone position (Nairobi) with location allowed; location.spec.ts also tests it blocked.
+    geolocation: { latitude: -1.2995, longitude: 36.79, accuracy: 20 },
+    permissions: ["geolocation"],
     trace: "retain-on-failure",
   },
   // Each project needs a fresh database, so run one per invocation: --project=<name>.

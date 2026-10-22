@@ -6,10 +6,12 @@ from flask import Blueprint, jsonify
 from app import db
 from app.models.customer import Customer
 from app.models.job import Job
+from app.models.location import LocationPoint
 from app.models.machine import Machine
 from app.models.service_record import ServiceRecord
 from app.models.user import User
 from app.models.worksheet import JobChecklistItem, JobEvent, JobPart, WorkEntry
+from app.services.location import point_out
 from app.services.worksheet import FINISHED, completion_problems, format_quantity, record_event
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
@@ -151,6 +153,13 @@ def job_detail(job, user):
                 "created_at": iso(e.created_at),
             }
             for e in events
+        ],
+        # Where the mechanic was when they started, resumed and completed the job.
+        locations=[
+            point_out(p)
+            for p in LocationPoint.query.filter(LocationPoint.job_id == job.id, LocationPoint.kind != "live")
+            .order_by(LocationPoint.recorded_at, LocationPoint.id)
+            .all()
         ],
         can_edit=user.role == "mechanic" and job.status not in FINISHED,
         completion_blockers=completion_problems(job) if job.status not in FINISHED else [],

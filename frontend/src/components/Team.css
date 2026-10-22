@@ -1,0 +1,226 @@
+/* Team map and shift list. */
+.teamMap {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr);
+  gap: 16px;
+  padding: 14px 18px 18px;
+}
+.teamMap > .error {
+  grid-column: 1 / -1;
+}
+.teamMapCanvas {
+  min-height: 460px;
+  border-radius: 14px;
+  border: 1px solid #e1e8f0;
+  overflow: hidden;
+  z-index: 0;
+}
+.teamList {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+.teamList > p {
+  margin: 0;
+  font-size: 12px;
+}
+.teamRow {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #e1e8f0;
+  background: #fff;
+}
+.teamRow > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  font-size: 12px;
+  color: #68768a;
+}
+.teamRow strong {
+  font-size: 14px;
+  color: #172033;
+}
+.teamRow .titleLink {
+  justify-self: start;
+  font-size: 12px;
+}
+/* Beats ".teamRow > div" above, which lays out the text column as a grid. */
+.teamRow > .teamRowActions {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.appShell .teamRowActions .listAction {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+}
+.teamAvatar,
+.teamMarker span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--role-color, #0969d7);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+.teamMarker span {
+  border: 3px solid #fff;
+  box-shadow: 0 4px 12px #17203340;
+}
+
+.shiftsView {
+  display: grid;
+  gap: 14px;
+  padding: 14px 18px 18px;
+}
+.shiftFilters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+.shiftFilters label {
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #68768a;
+}
+.shiftFilters select {
+  min-width: 170px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid #dce5ef;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+}
+.shiftTotal {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 800;
+  color: #172033;
+}
+.shiftTable {
+  display: grid;
+  border: 1px solid #e1e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.shiftRow {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 0.7fr 1.3fr 1fr 0.9fr 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-top: 1px solid #edf1f5;
+  font-size: 13px;
+  color: #334155;
+}
+.shiftTable.own .shiftRow {
+  grid-template-columns: 1fr 0.7fr 1.3fr 1fr 0.9fr;
+}
+.shiftRow.shiftHead {
+  border-top: 0;
+  background: #f6f8fb;
+  font-size: 11px;
+  font-weight: 800;
+  color: #68768a;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.shiftRow.open {
+  background: #f6fdf9;
+}
+.shiftRow > span {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.shiftRow small {
+  flex-basis: 100%;
+  font-size: 11px;
+  color: #8a5300;
+}
+.shiftRow a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--role-color, #0969d7);
+  font-weight: 700;
+  text-decoration: none;
+}
+.shiftBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+.shiftBadge.on {
+  background: #e3f7ec;
+  color: #15803d;
+}
+.shiftBadge.warn {
+  background: #fff4dc;
+  color: #8a5300;
+}
+.shiftAction {
+  justify-content: flex-end;
+}
+
+@media (max-width: 900px) {
+  .teamMap {
+    grid-template-columns: 1fr;
+  }
+  .teamMapCanvas {
+    min-height: 340px;
+  }
+  .shiftRow.shiftHead {
+    display: none;
+  }
+  .shiftRow,
+  .shiftTable.own .shiftRow {
+    grid-template-columns: 1fr 1fr;
+  }
+  .shiftRow > [data-label]::before {
+    content: attr(data-label);
+    flex-basis: 100%;
+    font-size: 10px;
+    font-weight: 800;
+    color: #8a97a8;
+    text-transform: uppercase;
+  }
+  .shiftRow > strong {
+    grid-column: 1 / -1;
+    font-size: 14px;
+  }
+  .shiftRow > strong::before {
+    display: none;
+  }
+  .shiftAction {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+  .shiftTotal {
+    margin-left: 0;
+  }
+}

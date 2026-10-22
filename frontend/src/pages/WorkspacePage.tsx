@@ -4,10 +4,12 @@ import {
   Bell,
   CheckCircle2,
   ClipboardList,
+  Clock,
   Cog,
   FileText,
   HelpCircle,
   ListChecks,
+  Map as MapIcon,
   MessageSquare,
   Plus,
   Search,
@@ -33,6 +35,9 @@ import {
   updateMachine,
 } from "../services/api";
 import ChecklistManager from "../components/ChecklistManager";
+import ShiftsView from "../components/ShiftsView";
+import TeamMap from "../components/TeamMap";
+import { LocationSettings } from "../components/Shift";
 import InviteForm from "../components/InviteForm";
 import ResetPassword from "../components/ResetPassword";
 import Modal from "../components/Modal";
@@ -103,6 +108,9 @@ const resources: Record<string, Resource> = {
   Profile: { label: "Profile", icon: UserRound },
   "Help & Support": { label: "Help & support", icon: HelpCircle },
   Checklists: { label: "Checklists", icon: ListChecks },
+  "Team Map": { label: "Clocked-in mechanics", icon: MapIcon },
+  Shifts: { label: "Shifts", icon: Clock },
+  "My Shifts": { label: "My shifts", icon: Clock },
 };
 
 export default function WorkspacePage({ title, user, onOpenJob }: Props) {
@@ -233,6 +241,10 @@ export default function WorkspacePage({ title, user, onOpenJob }: Props) {
           />
         ) : title === "Checklists" ? (
           <ChecklistManager />
+        ) : title === "Team Map" ? (
+          <TeamMap onOpenJob={onOpenJob} />
+        ) : title === "Shifts" || title === "My Shifts" ? (
+          <ShiftsView user={user} />
         ) : title === "Messages" ? (
           <Empty
             title="Messaging is not connected"
@@ -241,6 +253,7 @@ export default function WorkspacePage({ title, user, onOpenJob }: Props) {
         ) : title === "Settings" || title === "Profile" ? (
           <>
             <Settings user={user} />
+            {user.role === "mechanic" && <LocationSettings />}
             <ChangePassword />
           </>
         ) : filtered.length ? (
@@ -477,6 +490,9 @@ function description(title: string) {
         Reports: "Operational performance for the data you are allowed to see.",
         Mechanics: "The mechanics on your service team.",
         Checklists: "Checklists your mechanics complete for each type of job.",
+        "Team Map": "Where your clocked-in mechanics were last seen.",
+        Shifts: "Clock-in and clock-out times and hours for your team.",
+        "My Shifts": "Your clock-in and clock-out times and hours.",
         Notifications: "Updates about your jobs, requests, and reviews.",
         "Service Requests": "Service you have requested and its current status.",
         "Service History": "Every service visit recorded on your machines.",

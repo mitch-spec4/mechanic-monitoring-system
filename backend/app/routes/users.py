@@ -10,6 +10,7 @@ from app.models.review import Review
 from app.models.security import PasswordReset
 from app.models.service_record import ServiceRecord
 from app.models.user import User
+from app.models.location import Shift
 from app.models.worksheet import JobEvent
 from app.routes.auth import hash_code
 from app.utils.auth import current_user, roles
@@ -99,6 +100,8 @@ def delete_user(uid):
             return jsonify(error="This mechanic has jobs or service history and cannot be deleted."), 409
     if JobEvent.query.filter_by(user_id=user.id).first():
         return jsonify(error="This person appears in job history and cannot be deleted."), 409
+    if Shift.query.filter_by(user_id=user.id).first():
+        return jsonify(error="This mechanic has shift records and cannot be deleted."), 409
     Notification.query.filter_by(user_id=user.id).delete()
     PasswordReset.query.filter((PasswordReset.user_id == user.id) | (PasswordReset.created_by == user.id)).delete()
     db.session.delete(user)

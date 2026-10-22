@@ -117,3 +117,18 @@ export const checklists = () => api("/checklists");
 export const createChecklist = (data: any) => post("/checklists", data);
 export const updateChecklist = (id: number, data: any) => patch(`/checklists/${id}`, data);
 export const deleteChecklist = (id: number) => api(`/checklists/${id}`, { method: "DELETE" });
+
+// Clock in/out and location
+export const shiftStatus = () => api("/shifts/current");
+export const setLocationConsent = (consent: boolean) => post("/shifts/consent", { consent });
+export const clockIn = (position: any) => post("/shifts/clock-in", position);
+export const clockOut = (position: any) => post("/shifts/clock-out", position);
+export const shiftList = (params: { mechanic_id?: number | ""; days?: number } = {}) => {
+  const query = new URLSearchParams();
+  if (params.mechanic_id) query.set("mechanic_id", String(params.mechanic_id));
+  if (params.days) query.set("days", String(params.days));
+  return api(`/shifts?${query}`);
+};
+export const correctShift = (id: number, clockedOutAt: string) => patch(`/shifts/${id}`, { clocked_out_at: clockedOutAt });
+export const sendLiveLocation = (jobId: number, position: any) => post("/location/live", { job_id: jobId, ...position });
+export const teamLocations = () => api("/location/team");

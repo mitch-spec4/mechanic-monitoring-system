@@ -7,6 +7,7 @@ import WorkspacePage from "./pages/WorkspacePage";
 import JobPage from "./pages/JobPage";
 import Profile from "./components/Profile";
 import Sidebar from "./components/Sidebar";
+import { LocationIndicator, ShiftProvider } from "./components/Shift";
 import { clearSession, logout as endSession, SESSION_EXPIRED_EVENT } from "./services/api";
 import "./style.css";
 import "./components/DashboardShell.css";
@@ -67,13 +68,16 @@ export default function App() {
 		<CustomerDashboard u={user} onOpenJob={openJob} />
 	);
 
-	return (
+	const shell = (
 		<div className={`appShell role-${user.role}`}>
 			<Sidebar user={user} active={openJobId ? "" : active} onNavigate={navigate} />
 			<div className="appMain">
 				<Profile user={user} onLogout={logout} />
+				{user.role === "mechanic" && <LocationIndicator />}
 				{dashboard}
 			</div>
 		</div>
 	);
+	// Mechanics clock in and out; their location is only shared while clocked in.
+	return user.role === "mechanic" ? <ShiftProvider key={user.id}>{shell}</ShiftProvider> : shell;
 }

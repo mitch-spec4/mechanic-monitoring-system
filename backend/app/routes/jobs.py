@@ -6,6 +6,7 @@ from app.models.customer import Customer
 from app.models.job import Job
 from app.models.machine import Machine
 from app.models.user import User
+from app.services.location import open_shift, stamp_job
 from app.services.notifications import notify, notify_bosses
 from app.services.worksheet import (
     completion_problems,
@@ -42,6 +43,9 @@ MECHANIC_TRANSITIONS = {
 }
 REASSIGNABLE = {"Pending", "Assigned", "Accepted", "Paused"}
 DELETABLE = {"Pending", "Assigned"}
+# A mechanic's phone sends its position with Start, Resume and Complete.
+LOCATION_FIELDS = {"latitude", "longitude", "accuracy", "location_error"}
+STAMPED = {"In Progress": "job_start", "Completed": "job_complete"}
 
 
 def out(job):
@@ -143,7 +147,7 @@ def update_job(jid):
     if user.role == "mechanic":
         if job.mechanic_id != user.id:
             return jsonify(error="Forbidden"), 403
-        if set(data) - {"status"} or "status" not in data:
+        if set(data) - ({"status"} | LOCATION_FIELDS) or "status" not in data:
             return jsonify(error="Mechanics can only update job status"), 403
 
     if user.role == "boss":
@@ -164,11 +168,15 @@ def update_job(jid):
                 raise ValidationError("Mechanics cannot decline or cancel jobs", 403)
             if new_status == "Assigned" and not job.mechanic_id:
                 raise ValidationError("Assign a mechanic first", 409)
+            if new_status == "In Progress":
+                require_clocked_in(job, user)
             if new_status == "Completed":
                 problems = completion_problems(job)
                 if problems:
                     raise ValidationError("Can't complete yet: " + "; ".join(problems) + ".", 409)
             change_status(job, user, new_status)
+            if new_status in STAMPED:
+                stamp_job(user, job, STAMPED[new_status], data)
 
     if old_status != job.status and user.role == "mechanic":
         notify_bosses(job.company_id, "Job status updated", f"{job.title} is now {job.status}.", "status")
@@ -222,6 +230,15 @@ def change_status(job, user, new_status):
         stop_timer(job)
     if new_status == "Completed":
         fill_service_record(job)
+
+
+def require_clocked_in(job, user):
+    """Job time only runs while the assigned mechanic is on the clock."""
+    mechanic = db.session.get(User, job.mechanic_id) if job.mechanic_id else None
+    if mechanic and not open_shift(mechanic):
+        if user.id == mechanic.id:
+            raise ValidationError("Clock in before starting work", 409)
+        raise ValidationError(f"{mechanic.name} isn't clocked in, so this job can't be started", 409)
 
 
 def assign_mechanic(job, mechanic_id, user):
