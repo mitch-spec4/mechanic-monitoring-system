@@ -2,13 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [main, "fix/**"]
-  pull_request:
     branches: [main]
+  pull_request:
 
 jobs:
   frontend-build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -17,13 +19,11 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - name: Install dependencies
-        working-directory: frontend
         run: npm ci
-      - name: Build frontend
-        working-directory: frontend
+      - name: Type-check and build
         run: npm run build
 
-  backend-smoke-test:
+  backend-tests:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -34,29 +34,60 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: backend/requirements*.txt
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Run tests
+        run: pytest -q
+      - name: Check migrations match the models
+        env:
+          APP_ENV: development
+          DATABASE_URL: sqlite:////tmp/migration-check.db
+        run: |
+          flask --app run.py db upgrade
+          flask --app run.py db check
+
+  backend-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mechanic_pro
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      APP_ENV: development
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mechanic_pro
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Compile backend
-        run: python -m compileall -q app run.py seed.py
-      - name: Seed demo database
+      - name: Migrate and seed PostgreSQL
         run: python seed.py
-      - name: Smoke test health and demo login
+      - name: Smoke test against PostgreSQL
         run: |
           python - <<'PY'
           from app import create_app
 
-          app = create_app()
-          client = app.test_client()
-          health = client.get("/api/health")
-          assert health.status_code == 200, health.get_data(as_text=True)
-          assert health.get_json().get("status") == "ok"
-
-          login = client.post(
-              "/api/auth/login",
-              json={"email": "james@mechanicpro.test", "password": "password"},
-          )
+          client = create_app().test_client()
+          assert client.get("/api/health").get_json() == {"status": "ok"}
+          login = client.post("/api/auth/login", json={"email": "amina@mechanicpro.test", "password": "password"})
           assert login.status_code == 200, login.get_data(as_text=True)
-          assert login.get_json().get("token")
-          print("Health and demo login smoke tests passed.")
+          headers = {"Authorization": f"Bearer {login.get_json()['token']}"}
+          job = next(j for j in client.get("/api/jobs", headers=headers).get_json()["jobs"] if j["status"] == "Assigned")
+          for status in ("In Progress", "Paused", "In Progress", "Completed"):
+              response = client.patch(f"/api/jobs/{job['id']}", headers=headers, json={"status": status})
+              assert response.status_code == 200, response.get_data(as_text=True)
+          print("PostgreSQL migration, seed, login, and job flow passed.")
           PY
