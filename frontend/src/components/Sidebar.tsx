@@ -1,14 +1,14 @@
 import {useState} from "react";
 import {reports} from "../services/api";
 import {usePolling} from "../lib/usePolling";
-import {BarChart3, Bell, CalendarDays, ClipboardList, Cog, FileText, Gauge, HelpCircle, MessageSquare, Package, Star, UserRound, Users, Wrench} from "lucide-react";
+import {BarChart3, Bell, CalendarDays, ClipboardList, Cog, FileText, Gauge, HelpCircle, ListChecks, MessageSquare, Package, Star, UserRound, Users, Wrench} from "lucide-react";
 
 const commonLinks = [
   [Gauge, "Dashboard"],
   [UserRound, "Profile"]
 ] as const;
 const roleLinks = {
-  boss: [[ClipboardList, "Jobs / Requests"], [Users, "Customers"], [Wrench, "Machines"], [UserRound, "Mechanics"], [BarChart3, "Reports"], [BellIcon, "Notifications"]],
+  boss: [[ClipboardList, "Jobs / Requests"], [Users, "Customers"], [Wrench, "Machines"], [ListChecks, "Checklists"], [UserRound, "Mechanics"], [BarChart3, "Reports"], [BellIcon, "Notifications"]],
   mechanic: [[ClipboardList, "Assigned Jobs"], [ClipboardList, "My Jobs"], [FileText, "Service Records"], [Star, "Reviews"], [BellIcon, "Notifications"]],
   customer: [[Wrench, "My Machines"], [ClipboardList, "Service Requests"], [FileText, "Service History"], [Star, "Reviews"], [BellIcon, "Notifications"], [Users, "My Company"]]
 } as const;

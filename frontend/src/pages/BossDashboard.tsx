@@ -5,6 +5,7 @@ import {
   jobs,
   machines,
   mechanics,
+  checklists,
   createJob,
   requests,
   updateJob,
@@ -18,7 +19,7 @@ import CustomerProfile from "../components/CustomerProfile";
 import InviteForm from "../components/InviteForm";
 import { errorMessage, formatDate, greeting } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
-export default function BossDashboard({ u }: { u: any }) {
+export default function BossDashboard({ u, onOpenJob }: { u: any; onOpenJob: (id: number) => void }) {
   const [data, setData] = useState<any[]>([]),
     [cs, setCs] = useState<any[]>([]),
     [ms, setMs] = useState<any[]>([]),
@@ -29,16 +30,18 @@ export default function BossDashboard({ u }: { u: any }) {
     [formError, setFormError] = useState(""),
     [notice, setNotice] = useState(""),
     [editingJob, setEditingJob] = useState<any>(null),
+    [jobTypes, setJobTypes] = useState<string[]>([]),
     [selectedMechanic, setSelectedMechanic] = useState(null),
     [selectedCustomer, setSelectedCustomer] = useState(null);
   const load = () =>
-    Promise.all([jobs(), customers(), mechanics(), requests(), machines()])
-      .then(([j, c, m, r, mc]) => {
+    Promise.all([jobs(), customers(), mechanics(), requests(), machines(), checklists()])
+      .then(([j, c, m, r, mc, cl]) => {
         setData(j.jobs);
         setCs(c.customers);
         setMs(m.mechanics);
         setRs(r.requests);
         setMachineList(mc.machines);
+        setJobTypes(cl.checklists.map((template: any) => template.job_type));
       })
       .catch(() => {});
   usePolling(load, 30000);
@@ -116,6 +119,7 @@ export default function BossDashboard({ u }: { u: any }) {
                   setFormError("");
                   setEditingJob(job);
                 }}
+                onOpen={onOpenJob}
               />
             ))}
           </Panel>
@@ -170,7 +174,7 @@ export default function BossDashboard({ u }: { u: any }) {
         </div>
         <div className="dashboardGrid bossOverviewGrid">
           <Panel title="Upcoming jobs" action={<span className="pill">{data.filter((job) => job.status !== "Completed" && job.status !== "Cancelled").length}</span>}>
-            {data.filter((job) => job.status !== "Completed" && job.status !== "Cancelled").slice(0, 5).map((job) => <div className="request" key={job.id}><div><b>{job.title}</b><span>{job.location || "Location not set"} · {formatDate(job.due_date) || "Date not set"}</span></div><span className="status">{job.status}</span></div>)}
+            {data.filter((job) => job.status !== "Completed" && job.status !== "Cancelled").slice(0, 5).map((job) => <div className="request" key={job.id}><div><button className="titleLink" onClick={() => onOpenJob(job.id)}><b>{job.title}</b></button><span>{job.location || "Location not set"} · {formatDate(job.due_date) || "Date not set"}</span></div><span className="status">{job.status}</span></div>)}
           </Panel>
           <Panel title="Team overview" action={<button className="link" onClick={() => setModal("addmech")}>+ Add mechanic</button>}>
             {ms.length === 0 ? <p className="muted">No mechanics added yet.</p> : ms.map((mechanic) => <button key={mechanic.id} className="customer" onClick={() => setSelectedMechanic(mechanic)} style={{ border: "none", background: "none", cursor: "pointer", width: "100%", textAlign: "left" }}><div className="avatar">{mechanic.name[0]}</div><div><b>{mechanic.name}</b><span>{mechanic.email}</span></div><strong>{data.filter((job) => job.mechanic_id === mechanic.id && !["Completed", "Cancelled"].includes(job.status)).length} active</strong></button>)}
@@ -219,6 +223,7 @@ export default function BossDashboard({ u }: { u: any }) {
               </select>
               <input name="due_date" type="date" aria-label="Due date" title="Due date" />
             </div>
+            <JobTypeSelect types={jobTypes} />
             <button className="primary">Create & notify mechanic</button>
           </form>
         </Modal>
@@ -251,7 +256,18 @@ export default function BossDashboard({ u }: { u: any }) {
               </select>
               <input name="location" defaultValue={editingJob.location || ""} placeholder="Job site" />
             </div>
-            <input name="due_date" type="date" defaultValue={editingJob.due_date || ""} aria-label="Due date" title="Due date" />
+            <div className="row">
+              <select name="machine_id" defaultValue={editingJob.machine_id || ""} aria-label="Machine">
+                <option value="">No machine</option>
+                {machineList
+                  .filter((m) => !editingJob.customer_id || m.customer_id === editingJob.customer_id)
+                  .map((m) => (
+                    <option key={m.id} value={m.id}>{m.name} ({m.serial_no})</option>
+                  ))}
+              </select>
+              <input name="due_date" type="date" defaultValue={editingJob.due_date || ""} aria-label="Due date" title="Due date" />
+            </div>
+            <JobTypeSelect types={jobTypes} value={editingJob.job_type} />
             <button className="primary">Save changes</button>
           </form>
         </Modal>
@@ -308,12 +324,28 @@ function Panel({ title, action, children }: any) {
 // Jobs that have not started can be deleted; any unfinished job can be cancelled.
 const DELETABLE = ["Pending", "Assigned"];
 const CANCELLABLE = ["Pending", "Assigned", "Accepted", "In Progress", "Paused"];
-function Job({ j, mechanics, onAssign, onDelete, onCancel, onEdit }: any) {
+function JobTypeSelect({ types, value }: { types: string[]; value?: string | null }) {
+  // Keep a job's existing type selectable even if its checklist was since deleted.
+  const options = value && !types.includes(value) ? [...types, value] : types;
+  return (
+    <select name="job_type" defaultValue={value || ""} aria-label="Job type">
+      <option value="">General job (no checklist)</option>
+      {options.map((type) => (
+        <option key={type} value={type}>
+          {type}
+        </option>
+      ))}
+    </select>
+  );
+}
+function Job({ j, mechanics, onAssign, onDelete, onCancel, onEdit, onOpen }: any) {
   return (
     <div className="job">
       <div className="jobMain">
         <div className="jobTitle">
-          <b>{j.title}</b>
+          <button className="titleLink" onClick={() => onOpen(j.id)}>
+            <b>{j.title}</b>
+          </button>
           <span
             className={`status ${j.status.replaceAll(" ", "").toLowerCase()}`}
           >

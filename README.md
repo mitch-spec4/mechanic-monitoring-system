@@ -9,7 +9,9 @@ Built with React + TypeScript (Vite) on the frontend and Flask, SQLAlchemy, Alem
 - **Role-based dashboards** for managers (boss), mechanics and customers, with every query scoped to the user's company.
 - **Invite-only accounts.** Managers issue single-use invitation codes that expire after 7 days.
 - **A job workflow with enforced statuses:** Pending → Assigned → Accepted → In Progress ⇄ Paused → Completed. Mechanics can't decline or cancel jobs.
-- **Permanent service history.** Records, reviews and customer service requests can't be deleted.
+- **Job worksheets.** Start, Pause and Resume run a timer automatically; mechanics log work done, parts used (name and quantity) and the job type's checklist, on a phone-friendly screen. A job can't be completed until work is described and every required checklist item is ticked.
+- **Job history.** Every status change, assignment, edit, part, checklist tick and note is logged with who and when, and managers see it as a timeline.
+- **Permanent service history.** Records, reviews and customer service requests can't be deleted; finished jobs lock their worksheet.
 - **Notifications** for assignments, status changes, requests and reviews.
 
 ## Quick start

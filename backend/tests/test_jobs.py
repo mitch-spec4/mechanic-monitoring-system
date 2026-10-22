@@ -21,6 +21,10 @@ def test_mechanic_can_take_assigned_job_to_completed(client, data, auth):
     assert set_status(client, mech(auth), job, "In Progress").status_code == 200
     assert set_status(client, mech(auth), job, "Paused").status_code == 200
     assert set_status(client, mech(auth), job, "In Progress").status_code == 200
+    blocked = set_status(client, mech(auth), job, "Completed")
+    assert blocked.status_code == 409 and "work done" in blocked.get_json()["error"]
+    entry = client.get(f"/api/jobs/{job}", headers=mech(auth)).get_json()["job"]["entries"][-1]
+    client.patch(f"/api/jobs/{job}/entries/{entry['id']}", headers=mech(auth), json={"work_done": "Fixed it"})
     response = set_status(client, mech(auth), job, "Completed")
     assert response.status_code == 200
     assert response.get_json()["job"]["status"] == "Completed"

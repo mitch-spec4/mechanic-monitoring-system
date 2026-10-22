@@ -243,3 +243,23 @@
     transform: none !important;
   }
 }
+
+/* ---------- Titles that open a job ---------- */
+.appShell .titleLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  background-image: linear-gradient(var(--btn), var(--btn));
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 0 1.5px;
+  transition: background-size 0.3s var(--btn-ease), color 0.2s ease;
+}
+.appShell .titleLink:hover {
+  color: var(--btn);
+  background-size: 100% 1.5px;
+}

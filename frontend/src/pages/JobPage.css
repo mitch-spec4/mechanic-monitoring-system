@@ -1,0 +1,522 @@
+/* Job worksheet / detail page. Mobile first; colours come from the role theme. */
+.jobPage {
+  --accent: var(--role-color, #0969d7);
+  --accent-soft: var(--role-soft, #eaf3ff);
+  display: grid;
+  gap: 14px;
+  max-width: 1180px;
+  padding: 18px 14px 40px;
+  color: #172033;
+}
+.jobBack {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+/* ---------- Header ---------- */
+.jobHero {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid #e1e8f0;
+  background:
+    radial-gradient(120% 140% at 100% 0%, var(--accent-soft) 0%, transparent 55%),
+    #fff;
+  box-shadow: 0 10px 30px -22px rgba(15, 23, 42, 0.45);
+}
+.jobHeroTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.jobHero .eyebrow {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.jobHero h1 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.2;
+}
+.jobDescription {
+  margin: 0;
+  color: #5b6b80;
+  font-size: 13px;
+}
+.jobStatusPill {
+  flex: none;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.jobStatusPill.inprogress { color: #a15c07; background: #fff4e0; }
+.jobStatusPill.paused { color: #5b6b80; background: #eef2f7; }
+.jobStatusPill.completed { color: #15803d; background: #e7f7ec; }
+.jobStatusPill.cancelled { color: #b42318; background: #fdecec; }
+
+.jobMeta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+  margin: 4px 0 0;
+}
+.jobMeta dt,
+.recordView dt {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8592a6;
+}
+.jobMeta dd,
+.recordView dd {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.jobTimer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #0f1d33;
+  color: #d8e4f3;
+}
+.jobTimer svg {
+  color: var(--accent-soft);
+}
+.jobTimer div {
+  display: grid;
+}
+.jobTimer strong {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: #fff;
+}
+.jobTimer span {
+  font-size: 11px;
+  color: #9fb2c9;
+}
+.pulseDot {
+  margin-left: auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.6);
+  animation: job-pulse 1.6s infinite;
+}
+@keyframes job-pulse {
+  70% { box-shadow: 0 0 0 10px rgba(52, 211, 153, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+}
+
+.jobActions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+.appMain .jobActions button.primary,
+.appMain .jobActions button.secondary {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 15px;
+  border-radius: 12px;
+}
+
+.jobBlockers {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #f5d38a;
+  background: #fff8e6;
+  color: #7a4b00;
+  font-size: 13px;
+}
+.jobBlockers ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+/* ---------- Cards ---------- */
+.jobGrid {
+  display: grid;
+  gap: 14px;
+}
+.jobCard {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid #e1e8f0;
+  background: #fff;
+}
+.jobCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.jobCardHead h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+}
+.jobCardHead h2 svg {
+  color: var(--accent);
+}
+.jobBadge {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.jobEmpty {
+  margin: 0;
+  font-size: 12px;
+}
+
+/* Time entries */
+.entryList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.entryList li {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #e8edf3;
+  background: #fafbfd;
+}
+.entryList li.running {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  background: var(--accent-soft);
+}
+.entryTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 13px;
+}
+.entryTop em {
+  margin-left: auto;
+  font-style: normal;
+  font-weight: 800;
+  color: var(--accent);
+}
+.entrySite {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #7a889c;
+}
+.entryNotes {
+  margin: 0;
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+.entryWork,
+.inlineForm {
+  display: grid;
+  gap: 8px;
+}
+.entryWork label,
+.inlineForm label {
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #5b6b80;
+}
+.jobPage textarea,
+.jobPage input:not([type="checkbox"]) {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 11px;
+  border-radius: 10px;
+  border: 1px solid #d8e1ec;
+  background: #fff;
+  font-size: 14px;
+  color: #172033;
+}
+.jobPage textarea {
+  min-height: 70px;
+  resize: vertical;
+}
+.jobPage textarea:focus,
+.jobPage input:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-color: var(--accent);
+}
+.inlineRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.addLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  justify-self: start;
+}
+
+/* Checklist */
+.checkProgress {
+  height: 6px;
+  border-radius: 999px;
+  background: #eef2f7;
+  overflow: hidden;
+}
+.checkProgress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), #34d399);
+  transition: width 0.4s ease;
+}
+.checklist {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.checklist label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #e8edf3;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.checklist input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.checkBox {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  border: 2px solid #c9d4e1;
+  color: transparent;
+  transition: all 0.2s ease;
+}
+.checklist li.done label {
+  background: #f1fbf4;
+  border-color: #bfe8cb;
+}
+.checklist li.done .checkBox {
+  border-color: #16a34a;
+  background: #16a34a;
+  color: #fff;
+}
+.checklist input:focus-visible + .checkBox {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.checklist input:disabled + .checkBox {
+  opacity: 0.7;
+}
+.checkLabel {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+}
+.checkLabel em {
+  justify-self: start;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  color: #b45309;
+  background: #fff4e0;
+}
+.checkLabel small {
+  color: #7a889c;
+  font-size: 11px;
+}
+
+/* Parts */
+.partList {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.partList li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fafbfd;
+  border: 1px solid #e8edf3;
+  font-size: 13px;
+}
+.partQty {
+  min-width: 42px;
+  font-weight: 800;
+  color: var(--accent);
+}
+.partName {
+  flex: 1;
+}
+.appShell .partRemove {
+  width: 30px;
+  height: 30px;
+}
+.partForm {
+  grid-template-columns: 1fr 74px auto;
+  align-items: end;
+}
+.appMain .partForm button.primary,
+.appMain .noteForm button.secondary {
+  width: auto;
+  padding: 11px 14px;
+  font-size: 13px;
+}
+.noteForm {
+  grid-template-columns: 1fr auto;
+  align-items: end;
+}
+
+/* Service summary */
+.recordView {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+.workDoneList {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+
+/* History timeline */
+.timeline {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.timeline li {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  padding: 0 0 14px;
+}
+.timeline li::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 14px;
+  bottom: 0;
+  width: 2px;
+  background: #e5ebf2;
+}
+.timeline li:last-child::before {
+  display: none;
+}
+.timelineDot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-top: 3px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  background: #fff;
+}
+.timeline-status .timelineDot {
+  background: var(--accent);
+}
+.timeline-note .timelineDot {
+  border-color: #c27803;
+  background: #fff4e0;
+}
+.timeline p {
+  margin: 0;
+  font-size: 13px;
+}
+.timeline small {
+  color: #8592a6;
+  font-size: 11px;
+}
+.timeline blockquote {
+  margin: 4px 0;
+  padding: 6px 10px;
+  border-left: 3px solid #f5d38a;
+  background: #fffaf0;
+  font-size: 13px;
+}
+
+/* ---------- Larger screens ---------- */
+@media (min-width: 640px) {
+  .jobPage {
+    padding: 24px 24px 48px;
+  }
+  .jobHero {
+    padding: 22px 24px;
+  }
+  .jobHero h1 {
+    font-size: 26px;
+  }
+  .jobMeta {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .jobActions {
+    grid-template-columns: repeat(2, minmax(0, 220px));
+  }
+}
+@media (min-width: 1000px) {
+  .jobGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .jobCard.wide {
+    grid-column: 1 / -1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulseDot,
+  .checkProgress i {
+    animation: none;
+    transition: none;
+  }
+}

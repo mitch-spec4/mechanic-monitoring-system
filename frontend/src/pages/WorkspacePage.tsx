@@ -7,6 +7,7 @@ import {
   Cog,
   FileText,
   HelpCircle,
+  ListChecks,
   MessageSquare,
   Plus,
   Search,
@@ -31,12 +32,13 @@ import {
   updateCustomer,
   updateMachine,
 } from "../services/api";
+import ChecklistManager from "../components/ChecklistManager";
 import InviteForm from "../components/InviteForm";
 import ResetPassword from "../components/ResetPassword";
 import Modal from "../components/Modal";
 import { errorMessage, formatDate } from "../lib/format";
 
-type Props = { title: string; user: any };
+type Props = { title: string; user: any; onOpenJob?: (id: number) => void };
 type Resource = {
   label: string;
   icon: any;
@@ -100,9 +102,10 @@ const resources: Record<string, Resource> = {
   Settings: { label: "Settings", icon: Cog },
   Profile: { label: "Profile", icon: UserRound },
   "Help & Support": { label: "Help & support", icon: HelpCircle },
+  Checklists: { label: "Checklists", icon: ListChecks },
 };
 
-export default function WorkspacePage({ title, user }: Props) {
+export default function WorkspacePage({ title, user, onOpenJob }: Props) {
   const resource = resources[title] || resources.Profile;
   const Icon = resource.icon;
   const [items, setItems] = useState<any[]>([]);
@@ -228,6 +231,8 @@ export default function WorkspacePage({ title, user }: Props) {
             title="Need help?"
             text="Contact your company manager for access, invitations, or questions about a job. Use the sidebar to move between your jobs, records, and notifications."
           />
+        ) : title === "Checklists" ? (
+          <ChecklistManager />
         ) : title === "Messages" ? (
           <Empty
             title="Messaging is not connected"
@@ -247,6 +252,7 @@ export default function WorkspacePage({ title, user }: Props) {
                 title={title}
                 Icon={Icon}
                 actions={rowActions(item)}
+                onOpenJob={onOpenJob}
               />
             ))}
           </div>
@@ -470,6 +476,7 @@ function description(title: string) {
         Reviews: "Ratings and feedback visible according to your role.",
         Reports: "Operational performance for the data you are allowed to see.",
         Mechanics: "The mechanics on your service team.",
+        Checklists: "Checklists your mechanics complete for each type of job.",
         Notifications: "Updates about your jobs, requests, and reviews.",
         "Service Requests": "Service you have requested and its current status.",
         "Service History": "Every service visit recorded on your machines.",
@@ -484,8 +491,10 @@ function description(title: string) {
     )[title] || "Service operations workspace."
   );
 }
-function ResourceRow({ item, title, Icon, actions }: any) {
+function ResourceRow({ item, title, Icon, actions, onOpenJob }: any) {
   const isJob = ["My Jobs", "Assigned Jobs", "Jobs / Requests"].includes(title);
+  // Jobs, and service records that belong to a job, open the job's worksheet.
+  const jobId = isJob ? item.id : item.job_id;
   const heading =
     item.title ||
     item.name ||
@@ -509,7 +518,13 @@ function ResourceRow({ item, title, Icon, actions }: any) {
         <Icon size={16} />
       </span>
       <div>
-        <strong>{heading}</strong>
+        {jobId && onOpenJob ? (
+          <button className="titleLink" onClick={() => onOpenJob(jobId)}>
+            <strong>{heading}</strong>
+          </button>
+        ) : (
+          <strong>{heading}</strong>
+        )}
         <small>{detail}</small>
       </div>
       <span

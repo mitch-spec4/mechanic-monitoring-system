@@ -9,3 +9,4 @@ from app.models.notification import Notification
 from app.models.invitation import Invitation
 from app.models.request import ServiceRequest
 from app.models.security import AuthAttempt, PasswordReset
+from app.models.worksheet import ChecklistTemplate, ChecklistTemplateItem, JobChecklistItem, JobEvent, JobPart, WorkEntry

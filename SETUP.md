@@ -73,6 +73,8 @@ Open http://localhost:5173. The frontend calls `/api` on its own address, and Vi
 
 New mechanics and customers join by invitation. The manager creates an invitation code under **Customers** or **Mechanics**. The person then uses **Have an invitation code?** on the sign-in page. Codes work once, are tied to one email address, and expire after 7 days.
 
+**Worksheets and checklists.** Managers create a checklist for each job type under **Checklists** (the demo data includes Repair, Inspection and Preventive maintenance) and pick the job type when creating a job. When the mechanic presses **Start work**, the checklist is copied onto the job and the timer starts; **Pause** and **Resume** stop and restart it. Open a job's **Worksheet** to add work notes, parts used, checklist ticks and the customer's service summary. **Complete** is refused until work is described and every required checklist item is ticked; completing fills in the service record the customer can review. Click any job title to see its full worksheet and history.
+
 If someone forgets their password, the manager clicks **Reset password** next to them under **Mechanics** or **Customers**. The person enters that one-time code under **Forgot password?** on the sign-in page; it expires after 24 hours. Anyone can change their own password under **Settings**. Changing or resetting a password signs that account out everywhere else.
 
 Until email delivery is added, both kinds of code are shared with **Copy code** or **Email this code**, which opens your own mail app with the message filled in.

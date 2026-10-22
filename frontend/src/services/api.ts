@@ -93,7 +93,6 @@ export const updateJob = (id: number, data: any) => patch(`/jobs/${id}`, data);
 export const deleteJob = (id: number) => api(`/jobs/${id}`, { method: "DELETE" });
 export const invite = (data: any) => post("/customers/invite", data);
 export const createMachine = (data: any) => post("/machines", data);
-export const createService = (data: any) => post("/services", data);
 export const createRequest = (data: any) => post("/customers/requests", data);
 export const updateMachine = (id: number, data: any) => patch(`/machines/${id}`, data);
 export const updateCustomer = (id: number, data: any) => patch(`/customers/${id}`, data);
@@ -101,3 +100,20 @@ export const updateRequest = (id: number, data: any) => patch(`/customers/reques
 export const createReview = (data: any) => post("/reviews", data);
 export const markNotificationRead = (id: number) => patch(`/notifications/${id}/read`, {});
 export const markAllNotificationsRead = () => patch("/notifications/read-all", {});
+
+// Worksheets
+const put = (path: string, data: unknown) => api(path, { method: "PUT", body: JSON.stringify(data) });
+export const jobDetail = (id: number) => api(`/jobs/${id}`);
+export const addEntry = (jobId: number, data: any) => post(`/jobs/${jobId}/entries`, data);
+export const updateEntry = (jobId: number, entryId: number, data: any) => patch(`/jobs/${jobId}/entries/${entryId}`, data);
+export const addPart = (jobId: number, data: any) => post(`/jobs/${jobId}/parts`, data);
+export const removePart = (jobId: number, partId: number) => api(`/jobs/${jobId}/parts/${partId}`, { method: "DELETE" });
+export const updateChecklistItem = (jobId: number, itemId: number, data: any) => patch(`/jobs/${jobId}/checklist/${itemId}`, data);
+export const saveRecord = (jobId: number, data: any) => put(`/jobs/${jobId}/record`, data);
+export const addNote = (jobId: number, note: string) => post(`/jobs/${jobId}/notes`, { note });
+
+// Checklist templates (managers)
+export const checklists = () => api("/checklists");
+export const createChecklist = (data: any) => post("/checklists", data);
+export const updateChecklist = (id: number, data: any) => patch(`/checklists/${id}`, data);
+export const deleteChecklist = (id: number) => api(`/checklists/${id}`, { method: "DELETE" });

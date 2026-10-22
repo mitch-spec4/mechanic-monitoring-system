@@ -13,7 +13,7 @@ import Notifications from "../components/Notifications";
 import Modal from "../components/Modal";
 import { errorMessage } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
-export default function CustomerDashboard({ u }: { u: any }) {
+export default function CustomerDashboard({ u, onOpenJob }: { u: any; onOpenJob: (id: number) => void }) {
   const [j, setJ] = useState<any[]>([]),
     [m, setM] = useState<any[]>([]),
     [s, setS] = useState<any[]>([]),
@@ -121,7 +121,7 @@ export default function CustomerDashboard({ u }: { u: any }) {
             <div className="panelHead"><h2>Active requests</h2><span className="pill">{q.filter((x) => !["Completed", "Cancelled"].includes(x.status)).length} open</span></div>
             {q.length === 0 ? <p className="muted">No active service requests.</p> : q.slice(0, 5).map((request) => <div className="request" key={request.id}><div><b>{request.subject}</b><span>{request.status} · {request.description}</span></div><span className="priority">{request.priority}</span></div>)}
           </section>
-          <section className="panel"><div className="panelHead"><h2>Upcoming services</h2></div>{openJobs.slice(0, 5).map((job) => <div className="request" key={job.id}><div><b>{job.title}</b><span>{job.location || "Location not set"}</span></div><span className="status">{job.status}</span></div>)}{openJobs.length === 0 && <p className="muted">No upcoming services.</p>}</section>
+          <section className="panel"><div className="panelHead"><h2>Upcoming services</h2></div>{openJobs.slice(0, 5).map((job) => <div className="request" key={job.id}><div><button className="titleLink" onClick={() => onOpenJob(job.id)}><b>{job.title}</b></button><span>{job.location || "Location not set"}</span></div><span className="status">{job.status}</span></div>)}{openJobs.length === 0 && <p className="muted">No upcoming services.</p>}</section>
         </div>
         <section className="panel">
           <div className="panelHead">
@@ -133,7 +133,13 @@ export default function CustomerDashboard({ u }: { u: any }) {
             s.map((x) => (
               <div className="record" key={x.id}>
                 <div>
-                  <b>{x.service_type}</b>
+                  {x.job_id ? (
+                    <button className="titleLink" onClick={() => onOpenJob(x.job_id)}>
+                      <b>{x.service_type}</b>
+                    </button>
+                  ) : (
+                    <b>{x.service_type}</b>
+                  )}
                   <span>{x.work_done}</span>
                 </div>
                 <div>
