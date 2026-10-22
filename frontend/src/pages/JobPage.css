@@ -520,3 +520,39 @@
     transition: none;
   }
 }
+
+/* Location stamps (managers and the mechanic only). */
+.stampList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.stampList li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  font-size: 13px;
+}
+.stampList span {
+  color: #68768a;
+}
+.stampList a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  color: var(--role-color, #0969d7);
+  font-weight: 700;
+  text-decoration: none;
+}
+.stampList em {
+  margin-left: auto;
+  color: #8a5300;
+  font-style: normal;
+}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   CheckCircle2,
   ClipboardList,
@@ -12,8 +12,8 @@ import {
   machines,
   services,
   reviews as fetchReviews,
-  updateJob,
 } from "../services/api";
+import { ClockCard, changeJobStatus, useShift } from "../components/Shift";
 import { errorMessage, formatDate, greeting } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
 
@@ -34,7 +34,10 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
         setReviewList(reviewData.reviews || []);
       })
       .catch(() => {});
-  usePolling(load, 30000);
+  usePolling(load, 30000, true);
+  // A "clock in first" error is out of date once the mechanic clocks in or out.
+  const shiftId = useShift()?.status?.shift?.id;
+  useEffect(() => setActionError(""), [shiftId]);
   const activeJobs = jobList.filter((job) => !["Completed", "Cancelled"].includes(job.status));
   // Machines this mechanic works on: from their jobs and their own service records.
   const myMachineIds = new Set<number>([
@@ -52,12 +55,17 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
     : "—";
   const latestService = serviceList[0] || null;
   const pendingJobs = activeJobs;
+  // Start, Resume and Complete wait for a GPS fix, so the job's buttons are disabled meanwhile.
+  const [changing, setChanging] = useState<number | null>(null);
   const change = async (id: number, status: string) => {
     setActionError("");
+    setChanging(id);
     try {
-      await updateJob(id, { status });
+      await changeJobStatus(id, status, "mechanic");
     } catch (error) {
       setActionError(errorMessage(error));
+    } finally {
+      setChanging(null);
     }
     load();
   };
@@ -72,6 +80,7 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
           </p>
         </div>
       </div>
+      <ClockCard />
       <div className="kpiGrid">
         <Kpi
           icon={<FileText />}
@@ -136,7 +145,7 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
                   {formatDate(job.due_date) || "Not set"}
                 </small>
               </div>
-              <div className="pendingActions">
+              <fieldset className="pendingActions" disabled={changing === job.id} aria-busy={changing === job.id}>
                 <button className="secondary" onClick={() => onOpenJob(job.id)}>
                   <ClipboardList size={14} /> Worksheet
                 </button>
@@ -176,7 +185,7 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
                     </button>
                   </>
                 )}
-              </div>
+              </fieldset>
             </article>
           ))
         )}

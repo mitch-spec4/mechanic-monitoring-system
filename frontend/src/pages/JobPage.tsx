@@ -23,8 +23,9 @@ import {
   saveRecord,
   updateChecklistItem,
   updateEntry,
-  updateJob,
 } from "../services/api";
+import { changeJobStatus } from "../components/Shift";
+import { mapLink } from "../lib/location";
 import { errorMessage, formatDate } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
 import "./JobPage.css";
@@ -115,7 +116,7 @@ export default function JobPage({ jobId, user, onBack }: Props) {
     .filter((entry: any) => !entry.running)
     .reduce((sum: number, entry: any) => sum + entry.hours * 3600, 0);
   const liveSeconds = closedSeconds + (running ? Math.max(0, (now - asDate(running.started_at).getTime()) / 1000) : 0);
-  const setStatus = (status: string) => run(() => updateJob(job.id, { status }));
+  const setStatus = (status: string) => run(() => changeJobStatus(job.id, status, user.role));
 
   return (
     <main className={`jobPage status-${job.status.replace(/ /g, "").toLowerCase()}`}>
@@ -322,6 +323,26 @@ export default function JobPage({ jobId, user, onBack }: Props) {
           )}
         </Card>
 
+        {!isCustomer && job.locations?.length > 0 && (
+          <Card title="Locations" icon={<MapPin size={16} />} wide>
+            <ul className="stampList">
+              {job.locations.map((point: any, index: number) => (
+                <li key={index}>
+                  <strong>{STAMP_TEXT[point.kind] || point.kind}</strong>
+                  <span>{stamp(point.recorded_at)}</span>
+                  {point.latitude != null ? (
+                    <a href={mapLink(point.latitude, point.longitude)} target="_blank" rel="noreferrer">
+                      <MapPin size={12} /> View on map{point.accuracy_m ? ` (±${point.accuracy_m} m)` : ""}
+                    </a>
+                  ) : (
+                    <em>Location not shared ({MISSING_TEXT[point.missing_reason] || "no position"})</em>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+
         {!isCustomer && (
           <Card title="History" icon={<History size={16} />} wide>
             <ol className="timeline">
@@ -345,6 +366,15 @@ export default function JobPage({ jobId, user, onBack }: Props) {
     </main>
   );
 }
+
+const STAMP_TEXT: Record<string, string> = { job_start: "Started or resumed work", job_complete: "Completed the job" };
+const MISSING_TEXT: Record<string, string> = {
+  denied: "location blocked",
+  unavailable: "no GPS",
+  timeout: "timed out",
+  unsupported: "not supported",
+  not_sent: "not sent",
+};
 
 function BackButton({ onBack }: { onBack: () => void }) {
   return (

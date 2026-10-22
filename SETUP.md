@@ -75,6 +75,10 @@ New mechanics and customers join by invitation. The manager creates an invitatio
 
 **Worksheets and checklists.** Managers create a checklist for each job type under **Checklists** (the demo data includes Repair, Inspection and Preventive maintenance) and pick the job type when creating a job. When the mechanic presses **Start work**, the checklist is copied onto the job and the timer starts; **Pause** and **Resume** stop and restart it. Open a job's **Worksheet** to add work notes, parts used, checklist ticks and the customer's service summary. **Complete** is refused until work is described and every required checklist item is ticked; completing fills in the service record the customer can review. Click any job title to see its full worksheet and history.
 
+**Clock in and location.** Mechanics must clock in before they can start or resume a job, and clocking out pauses any job in progress. The first time they clock in, they are asked to agree to location sharing. Clocking in needs a position; clocking out never does. While clocked in, a **Location on** sign is shown. A position is recorded at clock-in and clock-out, when a job starts, resumes or completes, and every few minutes while a job is in progress and the app is open. Nothing is recorded while clocked out. Phones stop sending positions when the app is in the background; only a native app could track in the background. Managers see clocked-in mechanics under **Team Map**, and hours under **Shifts**, where they can set the clock-out time of a forgotten shift. In the demo data, Mitch and Amina are clocked in, and Brian is clocked out and hasn't agreed yet.
+
+**Testing location on a real phone.** Phones only share location with secure (https) pages. With the backend running, start the frontend with `npm run dev:phone` instead of `npm run dev`. Then open the `https://<your computer's IP>:5173` address it prints, on a phone on the same Wi-Fi. The certificate is self-signed, so the phone warns once: choose to continue. Also try it with location blocked for the site, and outdoors.
+
 If someone forgets their password, the manager clicks **Reset password** next to them under **Mechanics** or **Customers**. The person enters that one-time code under **Forgot password?** on the sign-in page; it expires after 24 hours. Anyone can change their own password under **Settings**. Changing or resetting a password signs that account out everywhere else.
 
 Until email delivery is added, both kinds of code are shared with **Copy code** or **Email this code**, which opens your own mail app with the message filled in.
@@ -127,6 +131,8 @@ All backend settings live in `backend/.env` (see `backend/.env.example`).
 | `LOGIN_RATE_LIMIT` | `10 per minute;50 per hour` | Failed sign-ins per IP and per email; invitation and reset attempts per IP. Stored in the database |
 | `TRUSTED_PROXY_COUNT` | `0` | Number of proxies/load balancers in front of the app, so rate limiting sees the real client IP |
 
+Live positions taken during jobs are deleted after 30 days. The app removes old ones whenever new positions arrive; in production, also run `flask --app run.py purge-locations` once a day (for example from cron).
+
 Generate secrets with:
 
 ```bash
@@ -145,6 +151,8 @@ Frontend setting (`frontend/.env.local`, or the build environment):
 ## Production notes (until the deployment guide is written)
 
 - Run `flask --app run.py db upgrade` on every deploy. Never run `seed.py`.
+- Run `flask --app run.py purge-locations` daily.
+- Map tiles come from the free OpenStreetMap servers, which are not meant for heavy commercial use. Switch to a paid tile provider before launch.
 - Serve the backend with a production WSGI server (for example gunicorn), not `flask run`.
 - Build the frontend with `npm run build` and serve `frontend/dist/` as static files.
 - Serve the frontend and the API from the same site over HTTPS (for example `app.example.com` with the API at `/api`). Sessions are httpOnly, `Secure` cookies with CSRF protection, so browsers won't send them to a different site.

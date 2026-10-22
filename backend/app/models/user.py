@@ -13,6 +13,8 @@ class User(db.Model):
     customer_id = db.Column(db.Integer, db.ForeignKey("customer.id"), nullable=True, index=True)
     # Bumped on password change/reset so every existing session stops working.
     token_version = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    # When a mechanic agreed to location sharing while clocked in (None: not agreed or withdrawn).
+    location_consent_at = db.Column(db.DateTime)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)

@@ -8,7 +8,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ["APP_ENV"] = "test"
 
 from app import create_app, db, normalize_database_url  # noqa: E402
-from app.models import Company, Customer, Job, Machine, ServiceRecord, User  # noqa: E402
+from app.models import Company, Customer, Job, Machine, ServiceRecord, Shift, User  # noqa: E402
+from app.utils.time import utcnow  # noqa: E402
 
 PASSWORD = "correct-horse-battery"
 
@@ -84,6 +85,10 @@ def data(app):
         service_type="Repair",
     )
     db.session.add_all([job, record])
+    # Mech One starts the day clocked in (with location consent) so job tests can start work;
+    # Mech Two is clocked out. test_location.py covers clocking in and out.
+    mechanic.location_consent_at = utcnow()
+    db.session.add(Shift(company_id=acme.id, user_id=mechanic.id, clocked_in_at=utcnow()))
     db.session.commit()
     return {
         "acme": acme.id,

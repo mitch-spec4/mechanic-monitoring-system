@@ -11,6 +11,7 @@ from app.models import (
     Customer,
     Job,
     JobChecklistItem,
+    LocationPoint,
     JobEvent,
     JobPart,
     Machine,
@@ -18,6 +19,7 @@ from app.models import (
     Review,
     ServiceRecord,
     ServiceRequest,
+    Shift,
     User,
     WorkEntry,
 )
@@ -170,6 +172,40 @@ def add_service(service_type, problem, work_done, parts, solution, advice, compa
     return record
 
 
+def add_shifts(user, company_id, shifts, consent=True, boss=None):
+    """Demo shifts as (hours ago clocked in, hours worked or None while still clocked in, (lat, lng)).
+    Only added the first time, so running the seed again doesn't duplicate them."""
+    if Shift.query.filter_by(user_id=user.id).first():
+        return
+    now = utcnow()
+    if consent:
+        user.location_consent_at = now - timedelta(days=7)
+    for started, hours, place in shifts:
+        shift = Shift(company_id=company_id, user_id=user.id, clocked_in_at=now - timedelta(hours=started))
+        if hours is not None:
+            shift.clocked_out_at = shift.clocked_in_at + timedelta(hours=hours)
+        if hours and hours > 12 and boss:
+            # A forgotten clock-out the manager corrected.
+            shift.original_clocked_out_at = shift.clocked_out_at
+            shift.clocked_out_at = shift.clocked_in_at + timedelta(hours=9)
+            shift.edited_by, shift.edited_at = boss.id, shift.clocked_out_at + timedelta(hours=10)
+        db.session.add(shift)
+        db.session.flush()
+        if consent and place:
+            stamp(user, shift, "clock_in", place, shift.clocked_in_at)
+            if shift.clocked_out_at:
+                stamp(user, shift, "clock_out", place, shift.clocked_out_at)
+
+
+def stamp(user, shift, kind, place, at, job=None):
+    db.session.add(
+        LocationPoint(
+            company_id=user.company_id, user_id=user.id, shift_id=shift.id, job_id=job.id if job else None,
+            kind=kind, latitude=place[0], longitude=place[1], accuracy_m=15, recorded_at=at,
+        )
+    )
+
+
 def add_request(subject, description, priority, status, company_id, customer, machine):
     if ServiceRequest.query.filter_by(subject=subject, company_id=company_id).first():
         return
@@ -274,6 +310,19 @@ with app.app_context():
     if excavator_service and not Review.query.filter_by(service_record_id=excavator_service.id).first():
         db.session.add(Review(customer_id=abc.id, mechanic_id=amina.id, machine_id=excavator.id, company_id=company.id, service_record_id=excavator_service.id, rating=5, comment="The excavator is working smoothly again.", advice="Keep the current inspection schedule."))
 
+    # Mitch and Amina are clocked in; Brian is clocked out and hasn't agreed to location sharing yet.
+    industrial_area, mombasa_road = (-1.3080, 36.8510), (-1.3330, 36.8890)
+    first_shift = not Shift.query.filter_by(user_id=mitch.id).first()
+    add_shifts(mitch, company.id, [(50, 8, industrial_area), (26, 8.5, industrial_area), (1.5, None, industrial_area)])
+    add_shifts(amina, company.id, [(27, 8, mombasa_road), (2, None, mombasa_road)])
+    add_shifts(brian, company.id, [(75, 15, None), (30, 7.5, None)], consent=False, boss=boss)
+    if first_shift:
+        generator_job = job_named("Service Generator G-102")
+        today = Shift.query.filter_by(user_id=mitch.id, clocked_out_at=None).one()
+        now = utcnow()
+        stamp(mitch, today, "job_start", (-1.3083, 36.8506), now - timedelta(hours=1), generator_job)
+        stamp(mitch, today, "live", (-1.3085, 36.8503), now - timedelta(minutes=4), generator_job)
+
     add_request("Generator G-102 overheating issue", "The generator overheats and vibrates after extended use.", "High", "Submitted", company.id, abc, generator)
     add_request("Hydraulic leak inspection", "Please inspect the hydraulic line before the next production run.", "Medium", "Reviewing", company.id, kenya, pump)
     add_request("Mixer vibration check", "The mixer vibrates when processing heavier batches.", "High", "Approved", company.id, xyz, mixer)
@@ -288,4 +337,4 @@ with app.app_context():
     add_notification(abc_user, "Review reminder", "Please leave a review for your completed service.", "review")
 
     db.session.commit()
-    print("Demo data ready: 3 customers, 3 mechanics, 6 machines, 6 jobs with worksheets and history, 3 checklists, 6 service records, 3 reviews, 3 requests, and notifications.")
+    print("Demo data ready: 3 customers, 3 mechanics, 6 machines, 6 jobs with worksheets and history, 3 checklists, shifts and locations, 6 service records, 3 reviews, 3 requests, and notifications.")

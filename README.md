@@ -10,6 +10,7 @@ Built with React + TypeScript (Vite) on the frontend and Flask, SQLAlchemy, Alem
 - **Invite-only accounts.** Managers issue single-use invitation codes that expire after 7 days.
 - **A job workflow with enforced statuses:** Pending → Assigned → Accepted → In Progress ⇄ Paused → Completed. Mechanics can't decline or cancel jobs.
 - **Job worksheets.** Start, Pause and Resume run a timer automatically; mechanics log work done, parts used (name and quantity) and the job type's checklist, on a phone-friendly screen. A job can't be completed until work is described and every required checklist item is ticked.
+- **Clock in and out, with location.** Mechanics clock in to start work, with their location shared only while clocked in, after they agree to it, and with a "Location on" sign always visible. Start, resume and complete are stamped with a position. Managers see a map of clocked-in mechanics and every shift's hours, and can correct a forgotten clock-out.
 - **Job history.** Every status change, assignment, edit, part, checklist tick and note is logged with who and when, and managers see it as a timeline.
 - **Permanent service history.** Records, reviews and customer service requests can't be deleted; finished jobs lock their worksheet.
 - **Notifications** for assignments, status changes, requests and reviews.
@@ -31,7 +32,7 @@ Then open http://localhost:5173.
 ## Project structure
 
 - `backend/app/models`: SQLAlchemy models
-- `backend/app/routes`: REST API (auth, jobs, customers and requests, machines, service records, reviews, notifications, users, company, reports)
+- `backend/app/routes`: REST API (auth, jobs and worksheets, checklists, shifts and location, customers and requests, machines, service records, reviews, notifications, users, company, reports)
 - `backend/app/utils`: role checks and input validation
 - `backend/migrations`: Alembic database migrations
 - `backend/tests`: pytest suite

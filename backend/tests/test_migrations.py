@@ -71,4 +71,4 @@ def test_migrations_roll_back_and_forward(tmp_path):
         upgrade(directory=migrations)
         downgrade(directory=migrations, revision="base")
         upgrade(directory=migrations)
-    assert sqlite3.connect(path).execute("select version_num from alembic_version").fetchone() == ("0002_worksheets",)
+    assert sqlite3.connect(path).execute("select version_num from alembic_version").fetchone() == ("0003_shifts_location",)
