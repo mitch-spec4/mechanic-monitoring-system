@@ -24,7 +24,7 @@ type SidebarProps = {user: any; active: string; onNavigate: (label: string) => v
 
 export default function Sidebar({user, active, onNavigate}: SidebarProps) {
   const [stats, setStats] = useState<any>(null);
-  usePolling(() => reports().then(setStats).catch(() => {}), 60000);
+  usePolling(() => reports().then(setStats).catch(() => {}), 60000, true);
   const visibleLinks = [...commonLinks, ...(roleLinks[user.role as keyof typeof roleLinks] || roleLinks.customer), ...utilityLinks];
   const select = (label: string) => { if (label === "Profile") document.querySelector<HTMLButtonElement>(".profileTrigger")?.click(); else onNavigate(label); };
   return <aside className="sidebar">

@@ -19,7 +19,6 @@ import {
   company,
   createMachine,
   customers,
-  invite,
   jobs,
   machines,
   mechanics,
@@ -29,6 +28,7 @@ import {
   reviews,
   services,
 } from "../services/api";
+import InviteForm from "../components/InviteForm";
 import Modal from "../components/Modal";
 import { errorMessage, formatDate } from "../lib/format";
 
@@ -229,7 +229,7 @@ export default function WorkspacePage({ title, user }: Props) {
       </section>
       {adding && title === "Machines" && <AddMachine onClose={() => setAdding(false)} onAdded={added} />}
       {adding && (title === "Customers" || title === "Mechanics") && (
-        <InviteForm role={title === "Customers" ? "customer" : "mechanic"} onClose={() => setAdding(false)} onAdded={added} />
+        <InviteForm role={title === "Customers" ? "customer" : "mechanic"} onClose={() => setAdding(false)} onDone={added} />
       )}
     </main>
   );
@@ -288,46 +288,6 @@ function AddMachine({ onClose, onAdded }: { onClose: () => void; onAdded: () => 
           <Plus size={15} /> Add machine
         </button>
       </form>
-    </Modal>
-  );
-}
-
-function InviteForm({ role, onClose, onAdded }: { role: "customer" | "mechanic"; onClose: () => void; onAdded: () => void }) {
-  const [formError, setFormError] = useState("");
-  const [code, setCode] = useState("");
-  const submit = async (event: any) => {
-    event.preventDefault();
-    setFormError("");
-    try {
-      const result = await invite({ ...Object.fromEntries(new FormData(event.currentTarget)), role });
-      setCode(result.code);
-    } catch (e) {
-      setFormError(errorMessage(e));
-    }
-  };
-  const label = role === "customer" ? "customer" : "mechanic";
-  return (
-    <Modal title={`Invite ${label}`} icon={<Users size={20} />} onClose={code ? onAdded : onClose}>
-      {code ? (
-        <div className="form form-upgraded">
-          <p>Share this invitation code with the {label}. It works once and expires in 7 days.</p>
-          <strong className="inviteCode">{code}</strong>
-          <button className="primary" onClick={onAdded}>Done</button>
-        </div>
-      ) : (
-        <form className="form form-upgraded" onSubmit={submit}>
-          {formError && <div className="error">{formError}</div>}
-          <div className="formGroup">
-            <label>{role === "customer" ? "Company/Organization Name" : "Full name"}</label>
-            <input name="name" required />
-          </div>
-          <div className="formGroup">
-            <label>Email Address</label>
-            <input name="email" type="email" required />
-          </div>
-          <button className="primary">Generate Invitation Code</button>
-        </form>
-      )}
     </Modal>
   );
 }

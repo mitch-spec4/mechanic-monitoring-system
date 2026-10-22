@@ -1,6 +1,8 @@
 const BASE = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:5000/api").replace(/\/$/, "");
 
 export const SESSION_EXPIRED_EVENT = "mechanicpro:session-expired";
+// Fired after any successful change so always-visible widgets (sidebar, bell) refresh at once.
+export const DATA_CHANGED_EVENT = "mechanicpro:data-changed";
 
 export function saveSession(data: { token: string; refresh_token?: string; user?: unknown }) {
   localStorage.setItem("token", data.token);
@@ -61,6 +63,7 @@ export async function api(path: string, options: RequestInit = {}) {
   if (!response.ok) {
     throw new Error(data.error || data.message || data.msg || `Request failed (${response.status})`);
   }
+  if ((options.method || "GET").toUpperCase() !== "GET") window.dispatchEvent(new Event(DATA_CHANGED_EVENT));
   return data;
 }
 

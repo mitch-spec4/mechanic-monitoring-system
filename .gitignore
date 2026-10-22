@@ -31,3 +31,7 @@ notes.odt
 
 # Design mockups (kept locally, not published)
 docs/mockups/
+
+# Playwright output
+frontend/test-results/
+frontend/playwright-report/

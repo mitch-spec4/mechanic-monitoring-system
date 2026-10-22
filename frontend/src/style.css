@@ -1273,3 +1273,13 @@ body {
   letter-spacing: 1px;
   text-align: center;
 }
+.inviteActions > .secondary {
+  font-size: 13px;
+}
+.inviteEmail {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+}

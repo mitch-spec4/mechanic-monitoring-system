@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { Plus, Users, ClipboardList, Wrench, Trash2, CheckCircle2, UserPlus, Mail } from "lucide-react";
+import { Plus, ClipboardList, Wrench, Trash2, CheckCircle2 } from "lucide-react";
 import {
   customers,
   jobs,
   machines,
   mechanics,
   createJob,
-  invite,
   requests,
   updateJob,
   deleteJob,
@@ -16,6 +15,7 @@ import Notifications from "../components/Notifications";
 import Modal from "../components/Modal";
 import MechanicProfile from "../components/MechanicProfile";
 import CustomerProfile from "../components/CustomerProfile";
+import InviteForm from "../components/InviteForm";
 import { errorMessage, formatDate, greeting } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
 export default function BossDashboard({ u }: { u: any }) {
@@ -27,6 +27,7 @@ export default function BossDashboard({ u }: { u: any }) {
     [jobCustomer, setJobCustomer] = useState(""),
     [modal, setModalState] = useState(""),
     [formError, setFormError] = useState(""),
+    [notice, setNotice] = useState(""),
     [selectedMechanic, setSelectedMechanic] = useState(null),
     [selectedCustomer, setSelectedCustomer] = useState(null);
   const load = () =>
@@ -47,10 +48,11 @@ export default function BossDashboard({ u }: { u: any }) {
   };
   // Runs a change, reloads, and reports failures instead of failing silently.
   const act = async (change: () => Promise<unknown>) => {
+    setNotice("");
     try {
       await change();
     } catch (error) {
-      alert(errorMessage(error));
+      setNotice(errorMessage(error));
     }
     load();
   };
@@ -63,21 +65,6 @@ export default function BossDashboard({ u }: { u: any }) {
       await createJob(Object.fromEntries(new FormData(e.currentTarget)));
       setModal("");
       load();
-    } catch (error) {
-      setFormError(errorMessage(error));
-    }
-  };
-  const submitInvite = async (e: any, role: "customer" | "mechanic") => {
-    e.preventDefault();
-    setFormError("");
-    try {
-      const x = await invite({ ...Object.fromEntries(new FormData(e.currentTarget)), role });
-      alert(
-        role === "mechanic"
-          ? `✅ Unique Invitation Code Generated\n\n${x.code}\n\nShare this code with the mechanic to join the team. It expires in 7 days.`
-          : `Invitation code: ${x.code}\n\nShare this code with the customer. It expires in 7 days.`,
-      );
-      setModal("");
     } catch (error) {
       setFormError(errorMessage(error));
     }
@@ -96,6 +83,11 @@ export default function BossDashboard({ u }: { u: any }) {
             <Plus size={17} /> Create Job
           </button>
         </div>
+        {notice && (
+          <div className="error" role="alert">
+            {notice}
+          </div>
+        )}
         <div className="stats">
           <Stat icon={<ClipboardList />} n={data.length} t="Total jobs" />
           <Stat icon={<ClipboardList />} n={activeRequestCount} t="Pending requests" />
@@ -225,52 +217,8 @@ export default function BossDashboard({ u }: { u: any }) {
           </form>
         </Modal>
       )}
-      {modal === "invite" && (
-        <Modal title="Add New Customer" icon={<Users size={20} />} onClose={() => setModal("")}>
-          <form className="form form-upgraded" onSubmit={(e) => submitInvite(e, "customer")}>
-            {formError && <div className="error">{formError}</div>}
-            <div className="formGroup">
-              <label>Company/Organization Name</label>
-              <input name="name" placeholder="Enter customer name" required />
-            </div>
-            <div className="formGroup">
-              <label>Email Address</label>
-              <input
-                name="email"
-                type="email"
-                placeholder="customer@company.com"
-                required
-              />
-            </div>
-            <button className="primary" style={{marginTop: '10px'}}>
-              <Mail size={15} /> Generate Invitation Code
-            </button>
-          </form>
-        </Modal>
-      )}
-      {modal === "addmech" && (
-        <Modal title="Add Mechanic to Team" icon={<UserPlus size={20} />} onClose={() => setModal("")}>
-          <form className="form form-upgraded" onSubmit={(e) => submitInvite(e, "mechanic")}>
-            {formError && <div className="error">{formError}</div>}
-            <div className="formGroup">
-              <label>Mechanic Full Name</label>
-              <input name="name" placeholder="Enter mechanic's name" required />
-            </div>
-            <div className="formGroup">
-              <label>Email Address</label>
-              <input
-                name="email"
-                type="email"
-                placeholder="mechanic@example.com"
-                required
-              />
-            </div>
-            <button className="primary" style={{marginTop: '10px'}}>
-              <UserPlus size={15} /> Generate Unique Code
-            </button>
-          </form>
-        </Modal>
-      )}
+      {modal === "invite" && <InviteForm role="customer" onClose={() => setModal("")} />}
+      {modal === "addmech" && <InviteForm role="mechanic" onClose={() => setModal("")} />}
       {selectedMechanic && (
         <MechanicProfile mechanic={selectedMechanic} onClose={() => setSelectedMechanic(null)} />
       )}
