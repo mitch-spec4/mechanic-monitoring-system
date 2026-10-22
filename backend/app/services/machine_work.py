@@ -1,0 +1,46 @@
+"""Which machines need work, and why. One rule shared by every screen:
+an open job, an open service request, or a status of Under Maintenance or Under Repair."""
+from app.models.constants import ACTIVE_JOB_STATUSES
+from app.models.job import Job
+from app.models.request import ServiceRequest
+
+CLOSED_REQUEST_STATUSES = ("Completed", "Cancelled")
+NEEDS_WORK_STATUSES = ("Under Maintenance", "Under Repair")
+
+
+def work_by_machine(company_id, machine_ids):
+    """{machine_id: [reason, ...]} for the open jobs and requests on these machines."""
+    reasons = {machine_id: [] for machine_id in machine_ids}
+    if not machine_ids:
+        return reasons
+    jobs = (
+        Job.query.filter(Job.company_id == company_id, Job.machine_id.in_(machine_ids), Job.status.in_(ACTIVE_JOB_STATUSES))
+        .order_by(Job.id)
+        .all()
+    )
+    for job in jobs:
+        reasons[job.machine_id].append({"type": "job", "id": job.id, "title": job.title, "status": job.status})
+    requests = (
+        ServiceRequest.query.filter(
+            ServiceRequest.company_id == company_id,
+            ServiceRequest.machine_id.in_(machine_ids),
+            ServiceRequest.status.notin_(CLOSED_REQUEST_STATUSES),
+        )
+        .order_by(ServiceRequest.id)
+        .all()
+    )
+    for request in requests:
+        reasons[request.machine_id].append({"type": "request", "id": request.id, "title": request.subject, "status": request.status})
+    return reasons
+
+
+def with_work(machine_rows, company_id):
+    """Add needs_work and work (the reasons) to serialized machines."""
+    reasons = work_by_machine(company_id, [row["id"] for row in machine_rows])
+    for row in machine_rows:
+        work = list(reasons.get(row["id"], []))
+        if row["status"] in NEEDS_WORK_STATUSES:
+            work.append({"type": "status", "status": row["status"]})
+        row["work"] = work
+        row["needs_work"] = bool(work)
+    return machine_rows

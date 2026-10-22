@@ -8,6 +8,7 @@ from app.models.machine import Machine
 from app.models.request import ServiceRequest
 from app.models.review import Review
 from app.models.service_record import ServiceRecord
+from app.services.machine_work import with_work
 from app.utils.auth import current_user, roles
 from app.utils.validation import ValidationError, choice, integer, json_body, text
 
@@ -39,7 +40,10 @@ def machines():
     query = Machine.query.filter_by(company_id=user.company_id)
     if user.role == "customer":
         query = query.filter_by(customer_id=user.customer_id)
-    return jsonify(machines=[out(machine) for machine in query.order_by(Machine.name).all()])
+    rows = [out(machine) for machine in query.order_by(Machine.name).all()]
+    if user.role == "boss":
+        rows = with_work(rows, user.company_id)
+    return jsonify(machines=rows)
 
 
 @bp.post("")
