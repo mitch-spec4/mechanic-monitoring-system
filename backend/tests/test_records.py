@@ -47,10 +47,12 @@ def test_reviews_are_permanent(client, data, auth):
     assert client.delete(f"/api/reviews/{rid}", headers=customer).status_code == 405
 
 
-def test_mechanic_records_only_for_machines_on_their_jobs(client, data, auth):
-    payload = {"machine_id": data["machine"], "service_type": "Check"}
-    assert client.post("/api/services", headers=auth("mech2@acme.test"), json=payload).status_code == 403
-    assert client.post("/api/services", headers=auth("mech@acme.test"), json=payload).status_code == 201
+def test_only_the_assigned_mechanic_writes_the_service_summary(client, data, auth):
+    payload = {"problem": "Overheats", "solution": "New fan"}
+    assert client.put(f"/api/jobs/{data['job']}/record", headers=auth("mech2@acme.test"), json=payload).status_code == 404
+    response = client.put(f"/api/jobs/{data['job']}/record", headers=auth("mech@acme.test"), json=payload)
+    assert response.status_code == 200
+    assert response.get_json()["job"]["record"]["solution"] == "New fan"
 
 
 def test_boss_edits_customer(client, data, auth):
@@ -70,17 +72,11 @@ def test_boss_edits_machine(client, data, auth):
     assert client.patch(url, headers=boss(auth), json={"status": "Broken"}).status_code == 400
 
 
-def test_service_history_cannot_be_deleted(client, data, auth):
-    assert client.delete(f"/api/services/{data['record']}", headers=boss(auth)).status_code == 405
-    assert client.delete(f"/api/services/{data['record']}", headers=auth("mech@acme.test")).status_code == 405
-
-
-def test_service_record_create_validation(client, data, auth):
-    mech = auth("mech@acme.test")
-    assert client.post("/api/services", headers=mech, json={"machine_id": data["machine"]}).status_code == 400
-    assert client.post("/api/services", headers=mech, json={"machine_id": data["other_machine"], "service_type": "x"}).status_code == 404
-    response = client.post("/api/services", headers=mech, json={"machine_id": str(data["machine"]), "service_type": "Check"})
-    assert response.status_code == 201
+def test_service_history_has_no_write_endpoints(client, data, auth):
+    for method in ("delete", "patch"):
+        response = getattr(client, method)(f"/api/services/{data['record']}", headers=boss(auth), json={})
+        assert response.status_code in (404, 405)
+    assert client.post("/api/services", headers=auth("mech@acme.test"), json={}).status_code == 405
 
 
 def test_serial_numbers_are_unique_per_company_only(client, data, auth):

@@ -10,6 +10,7 @@ class Job(db.Model):
     description = db.Column(db.Text, nullable=False)
     priority = db.Column(db.String(30), nullable=False, default=DEFAULT_PRIORITY)
     status = db.Column(db.String(40), nullable=False, default="Pending")
+    job_type = db.Column(db.String(80))
     location = db.Column(db.String(200))
     due_date = db.Column(db.Date)
     company_id = db.Column(db.Integer, db.ForeignKey("company.id"), nullable=False, index=True)

@@ -7,6 +7,15 @@ from app.models.job import Job
 from app.models.machine import Machine
 from app.models.user import User
 from app.services.notifications import notify, notify_bosses
+from app.services.worksheet import (
+    completion_problems,
+    copy_checklist,
+    delete_job_children,
+    fill_service_record,
+    record_event,
+    start_timer,
+    stop_timer,
+)
 from app.utils.auth import current_user, roles
 from app.utils.validation import ValidationError, choice, integer, iso_date, json_body, text
 
@@ -42,12 +51,22 @@ def out(job):
         "description": job.description,
         "priority": job.priority,
         "status": job.status,
+        "job_type": job.job_type,
         "location": job.location,
         "due_date": job.due_date.isoformat() if job.due_date else None,
         "customer_id": job.customer_id,
         "machine_id": job.machine_id,
         "mechanic_id": job.mechanic_id,
     }
+
+
+def find_machine(company_id, machine_id, customer_id=None):
+    machine = Machine.query.filter_by(id=machine_id, company_id=company_id).first()
+    if not machine:
+        raise ValidationError("Machine not found", 404)
+    if customer_id and machine.customer_id != customer_id:
+        raise ValidationError("Machine does not belong to the selected customer")
+    return machine
 
 
 def find_mechanic(company_id, mechanic_id):
@@ -85,13 +104,8 @@ def create_job():
         find_mechanic(user.company_id, mechanic_id)
     if customer_id and not Customer.query.filter_by(id=customer_id, company_id=user.company_id).first():
         raise ValidationError("Customer not found", 404)
-    machine = None
-    if machine_id:
-        machine = Machine.query.filter_by(id=machine_id, company_id=user.company_id).first()
-        if not machine:
-            raise ValidationError("Machine not found", 404)
-        if customer_id and machine.customer_id != customer_id:
-            raise ValidationError("Machine does not belong to the selected customer")
+    machine = find_machine(user.company_id, machine_id, customer_id) if machine_id else None
+    if machine:
         customer_id = machine.customer_id
 
     job = Job(
@@ -99,6 +113,7 @@ def create_job():
         title=title,
         description=description,
         priority=priority,
+        job_type=text(data, "job_type", "Job type", max_length=80),
         location=text(data, "location", max_length=200),
         due_date=iso_date(data, "due_date", "Due date"),
         customer_id=customer_id,
@@ -108,7 +123,10 @@ def create_job():
     )
     db.session.add(job)
     db.session.flush()
+    record_event(job, user, "created", to_status=job.status)
     if job.mechanic_id:
+        mechanic = db.session.get(User, job.mechanic_id)
+        record_event(job, user, "assigned", note=f"Assigned to {mechanic.name}")
         notify(job.mechanic_id, "New task assigned", f"{job.title} was assigned to you.", "job")
     db.session.commit()
     return jsonify(job=out(job)), 201
@@ -129,18 +147,11 @@ def update_job(jid):
             return jsonify(error="Mechanics can only update job status"), 403
 
     if user.role == "boss":
-        if "title" in data:
-            job.title = text(data, "title", required=True, max_length=200)
-        if "description" in data:
-            job.description = text(data, "description", required=True)
-        if "priority" in data:
-            job.priority = choice(data, "priority", PRIORITIES, default=job.priority)
-        if "location" in data:
-            job.location = text(data, "location", max_length=200)
-        if "due_date" in data:
-            job.due_date = iso_date(data, "due_date", "Due date")
+        edited = edit_details(job, data)
+        if edited:
+            record_event(job, user, "updated", note="Changed " + ", ".join(edited))
         if "mechanic_id" in data:
-            assign_mechanic(job, integer(data, "mechanic_id", "Mechanic"))
+            assign_mechanic(job, integer(data, "mechanic_id", "Mechanic"), user)
 
     if "status" in data:
         new_status = data["status"]
@@ -153,7 +164,11 @@ def update_job(jid):
                 raise ValidationError("Mechanics cannot decline or cancel jobs", 403)
             if new_status == "Assigned" and not job.mechanic_id:
                 raise ValidationError("Assign a mechanic first", 409)
-            job.status = new_status
+            if new_status == "Completed":
+                problems = completion_problems(job)
+                if problems:
+                    raise ValidationError("Can't complete yet: " + "; ".join(problems) + ".", 409)
+            change_status(job, user, new_status)
 
     if old_status != job.status and user.role == "mechanic":
         notify_bosses(job.company_id, "Job status updated", f"{job.title} is now {job.status}.", "status")
@@ -163,19 +178,68 @@ def update_job(jid):
     return jsonify(job=out(job))
 
 
-def assign_mechanic(job, mechanic_id):
+EDITABLE_FIELDS = ("title", "description", "priority", "job_type", "location", "due_date", "machine_id")
+
+
+def edit_details(job, data):
+    """Apply a manager's edits and return the names of the fields that changed."""
+    before = {field: getattr(job, field) for field in EDITABLE_FIELDS}
+    if "title" in data:
+        job.title = text(data, "title", required=True, max_length=200)
+    if "description" in data:
+        job.description = text(data, "description", required=True)
+    if "priority" in data:
+        job.priority = choice(data, "priority", PRIORITIES, default=job.priority)
+    if "job_type" in data:
+        job.job_type = text(data, "job_type", "Job type", max_length=80)
+    if "location" in data:
+        job.location = text(data, "location", max_length=200)
+    if "due_date" in data:
+        job.due_date = iso_date(data, "due_date", "Due date")
+    if "machine_id" in data:
+        machine_id = integer(data, "machine_id", "Machine")
+        if job.status in FINISHED_STATUSES and machine_id != job.machine_id:
+            raise ValidationError("The machine on a finished job cannot be changed", 409)
+        machine = find_machine(job.company_id, machine_id, job.customer_id) if machine_id else None
+        job.machine_id = machine.id if machine else None
+        if machine:
+            job.customer_id = machine.customer_id
+    return [field.replace("_id", "").replace("_", " ") for field in EDITABLE_FIELDS if getattr(job, field) != before[field]]
+
+
+FINISHED_STATUSES = {"Completed", "Cancelled"}
+
+
+def change_status(job, user, new_status):
+    """Move a job to a new status, keeping the worksheet timer and history in step."""
+    old_status = job.status
+    job.status = new_status
+    record_event(job, user, "status", from_status=old_status, to_status=new_status)
+    if new_status == "In Progress":
+        copy_checklist(job)
+        start_timer(job, job.mechanic_id)
+    elif new_status in {"Paused", "Completed", "Cancelled"}:
+        stop_timer(job)
+    if new_status == "Completed":
+        fill_service_record(job)
+
+
+def assign_mechanic(job, mechanic_id, user):
     if mechanic_id == job.mechanic_id:
         return
     if job.status not in REASSIGNABLE:
         raise ValidationError(f"A job that is {job.status} cannot be reassigned", 409)
+    old_status = job.status
     if mechanic_id:
-        find_mechanic(job.company_id, mechanic_id)
+        mechanic = find_mechanic(job.company_id, mechanic_id)
         job.mechanic_id = mechanic_id
         job.status = "Assigned"
+        record_event(job, user, "assigned", from_status=old_status, to_status=job.status, note=f"Assigned to {mechanic.name}")
         notify(mechanic_id, "New task assigned", f"{job.title} was assigned to you.", "job")
     else:
         job.mechanic_id = None
         job.status = "Pending"
+        record_event(job, user, "unassigned", from_status=old_status, to_status=job.status)
 
 
 @bp.delete("/<int:jid>")
@@ -184,6 +248,7 @@ def delete_job(jid):
     job = Job.query.filter_by(id=jid, company_id=current_user().company_id).first_or_404()
     if job.status not in DELETABLE:
         return jsonify(error="Only jobs that have not started can be deleted. Cancel this job instead."), 409
+    delete_job_children(job)
     db.session.delete(job)
     db.session.commit()
     return jsonify(ok=True)

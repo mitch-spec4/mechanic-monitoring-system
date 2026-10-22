@@ -1,10 +1,28 @@
 """Load demo data for local development. Refuses to run in production."""
-from datetime import date
+from datetime import date, timedelta
 
 from flask_migrate import upgrade
 
 from app import create_app, db
-from app.models import Company, Customer, Job, Machine, Notification, Review, ServiceRecord, ServiceRequest, User
+from app.models import (
+    ChecklistTemplate,
+    ChecklistTemplateItem,
+    Company,
+    Customer,
+    Job,
+    JobChecklistItem,
+    JobEvent,
+    JobPart,
+    Machine,
+    Notification,
+    Review,
+    ServiceRecord,
+    ServiceRequest,
+    User,
+    WorkEntry,
+)
+from app.services.worksheet import copy_checklist, fill_service_record
+from app.utils.time import utcnow
 
 DEMO_PASSWORD = "password"
 
@@ -62,13 +80,64 @@ def get_or_create_machine(name, model, serial_no, customer_id, company_id, statu
     return machine
 
 
-def add_job(title, description, priority, status, location, due_date, company_id, customer, machine, mechanic):
+CHECKLISTS = {
+    "Repair": [("Isolate power and lock out the machine", True), ("Identify and record the fault", True), ("Test run after the repair", True), ("Clean the work area", False)],
+    "Inspection": [("Visual inspection for leaks and damage", True), ("Check fluid levels", True), ("Photograph the machine's condition", False)],
+    "Preventive maintenance": [("Change oil and filters", True), ("Check belts and hoses", True), ("Update the service sticker", False)],
+}
+
+
+def add_checklists(company_id):
+    for job_type, items in CHECKLISTS.items():
+        if ChecklistTemplate.query.filter_by(company_id=company_id, job_type=job_type).first():
+            continue
+        template = ChecklistTemplate(company_id=company_id, job_type=job_type)
+        db.session.add(template)
+        db.session.flush()
+        for position, (label, required) in enumerate(items):
+            db.session.add(ChecklistTemplateItem(template_id=template.id, label=label, required=required, position=position))
+
+
+def add_worksheet(job, boss, entries=(), parts=(), ticked=0, statuses=()):
+    """Give a demo job a history, time entries, parts and a checklist (only once)."""
+    if JobEvent.query.filter_by(job_id=job.id).first():
+        return
+    now = utcnow()
+    stamp = now - timedelta(days=3)
+    db.session.add(JobEvent(job_id=job.id, user_id=boss.id, action="created", to_status="Pending", created_at=stamp))
+    if job.mechanic_id:
+        mechanic = db.session.get(User, job.mechanic_id)
+        db.session.add(JobEvent(job_id=job.id, user_id=boss.id, action="assigned", from_status="Pending", to_status="Assigned", note=f"Assigned to {mechanic.name}", created_at=stamp + timedelta(minutes=5)))
+    previous = "Assigned"
+    for hours_ago, status in statuses:
+        db.session.add(JobEvent(job_id=job.id, user_id=job.mechanic_id, action="status", from_status=previous, to_status=status, created_at=now - timedelta(hours=hours_ago)))
+        previous = status
+    for start_hours_ago, length_hours, work_done in entries:
+        started = now - timedelta(hours=start_hours_ago)
+        ended = None if length_hours is None else started + timedelta(hours=length_hours)
+        db.session.add(WorkEntry(job_id=job.id, mechanic_id=job.mechanic_id, started_at=started, ended_at=ended, site=job.location, work_done=work_done))
+    for name, quantity in parts:
+        db.session.add(JobPart(job_id=job.id, name=name, quantity=quantity, added_by=job.mechanic_id, created_at=now - timedelta(hours=2)))
+    db.session.flush()
+    if job.status in {"In Progress", "Paused", "Completed"}:
+        copy_checklist(job)
+    db.session.flush()
+    items = JobChecklistItem.query.filter_by(job_id=job.id).order_by(JobChecklistItem.position).all()
+    for item in items[:ticked]:
+        item.done, item.done_by, item.done_at = True, job.mechanic_id, now - timedelta(hours=1)
+    if job.status == "Completed":
+        db.session.flush()
+        fill_service_record(job)
+
+
+def add_job(title, description, priority, status, location, due_date, company_id, customer, machine, mechanic, job_type=None):
     if Job.query.filter_by(title=title, company_id=company_id).first():
         return
     db.session.add(Job(
         title=title,
         description=description,
         priority=priority,
+        job_type=job_type,
         status=status,
         location=location,
         due_date=due_date,
@@ -153,12 +222,42 @@ with app.app_context():
     conveyor = get_or_create_machine("Conveyor Line CL-4", "Dorner 2200", "CL4-99120", xyz.id, company.id)
     mixer = get_or_create_machine("Industrial Mixer MX-08", "Hobart H600", "MX08-11987", xyz.id, company.id)
 
-    add_job("Service Generator G-102", "Generator overheating after two hours of operation.", "High", "In Progress", "Nairobi Industrial Area", date(2026, 8, 27), company.id, abc, generator, mitch)
-    add_job("Inspect Excavator EX-01", "Hydraulic pressure drops during heavy lifting.", "Urgent", "Assigned", "Mombasa Road", date(2026, 8, 29), company.id, abc, excavator, amina)
-    add_job("Compressor C-55 maintenance", "Complete the scheduled oil change and inspection.", "Medium", "Accepted", "Westlands, Nairobi", date(2026, 8, 30), company.id, kenya, compressor, mitch)
-    add_job("Repair Hydraulic Pump H-21", "Investigate oil leak near the main seal.", "High", "Pending", "Thika Road", date(2026, 9, 2), company.id, kenya, pump, None)
-    add_job("Conveyor Line CL-4 inspection", "Routine belt alignment and safety inspection.", "Low", "Completed", "Athi River", date(2026, 8, 20), company.id, xyz, conveyor, brian)
-    add_job("Industrial Mixer MX-08 repair", "Mixer produces abnormal vibration under load.", "High", "Paused", "Nairobi South", date(2026, 9, 1), company.id, xyz, mixer, brian)
+    add_job("Service Generator G-102", "Generator overheating after two hours of operation.", "High", "In Progress", "Nairobi Industrial Area", date(2026, 8, 27), company.id, abc, generator, mitch, "Preventive maintenance")
+    add_job("Inspect Excavator EX-01", "Hydraulic pressure drops during heavy lifting.", "Urgent", "Assigned", "Mombasa Road", date(2026, 8, 29), company.id, abc, excavator, amina, "Inspection")
+    add_job("Compressor C-55 maintenance", "Complete the scheduled oil change and inspection.", "Medium", "Accepted", "Westlands, Nairobi", date(2026, 8, 30), company.id, kenya, compressor, mitch, "Preventive maintenance")
+    add_job("Repair Hydraulic Pump H-21", "Investigate oil leak near the main seal.", "High", "Pending", "Thika Road", date(2026, 9, 2), company.id, kenya, pump, None, "Repair")
+    add_job("Conveyor Line CL-4 inspection", "Routine belt alignment and safety inspection.", "Low", "Completed", "Athi River", date(2026, 8, 20), company.id, xyz, conveyor, brian, "Inspection")
+    add_job("Industrial Mixer MX-08 repair", "Mixer produces abnormal vibration under load.", "High", "Paused", "Nairobi South", date(2026, 9, 1), company.id, xyz, mixer, brian, "Repair")
+    add_checklists(company.id)
+    db.session.flush()
+
+    def job_named(title):
+        return Job.query.filter_by(title=title, company_id=company.id).one()
+
+    add_worksheet(job_named("Inspect Excavator EX-01"), boss)
+    add_worksheet(job_named("Repair Hydraulic Pump H-21"), boss)
+    add_worksheet(job_named("Compressor C-55 maintenance"), boss, statuses=[(20, "Accepted")])
+    add_worksheet(
+        job_named("Service Generator G-102"), boss,
+        statuses=[(26, "In Progress"), (23, "Paused"), (1, "In Progress")],
+        entries=[(26, 3, "Drained the coolant and flushed the radiator."), (1, None, "Replacing the thermostat.")],
+        parts=[("Coolant (L)", 8), ("Thermostat", 1)],
+        ticked=1,
+    )
+    add_worksheet(
+        job_named("Industrial Mixer MX-08 repair"), boss,
+        statuses=[(30, "In Progress"), (27, "Paused")],
+        entries=[(30, 2.5, "Measured vibration at 3 load levels; worn bearing on the drive side.")],
+        parts=[("Bearing kit", 1)],
+        ticked=2,
+    )
+    add_worksheet(
+        job_named("Conveyor Line CL-4 inspection"), boss,
+        statuses=[(72, "In Progress"), (70, "Completed")],
+        entries=[(72, 2, "Realigned the belt and checked all guards; safety stops tested.")],
+        parts=[("Belt fastener", 4)],
+        ticked=3,
+    )
 
     generator_service = add_service("Preventive maintenance", "Overheating after two hours.", "Inspected cooling system and cleaned radiator.", "Coolant filter", "Improved coolant flow.", "Check coolant level weekly.", company.id, abc, generator, mitch)
     excavator_service = add_service("Hydraulic system repair", "Hydraulic pressure drops under load.", "Replaced worn pressure hose and tested the system.", "High-pressure hose", "Restored normal hydraulic pressure.", "Inspect hose fittings every month.", company.id, abc, excavator, amina)
@@ -187,4 +286,4 @@ with app.app_context():
     add_notification(abc_user, "Review reminder", "Please leave a review for your completed service.", "review")
 
     db.session.commit()
-    print("Demo data ready: 3 customers, 3 mechanics, 6 machines, 6 jobs, 5 service records, 3 reviews, 3 requests, and notifications.")
+    print("Demo data ready: 3 customers, 3 mechanics, 6 machines, 6 jobs with worksheets and history, 3 checklists, 6 service records, 3 reviews, 3 requests, and notifications.")

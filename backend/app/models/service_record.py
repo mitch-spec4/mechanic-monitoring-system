@@ -5,6 +5,8 @@ from app import db
 
 class ServiceRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    # One service record per job; older records created before worksheets have no job.
+    job_id = db.Column(db.Integer, db.ForeignKey("job.id"), nullable=True, unique=True)
     machine_id = db.Column(db.Integer, db.ForeignKey("machine.id"), nullable=False, index=True)
     customer_id = db.Column(db.Integer, db.ForeignKey("customer.id"), nullable=False, index=True)
     mechanic_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)

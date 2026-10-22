@@ -97,6 +97,12 @@ def run_migrations_online():
     connectable = get_engine()
 
     with connectable.connect() as connection:
+        is_sqlite = connection.dialect.name == "sqlite"
+        if is_sqlite:
+            # SQLite changes columns by rebuilding tables, which foreign keys would block while
+            # other rows still point at them. Pause the checks, then verify integrity afterwards.
+            connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+
         context.configure(
             connection=connection,
             target_metadata=get_metadata(),
@@ -105,6 +111,14 @@ def run_migrations_online():
 
         with context.begin_transaction():
             context.run_migrations()
+
+        if is_sqlite:
+            # The PRAGMA above opened the connection's transaction, so commit it explicitly.
+            connection.commit()
+            problems = connection.exec_driver_sql("PRAGMA foreign_key_check").fetchall()
+            connection.exec_driver_sql("PRAGMA foreign_keys=ON")
+            if problems:
+                raise RuntimeError(f"Migration left broken foreign keys: {problems[:5]}")
 
 
 if context.is_offline_mode():
