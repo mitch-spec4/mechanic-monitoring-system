@@ -57,14 +57,54 @@ test("deleting a started job through the API is still refused", async ({ page })
   expect(result).toEqual([401, 409]);
 });
 
-test("customer profile opens as an overlay", async ({ page }) => {
+test("customers show their machines and which need work", async ({ page }) => {
+  const noErrors = failOnPageErrors(page);
   await signIn(page, "james@mechanicpro.test");
-  await page.locator(".customer-card", { hasText: "ABC Engineering" }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText("Customer Profile");
-  await expect(dialog).toContainText("Generator G-102");
-  await page.mouse.click(5, 500);
-  await expect(dialog).toBeHidden();
+  const card = page.locator(".customer-card", { hasText: "ABC Engineering" });
+  await expect(card).toContainText("2 machines · 2 need work");
+  await card.click();
+
+  const customerPage = page.locator(".customerPage");
+  await expect(customerPage.locator("h1")).toHaveText("ABC Engineering");
+  await expect(customerPage.locator(".needsWorkPill")).toContainText("2 machines need work");
+  const generator = customerPage.locator(".machineCard", { hasText: "Generator G-102" });
+  await expect(generator).toHaveClass(/needsWork/);
+  await expect(generator.locator(".workReasons")).toContainText("Service Generator G-102");
+  await expect(generator.locator(".workReasons")).toContainText("Customer requested service");
+
+  // Create job fills in this customer and machine.
+  await generator.getByRole("button", { name: "Create job" }).click();
+  const form = page.locator(".modal", { hasText: "Create service job" });
+  await expect(form.locator("select[name=customer_id]")).toHaveValue(/\d+/);
+  await expect(form.locator("select[name=customer_id] option:checked")).toHaveText("ABC Engineering");
+  await expect(form.locator("select[name=machine_id] option:checked")).toHaveText("Generator G-102 (G102-88421)");
+  await expect(form.locator("input[name=title]")).toHaveValue("Service Generator G-102");
+  // Creating jobs is covered above; close without saving so later tests see the seeded job list.
+  await form.locator(".closeBtn").click();
+  await expect(form).toHaveCount(0);
+
+  // A job link opens the job, and Back returns to the customer.
+  await generator.locator(".reasonLink", { hasText: "Service Generator G-102" }).click();
+  await expect(page.locator(".jobHero h1")).toHaveText("Service Generator G-102");
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(customerPage.locator("h1")).toHaveText("ABC Engineering");
+  noErrors();
+});
+
+test("machines are grouped by customer with a needs-work filter", async ({ page }) => {
+  await signIn(page, "james@mechanicpro.test");
+  await openPage(page, "Machines");
+  const groups = page.locator(".machineGroup");
+  await expect(groups.first()).toBeVisible();
+  const xyz = page.locator(".machineGroup", { hasText: "XYZ Factory" });
+  // Earlier tests may add machines, so check by name rather than by count.
+  await expect(xyz).toContainText("Conveyor Line CL-4");
+  await expect(xyz).toContainText("Industrial Mixer MX-08");
+  await page.getByLabel("Needs work only").check();
+  await expect(xyz).not.toContainText("Conveyor Line CL-4");
+  await expect(xyz).toContainText("Industrial Mixer MX-08");
+  await xyz.locator(".machineGroupHead .titleLink").click();
+  await expect(page.locator(".customerPage h1")).toHaveText("XYZ Factory");
 });
 
 test("boss adds a machine and duplicate serials are rejected", async ({ page }) => {
@@ -79,7 +119,7 @@ test("boss adds a machine and duplicate serials are rejected", async ({ page }) 
   await expect(form.locator(".error")).toContainText("serial number already exists");
   await form.locator("input[name=serial_no]").fill("B7-0001");
   await form.getByRole("button", { name: "Add machine" }).click();
-  await expect(page.locator(".subPageList")).toContainText("Boiler B-7");
+  await expect(page.locator(".machineGroup", { hasText: "XYZ Factory" })).toContainText("Boiler B-7");
 });
 
 test("invited customer joins with the code and signs in", async ({ page, context, browserName }) => {
@@ -159,11 +199,11 @@ test("boss edits a job", async ({ page }) => {
 test("boss edits a machine and a customer", async ({ page }) => {
   await signIn(page, "james@mechanicpro.test");
   await openPage(page, "Machines");
-  await page.locator(".subPageList article", { hasText: "Industrial Mixer MX-08" }).getByRole("button", { name: "Edit" }).click();
+  await page.locator(".machineCard", { hasText: "Industrial Mixer MX-08" }).getByRole("button", { name: "Edit" }).click();
   const machineForm = page.locator(".modal form");
   await machineForm.locator("select[name=status]").selectOption("Under Repair");
   await machineForm.getByRole("button", { name: "Save changes" }).click();
-  await expect(page.locator(".subPageList article", { hasText: "Industrial Mixer MX-08" })).toContainText("Under Repair");
+  await expect(page.locator(".machineCard", { hasText: "Industrial Mixer MX-08" }).locator(".machineStatus")).toHaveText("Under Repair");
 
   await openPage(page, "Customers");
   await page.locator(".subPageList article", { hasText: "Kenya Motors" }).getByRole("button", { name: "Edit" }).click();

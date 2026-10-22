@@ -132,3 +132,4 @@ export const shiftList = (params: { mechanic_id?: number | ""; days?: number } =
 export const correctShift = (id: number, clockedOutAt: string) => patch(`/shifts/${id}`, { clocked_out_at: clockedOutAt });
 export const sendLiveLocation = (jobId: number, position: any) => post("/location/live", { job_id: jobId, ...position });
 export const teamLocations = () => api("/location/team");
+export const customerDetail = (id: number) => api(`/customers/${id}`);

@@ -15,6 +15,9 @@ from app.models.review import Review
 from app.models.security import PasswordReset
 from app.models.service_record import ServiceRecord
 from app.models.user import User
+from app.routes.machines import out as machine_out
+from app.routes.services import out as record_out
+from app.services.machine_work import with_work
 from app.services.notifications import notify, notify_bosses
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
@@ -49,11 +52,55 @@ def request_out(service_request):
     }
 
 
+def machines_for(company_id, customer_ids):
+    """Machines (with their needs-work reasons) grouped by customer."""
+    machines = Machine.query.filter(Machine.company_id == company_id, Machine.customer_id.in_(customer_ids)).order_by(Machine.name).all()
+    rows = with_work([machine_out(machine) for machine in machines], company_id)
+    grouped = {customer_id: [] for customer_id in customer_ids}
+    for row in rows:
+        grouped[row["customer_id"]].append(row)
+    return grouped
+
+
 @bp.get("")
 @roles("boss")
 def customers():
-    rows = Customer.query.filter_by(company_id=current_user().company_id).order_by(Customer.name).all()
-    return jsonify(customers=[customer_out(customer) for customer in rows])
+    company_id = current_user().company_id
+    rows = Customer.query.filter_by(company_id=company_id).order_by(Customer.name).all()
+    machines = machines_for(company_id, [customer.id for customer in rows])
+    result = []
+    for customer in rows:
+        data = customer_out(customer)
+        data["machine_count"] = len(machines[customer.id])
+        data["needs_work_count"] = sum(1 for machine in machines[customer.id] if machine["needs_work"])
+        result.append(data)
+    return jsonify(customers=result)
+
+
+@bp.get("/<int:cid>")
+@roles("boss")
+def customer_detail(cid):
+    """A customer with every machine (those needing work first) and their recent service history."""
+    company_id = current_user().company_id
+    customer = Customer.query.filter_by(id=cid, company_id=company_id).first_or_404()
+    machines = machines_for(company_id, [customer.id])[customer.id]
+    machines.sort(key=lambda machine: (not machine["needs_work"], machine["status"] == "Retired", machine["name"].lower()))
+    jobs = Job.query.filter_by(company_id=company_id, customer_id=customer.id)
+    records = (
+        ServiceRecord.query.filter_by(company_id=company_id, customer_id=customer.id)
+        .order_by(ServiceRecord.service_date.desc(), ServiceRecord.id.desc())
+        .limit(10)
+        .all()
+    )
+    data = customer_out(customer)
+    data.update(
+        machines=machines,
+        needs_work_count=sum(1 for machine in machines if machine["needs_work"]),
+        job_count=jobs.count(),
+        completed_job_count=jobs.filter_by(status="Completed").count(),
+        records=[record_out(record) for record in records],
+    )
+    return jsonify(customer=data)
 
 
 @bp.get("/me")
