@@ -1,34 +1,30 @@
 import { useState } from "react";
 import {
   CheckCircle2,
+  ClipboardList,
   FileText,
   MapPin,
-  Plus,
   Star,
   Wrench,
 } from "lucide-react";
 import {
-  createService,
   jobs,
   machines,
   services,
   reviews as fetchReviews,
   updateJob,
 } from "../services/api";
-import Modal from "../components/Modal";
 import { errorMessage, formatDate, greeting } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
 
-type Props = { u: any };
+type Props = { u: any; onOpenJob: (id: number) => void };
 
-export default function MechanicDashboard({ u }: Props) {
+export default function MechanicDashboard({ u, onOpenJob }: Props) {
   const [jobList, setJobList] = useState<any[]>([]),
     [serviceList, setServiceList] = useState<any[]>([]),
     [machineList, setMachineList] = useState<any[]>([]),
     [reviewList, setReviewList] = useState<any[]>([]),
-    [modal, setModal] = useState<any>(null),
-    [actionError, setActionError] = useState(""),
-    [formError, setFormError] = useState("");
+    [actionError, setActionError] = useState("");
   const load = () =>
     Promise.all([jobs(), services(), machines(), fetchReviews()])
       .then(([jobData, serviceData, machineData, reviewData]) => {
@@ -46,10 +42,8 @@ export default function MechanicDashboard({ u }: Props) {
     ...serviceList.map((record) => record.machine_id),
   ].filter(Boolean));
   const myMachines = machineList.filter((item) => myMachineIds.has(item.id));
-  // Service records can only be added for machines on the mechanic's own (non-cancelled) jobs.
-  const jobMachineIds = new Set(jobList.filter((job) => job.status !== "Cancelled").map((job) => job.machine_id));
-  const recordMachines = machineList.filter((item) => jobMachineIds.has(item.id));
-  const focusMachineId = activeJobs.find((job) => job.machine_id)?.machine_id ?? serviceList[0]?.machine_id;
+  const focusJob = activeJobs.find((job) => job.machine_id);
+  const focusMachineId = focusJob?.machine_id ?? serviceList[0]?.machine_id;
   const machine = machineList.find((item) => item.id === focusMachineId) || null;
   const machineRecords = machine ? serviceList.filter((record) => record.machine_id === machine.id) : [];
   const completed = jobList.filter((job) => job.status === "Completed").length;
@@ -66,21 +60,6 @@ export default function MechanicDashboard({ u }: Props) {
       setActionError(errorMessage(error));
     }
     load();
-  };
-  const openRecord = (job: any) => {
-    setFormError("");
-    setModal(job);
-  };
-  const submit = async (event: any) => {
-    event.preventDefault();
-    setFormError("");
-    try {
-      await createService(Object.fromEntries(new FormData(event.currentTarget)));
-      setModal(null);
-      load();
-    } catch (error) {
-      setFormError(errorMessage(error));
-    }
   };
   return (
     <div className="mechanicDashboard" id="dashboard-top">
@@ -142,7 +121,9 @@ export default function MechanicDashboard({ u }: Props) {
             <article className="pendingJob" key={job.id}>
               <div>
                 <div className="jobTitle">
-                  <strong>{job.title}</strong>
+                  <button className="titleLink" onClick={() => onOpenJob(job.id)}>
+                    <strong>{job.title}</strong>
+                  </button>
                   <span
                     className={`jobStatus ${String(job.status).replace(/ /g, "").toLowerCase()}`}
                   >
@@ -156,6 +137,9 @@ export default function MechanicDashboard({ u }: Props) {
                 </small>
               </div>
               <div className="pendingActions">
+                <button className="secondary" onClick={() => onOpenJob(job.id)}>
+                  <ClipboardList size={14} /> Worksheet
+                </button>
                 {job.status === "Assigned" && (
                   <>
                     <button className="secondary" onClick={() => change(job.id, "Accepted")}>
@@ -181,9 +165,6 @@ export default function MechanicDashboard({ u }: Props) {
                 )}
                 {job.status === "In Progress" && (
                   <>
-                    <button className="secondary" onClick={() => openRecord(job)}>
-                      Add record
-                    </button>
                     <button className="secondary" onClick={() => change(job.id, "Paused")}>
                       Pause
                     </button>
@@ -209,7 +190,11 @@ export default function MechanicDashboard({ u }: Props) {
         </Panel>
         <Panel title="Machine History" icon={<Wrench />} className="historyPanel" action={machine && <span className="operational">{machine.status}</span>}>
           <MachineHistory machine={machine} records={machineRecords} />
-          <button className="blueAction" onClick={() => openRecord({})}><Plus size={14} /> New Service Record</button>
+          {focusJob && focusJob.machine_id === machine?.id && (
+            <button className="blueAction" onClick={() => onOpenJob(focusJob.id)}>
+              <ClipboardList size={14} /> Open worksheet
+            </button>
+          )}
         </Panel>
         <Panel id="customer-review" title="Latest Customer Feedback" icon={<Star />} className="reviewPanel">
           <Review reviews={reviewList} />
@@ -221,27 +206,6 @@ export default function MechanicDashboard({ u }: Props) {
           <div className="documentEmpty"><FileText size={20} /><strong>No documents yet</strong><span>Service reports and inspection files will appear here.</span></div>
         </Panel>
       </section>
-      {modal && (
-        <Modal title="New service record" onClose={() => setModal(null)}>
-          <form onSubmit={submit} className="modalForm">
-            {formError && <div className="error">{formError}</div>}
-            <select name="machine_id" defaultValue={modal?.machine_id || ""} required>
-              <option value="">Select machine</option>
-              {recordMachines.map((item) => (
-                <option key={item.id} value={item.id}>{item.name} ({item.serial_no})</option>
-              ))}
-            </select>
-            <input name="service_type" placeholder="Service type" required />
-            <input name="problem" placeholder="Problem found" />
-            <input name="work_done" placeholder="Work performed" required />
-            <input name="parts_replaced" placeholder="Parts replaced" />
-            <input name="solution" placeholder="Solution" />
-            <input name="advice" placeholder="Advice / follow-up" />
-            <button className="primary" disabled={recordMachines.length === 0}>Save Service</button>
-            {recordMachines.length === 0 && <p className="muted">None of your jobs has a machine yet. Ask your manager to link a machine to your job.</p>}
-          </form>
-        </Modal>
-      )}
     </div>
   );
 }

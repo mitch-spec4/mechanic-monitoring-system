@@ -1,0 +1,92 @@
+.checklistManager {
+  display: grid;
+  gap: 16px;
+  padding: 14px 18px 18px;
+}
+.checklistIntro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.checklistIntro p {
+  flex: 1 1 320px;
+  margin: 0;
+  font-size: 13px;
+}
+.appMain .checklistIntro button.primary {
+  width: auto;
+}
+.checklistCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+.checklistCard {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid #e1e8f0;
+  background: linear-gradient(180deg, #fff, #fbfcfe);
+}
+.checklistCardHead,
+.checklistCardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.checklistCard h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 15px;
+}
+.checklistCard h3 svg {
+  color: var(--role-color, #0969d7);
+}
+.checklistCardHead span {
+  font-size: 11px;
+  color: #7a889c;
+}
+.checklistCard ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+.checklistCard em,
+.checklistEditor em {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  color: #b45309;
+  background: #fff4e0;
+}
+.editorLabel {
+  font-size: 12px;
+  font-weight: 700;
+}
+.checklistRow {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+}
+.requiredToggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.checklistEditor .link {
+  justify-self: start;
+}

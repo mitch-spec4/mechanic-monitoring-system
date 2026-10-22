@@ -103,7 +103,7 @@ def add_worksheet(job, boss, entries=(), parts=(), ticked=0, statuses=()):
     if JobEvent.query.filter_by(job_id=job.id).first():
         return
     now = utcnow()
-    stamp = now - timedelta(days=3)
+    stamp = now - timedelta(days=4)
     db.session.add(JobEvent(job_id=job.id, user_id=boss.id, action="created", to_status="Pending", created_at=stamp))
     if job.mechanic_id:
         mechanic = db.session.get(User, job.mechanic_id)
@@ -123,8 +123,10 @@ def add_worksheet(job, boss, entries=(), parts=(), ticked=0, statuses=()):
         copy_checklist(job)
     db.session.flush()
     items = JobChecklistItem.query.filter_by(job_id=job.id).order_by(JobChecklistItem.position).all()
+    # Ticks happen during the first visit (or an hour ago if there is no visit yet).
+    ticked_at = now - timedelta(hours=entries[0][0]) + timedelta(minutes=30) if entries else now - timedelta(hours=1)
     for item in items[:ticked]:
-        item.done, item.done_by, item.done_at = True, job.mechanic_id, now - timedelta(hours=1)
+        item.done, item.done_by, item.done_at = True, job.mechanic_id, ticked_at
     if job.status == "Completed":
         db.session.flush()
         fill_service_record(job)

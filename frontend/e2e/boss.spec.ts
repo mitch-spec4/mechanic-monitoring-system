@@ -197,3 +197,31 @@ test("manager reset code lets a customer choose a new password", async ({ page }
   await expect(page.locator(".success")).toContainText("Password updated");
   await signIn(page, "kenya@example.com", "kenya-new-password");
 });
+
+test("boss creates a checklist and uses it as a job type", async ({ page }) => {
+  await signIn(page, "james@mechanicpro.test");
+  await openPage(page, "Checklists");
+  await page.getByRole("button", { name: "New checklist" }).click();
+  const editor = page.locator(".checklistEditor");
+  await editor.getByLabel("Job type").fill("Installation");
+  await editor.getByLabel("Item 1", { exact: true }).fill("Confirm mounting points");
+  await editor.getByRole("button", { name: "+ Add item" }).click();
+  await editor.getByLabel("Item 2", { exact: true }).fill("Commissioning test");
+  await editor.locator(".checklistRow").nth(1).getByLabel("Required").check();
+  await editor.getByRole("button", { name: "Save checklist" }).click();
+  const card = page.locator(".checklistCard", { hasText: "Installation" });
+  await expect(card).toContainText("2 items");
+  await expect(card.locator("em")).toHaveCount(2);
+
+  await page.locator(".sidebarLink", { hasText: "Dashboard" }).click();
+  await page.getByRole("button", { name: "Create Job" }).click();
+  const form = page.locator("form.form");
+  await form.locator("input[name=title]").fill("Install new compressor");
+  await form.locator("textarea[name=description]").fill("Fit and commission");
+  await form.locator("select[name=mechanic_id]").selectOption({ label: "Amina Otieno" });
+  await form.locator("select[name=job_type]").selectOption("Installation");
+  await form.getByRole("button", { name: "Create & notify mechanic" }).click();
+  await page.locator(".job", { hasText: "Install new compressor" }).locator(".titleLink").click();
+  await expect(page.locator(".jobHero .eyebrow")).toContainText("Installation");
+  await expect(page.locator(".jobCard", { hasText: "Checklist" })).toContainText("The checklist appears when work starts.");
+});
