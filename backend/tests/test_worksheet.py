@@ -267,3 +267,45 @@ def test_cancelling_stops_the_timer_and_deleting_cleans_up(client, data, auth):
 def test_people_in_history_cannot_be_deleted(client, data, auth):
     client.post(f"/api/jobs/{data['job']}/notes", headers=auth("boss2@acme.test"), json={"note": "Checked in"})
     assert client.delete(f"/api/users/{data['boss2']}", headers=boss(auth)).status_code == 409
+
+
+def test_time_entries_cannot_overlap(client, data, auth):
+    job = data["job"]
+    set_status(client, mech(auth), job, "In Progress")
+    now = utcnow()
+    url = f"/api/jobs/{job}/entries"
+    first = {"started_at": (now - timedelta(hours=5)).isoformat(), "ended_at": (now - timedelta(hours=3)).isoformat(), "work_done": "a"}
+    assert client.post(url, headers=mech(auth), json=first).status_code == 201
+    overlapping = {"started_at": (now - timedelta(hours=4)).isoformat(), "ended_at": (now - timedelta(hours=2)).isoformat()}
+    response = client.post(url, headers=mech(auth), json=overlapping)
+    assert response.status_code == 409 and "overlaps" in response.get_json()["error"]
+    # The running timer counts as running until now.
+    into_running = {"started_at": (now - timedelta(minutes=30)).isoformat(), "ended_at": (now - timedelta(minutes=10)).isoformat()}
+    running = WorkEntry.query.filter_by(job_id=job, ended_at=None).one()
+    running.started_at = now - timedelta(hours=1)
+    db.session.commit()
+    assert client.post(url, headers=mech(auth), json=into_running).status_code == 409
+    back_to_back = {"started_at": (now - timedelta(hours=3)).isoformat(), "ended_at": (now - timedelta(hours=2)).isoformat()}
+    assert client.post(url, headers=mech(auth), json=back_to_back).status_code == 201
+
+    entries = detail(client, mech(auth), job)["entries"]
+    manual = next(e for e in entries if e["work_done"] == "a")
+    moved = client.patch(f"{url}/{manual['id']}", headers=mech(auth), json={"ended_at": (now - timedelta(hours=2, minutes=30)).isoformat()})
+    assert moved.status_code == 409
+
+
+def test_renaming_a_checklist_keeps_jobs_connected(client, data, auth, inspection):
+    client.patch(f"/api/checklists/{inspection.id}", headers=boss(auth), json={"job_type": "Site inspection"})
+    assert db.session.get(Job, data["job"]).job_type == "Site inspection"
+    set_status(client, mech(auth), data["job"], "In Progress")
+    assert [i["label"] for i in detail(client, mech(auth), data["job"])["checklist"]] == ["Check oil", "Photograph site"]
+
+
+def test_customer_view_hides_staff_details(client, data, auth, inspection):
+    job = data["job"]
+    set_status(client, mech(auth), job, "In Progress")
+    tick(client, auth, job, "Check oil")
+    client.post(f"/api/jobs/{job}/parts", headers=mech(auth), json={"name": "Belt", "quantity": 1})
+    view = detail(client, auth("cust@acme.test"), job)
+    assert view["checklist"][0] == {"id": view["checklist"][0]["id"], "label": "Check oil", "required": True, "done": True}
+    assert view["parts"][0].keys() == {"id", "name", "quantity", "label"}

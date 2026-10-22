@@ -127,7 +127,13 @@ def job_detail(job, user):
         ),
     }
     if user.role == "customer":
-        # Customers see what was done; hours and internal history stay with the company.
+        # Customers see what was done; hours, internal history, and who ticked what stay with the company.
+        for item in detail["checklist"]:
+            item.pop("done_by")
+            item.pop("done_at")
+            item.pop("note")
+        for part in detail["parts"]:
+            part.pop("added_by")
         return detail
     entry_rows = [entry_out(e, names, now) for e in entries]
     detail.update(
@@ -175,6 +181,16 @@ def parse_time(data, field, label, required=False):
     return moment
 
 
+def check_overlap(job, started_at, ended_at, exclude_id=None):
+    """Time on one job can't be counted twice: refuse entries that overlap another one."""
+    end = ended_at or utcnow()
+    for other in WorkEntry.query.filter(WorkEntry.job_id == job.id, WorkEntry.id != (exclude_id or 0)).all():
+        other_end = other.ended_at or utcnow()
+        if other.started_at < end and other_end > started_at:
+            span = f"{other.started_at:%d %b %H:%M}–{'now' if other.ended_at is None else f'{other_end:%H:%M}'} UTC"
+            raise ValidationError(f"This overlaps another time entry on this job ({span})", 409)
+
+
 def check_span(started_at, ended_at):
     if ended_at is None:
         return
@@ -194,6 +210,7 @@ def add_entry(jid):
     started_at = parse_time(data, "started_at", "Start time", required=True)
     ended_at = parse_time(data, "ended_at", "End time", required=True)
     check_span(started_at, ended_at)
+    check_overlap(job, started_at, ended_at)
     entry = WorkEntry(
         job_id=job.id,
         mechanic_id=user.id,
@@ -227,6 +244,7 @@ def update_entry(jid, eid):
         if entry.ended_at is not None and ended_at is None:
             raise ValidationError("End time is required")
         check_span(started_at, ended_at)
+        check_overlap(job, started_at, ended_at, exclude_id=entry.id)
         if (started_at, ended_at) != (entry.started_at, entry.ended_at):
             record_event(job, user, "time_corrected")
         entry.started_at, entry.ended_at = started_at, ended_at

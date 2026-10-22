@@ -56,3 +56,19 @@ def test_upgrading_a_database_that_already_has_data(tmp_path):
     assert db.execute("select count(*) from review").fetchone() == (1,)
     assert db.execute("select job_id from service_record").fetchone() == (None,)
     assert db.execute("pragma foreign_key_check").fetchall() == []
+
+
+def test_migrations_roll_back_and_forward(tmp_path):
+    """A deploy can be undone: every migration downgrades and upgrades again cleanly."""
+    from pathlib import Path
+
+    from flask_migrate import downgrade
+
+    path = tmp_path / "rollback.db"
+    migrations = str(Path(__file__).resolve().parents[1] / "migrations")
+    app = create_app({"SQLALCHEMY_DATABASE_URI": f"sqlite:///{path}"})
+    with app.app_context():
+        upgrade(directory=migrations)
+        downgrade(directory=migrations, revision="base")
+        upgrade(directory=migrations)
+    assert sqlite3.connect(path).execute("select version_num from alembic_version").fetchone() == ("0002_worksheets",)

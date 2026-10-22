@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify
 
 from app import db
+from app.models.job import Job
 from app.models.worksheet import ChecklistTemplate, ChecklistTemplateItem
 from app.utils.auth import current_user, roles
 from app.utils.validation import ValidationError, json_body, text
@@ -81,6 +82,8 @@ def update_checklist(tid):
     if "job_type" in data:
         job_type = text(data, "job_type", "Job type", required=True, max_length=80)
         unique_type(template.company_id, job_type, exclude_id=template.id)
+        # Keep jobs of this type connected to their checklist under the new name.
+        Job.query.filter_by(company_id=template.company_id, job_type=template.job_type).update({"job_type": job_type})
         template.job_type = job_type
     if "items" in data:
         replace_items(template, read_items(data))
