@@ -150,8 +150,11 @@ def get_file(fid):
     url = storage().download_url(record.storage_key, name, record.content_type, attachment)
     if url:
         return redirect(url, code=302)
+    path = storage().local_path(record.storage_key)
+    if not path.is_file():
+        raise ValidationError("This file is no longer available", 404)
     response = send_file(
-        storage().local_path(record.storage_key),
+        path,
         mimetype=record.content_type,
         as_attachment=attachment,
         download_name=name,

@@ -182,7 +182,7 @@ def build_report(job):
     signature = next((f for f in reversed(files) if f.kind == "signature"), None)
     if job.signed_at:
         if signature:
-            image, size = thumbnail(storage().read(signature.storage_key), 600)
+            image, size = stored_thumbnail(signature, 600)
             if image:
                 width = 60
                 pdf.image(image, w=width, h=width * size[1] / size[0])
@@ -195,6 +195,14 @@ def build_report(job):
     return bytes(pdf.output())
 
 
+def stored_thumbnail(record, max_px):
+    try:
+        data = storage().read(record.storage_key)
+    except Exception:  # noqa: BLE001 - a missing file shouldn't stop the report
+        return None, None
+    return thumbnail(data, max_px)
+
+
 def add_photo_grid(pdf, photos):
     """Three photos per row, each fitted inside the same box and labelled Before/After/Photo."""
     columns, gap = 3, 4
@@ -202,10 +210,7 @@ def add_photo_grid(pdf, photos):
     height = width * 0.75
     images = []
     for photo in photos:
-        try:
-            image, _size = thumbnail(storage().read(photo.storage_key), 900)
-        except Exception:  # noqa: BLE001 - a missing file shouldn't stop the report
-            image = None
+        image, _size = stored_thumbnail(photo, 900)
         if image:
             images.append((image, PHOTO_LABELS[photo.kind]))
     for start in range(0, len(images), columns):

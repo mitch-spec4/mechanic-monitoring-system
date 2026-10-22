@@ -174,6 +174,20 @@ def test_pdf_report(client, data, auth):
     assert client.get(f"/api/jobs/{data['job']}", headers=boss(auth)).get_json()["job"]["report_url"] == url
 
 
+def test_missing_stored_files_give_404_and_the_report_still_builds(client, app, data, auth):
+    """Files lost from the disk or bucket shouldn't turn into server errors."""
+    start(client, auth, data)
+    photo = upload(client, auth, data["job"])["files"][0]
+    finish(client, auth, data)
+    for record in JobFile.query.filter_by(job_id=data["job"]).all():
+        app.extensions["storage"].delete(record.storage_key)
+    assert client.get(photo["url"], headers=boss(auth)).status_code == 404
+    signature = client.get(f"/api/jobs/{data['job']}", headers=boss(auth)).get_json()["job"]["signature"]
+    assert client.get(signature["url"], headers=boss(auth)).status_code == 404
+    report = client.get(f"/api/jobs/{data['job']}/report.pdf", headers=boss(auth))
+    assert report.status_code == 200 and report.data.startswith(b"%PDF")
+
+
 def test_report_handles_names_outside_latin1(client, data, auth):
     job = db.session.get(Job, data["job"])
     job.title = "Pump — check “seal” 🛠"
