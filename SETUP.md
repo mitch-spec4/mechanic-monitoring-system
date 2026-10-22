@@ -91,12 +91,12 @@ npm run build
 
 # Browser tests (from frontend/): starts a fresh seeded API and Vite, then drives the real UI
 npx playwright install chromium   # first time only
-npm run test:e2e
+npm run test:e2e                  # Chromium; also: npx playwright test --project=firefox|webkit|mobile
 ```
 
 The browser tests need ports 5000 and 5173 free, so stop your dev servers first. They use `python3` (`py` on Windows) to start the API. If the backend packages are only installed in `backend/.venv`, point `E2E_PYTHON` at that interpreter, e.g. `E2E_PYTHON=../backend/.venv/bin/python npm run test:e2e`.
 
-CI runs all of these on every pull request, and also runs the migrations, seed and a job workflow against PostgreSQL.
+CI runs all of these on every pull request: the browser tests in Chromium, Firefox, WebKit (Safari's engine) and a phone-sized Chromium; the migrations, seed and a job workflow against PostgreSQL; and the Windows PowerShell steps above on a Windows machine.
 
 ## Database migrations
 

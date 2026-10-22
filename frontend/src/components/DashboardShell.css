@@ -1002,8 +1002,12 @@
   .subPageList article {
     align-items: start;
   }
+  .subPageList article {
+    flex-wrap: wrap;
+  }
   .listAction {
-    display: none;
+    padding: 8px 12px;
+    font-size: 11px;
   }
 }
 @media (max-width: 1050px) {
@@ -1060,5 +1064,11 @@
   }
   .dateStamp {
     display: none;
+  }
+}
+@media (max-width: 760px) {
+  /* Keep the mechanic greeting clear of the fixed profile button. */
+  .mechanicDashboard .dashHeading {
+    padding-right: 72px;
   }
 }
