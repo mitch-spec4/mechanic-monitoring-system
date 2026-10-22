@@ -1,0 +1,210 @@
+/* Customer page and machine cards; the page frame reuses the job page styles. */
+.jobStatusPill.needsWorkPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #8a5300;
+  background: #fff4dc;
+}
+.jobMeta dd svg {
+  vertical-align: -2px;
+  color: var(--accent);
+}
+.machineCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.machineCard {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid #e1e8f0;
+  background: #fff;
+}
+.machineCard.needsWork {
+  border-color: #f6d79b;
+  background: linear-gradient(180deg, #fffaf0, #fff);
+  box-shadow: inset 4px 0 0 #f0a020;
+}
+.machineCardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.machineCardHead > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.machineCardHead strong {
+  font-size: 15px;
+}
+.machineCardHead small {
+  color: #68768a;
+  font-size: 12px;
+}
+.machineStatus {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #15803d;
+  background: #e7f7ec;
+}
+.machineStatus.undermaintenance,
+.machineStatus.underrepair {
+  color: #8a5300;
+  background: #fff4dc;
+}
+.machineStatus.retired {
+  color: #5b6b80;
+  background: #eef2f7;
+}
+.workReasons {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: #6b4500;
+}
+.workReasons li {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  align-items: start;
+  gap: 6px;
+  line-height: 1.5;
+}
+.workReasons li > svg {
+  margin-top: 2px;
+}
+.workReasons svg {
+  color: #c27803;
+}
+.workReasons em {
+  font-style: normal;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #fff4dc;
+}
+.appShell .workReasons .reasonLink {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--role-color, #0969d7);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.machineOk {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-size: 12px;
+  color: #15803d;
+}
+.machineCardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.appShell .machineCardActions .listAction {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.appMain .customerPage .jobCardHead .primary-sm {
+  width: auto;
+}
+.historyList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.historyList li {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  font-size: 13px;
+}
+.historyList li > div {
+  display: grid;
+  gap: 2px;
+}
+.historyList span {
+  color: #68768a;
+}
+.historyDate {
+  font-weight: 700;
+  color: #334155 !important;
+}
+
+/* Customers needing work stand out in lists. */
+.customer-card.needsWork {
+  box-shadow: inset 4px 0 0 #f0a020;
+}
+.customer-card.needsWork .customer-info span,
+.subPageList .needsWorkText {
+  color: #8a5300;
+  font-weight: 700;
+}
+
+/* Machines page grouped by customer. */
+.machineGroups {
+  display: grid;
+  gap: 16px;
+  padding: 14px 18px 18px;
+}
+.machineGroupsBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+.machineGroupsBar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 700;
+}
+.machineGroup {
+  display: grid;
+  gap: 10px;
+}
+.machineGroupHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+.machineGroupHead .titleLink {
+  font-size: 15px;
+}
+.machineGroupHead span {
+  font-size: 12px;
+  color: #68768a;
+}
+
+@media (max-width: 560px) {
+  .historyList li {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}

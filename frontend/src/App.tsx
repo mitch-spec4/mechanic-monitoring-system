@@ -5,6 +5,7 @@ import MechanicDashboard from "./pages/MechanicDashboard";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import WorkspacePage from "./pages/WorkspacePage";
 import JobPage from "./pages/JobPage";
+import CustomerPage from "./pages/CustomerPage";
 import Profile from "./components/Profile";
 import Sidebar from "./components/Sidebar";
 import { LocationIndicator, ShiftProvider } from "./components/Shift";
@@ -20,9 +21,15 @@ export default function App() {
 	});
 	const [active, setActive] = useState("Dashboard");
 	const [openJobId, setOpenJobId] = useState<number | null>(null);
+	const [openCustomerId, setOpenCustomerId] = useState<number | null>(null);
 	const navigate = (label: string) => {
 		setOpenJobId(null);
+		setOpenCustomerId(null);
 		setActive(label);
+	};
+	const openCustomer = (id: number) => {
+		setOpenCustomerId(id);
+		window.scrollTo({ top: 0 });
 	};
 	const openJob = (id: number) => {
 		setOpenJobId(id);
@@ -33,6 +40,7 @@ export default function App() {
 		clearSession();
 		setUser(null);
 		setOpenJobId(null);
+		setOpenCustomerId(null);
 		setActive("Dashboard");
 	};
 	const logout = () => {
@@ -58,10 +66,12 @@ export default function App() {
 
 	const dashboard = openJobId ? (
 		<JobPage key={openJobId} jobId={openJobId} user={user} onBack={() => setOpenJobId(null)} />
+	) : openCustomerId ? (
+		<CustomerPage key={openCustomerId} customerId={openCustomerId} onBack={() => setOpenCustomerId(null)} onOpenJob={openJob} />
 	) : active !== "Dashboard" && active !== "Profile" ? (
-		<WorkspacePage title={active} user={user} onOpenJob={openJob} />
+		<WorkspacePage title={active} user={user} onOpenJob={openJob} onOpenCustomer={openCustomer} />
 	) : user.role === "boss" ? (
-		<BossDashboard u={user} onOpenJob={openJob} />
+		<BossDashboard u={user} onOpenJob={openJob} onOpenCustomer={openCustomer} />
 	) : user.role === "mechanic" ? (
 		<MechanicDashboard u={user} onOpenJob={openJob} />
 	) : (
@@ -70,7 +80,7 @@ export default function App() {
 
 	const shell = (
 		<div className={`appShell role-${user.role}`}>
-			<Sidebar user={user} active={openJobId ? "" : active} onNavigate={navigate} />
+			<Sidebar user={user} active={openJobId || openCustomerId ? "" : active} onNavigate={navigate} />
 			<div className="appMain">
 				<Profile user={user} onLogout={logout} />
 				{user.role === "mechanic" && <LocationIndicator />}

@@ -1077,3 +1077,16 @@
     padding-right: 72px;
   }
 }
+
+/* Phones: rows with buttons give the text a full line and put status and buttons under it. */
+@media (max-width: 560px) {
+  .subPageList article:has(.listAction) > div {
+    flex: 1 1 calc(100% - 50px);
+  }
+  .subPageList article:has(.listAction) > .dataStatus {
+    margin-left: 46px;
+  }
+  .subPageList small {
+    white-space: normal;
+  }
+}
