@@ -59,7 +59,9 @@ function send(path: string, options: RequestInit) {
   return fetch(`${BASE}${path.startsWith("/") ? path : `/${path}`}`, { ...options, headers, credentials: "include" });
 }
 
-export async function api(path: string, options: RequestInit = {}) {
+/** `announce: false` skips the data-changed event, for a request that swaps the whole session
+ * (switching people in the demo): the outgoing screen must not refetch with the new session. */
+export async function api(path: string, options: RequestInit = {}, announce = true) {
   let response = await send(path, options);
   if (response.status === 401 && !path.startsWith("/auth/") && localStorage.getItem("user")) {
     if (await refreshSession()) {
@@ -74,7 +76,7 @@ export async function api(path: string, options: RequestInit = {}) {
   if (!response.ok) {
     throw new ApiError(data.error || data.message || data.msg || `Request failed (${response.status})`, response.status, data);
   }
-  if ((options.method || "GET").toUpperCase() !== "GET") window.dispatchEvent(new Event(DATA_CHANGED_EVENT));
+  if (announce && (options.method || "GET").toUpperCase() !== "GET") window.dispatchEvent(new Event(DATA_CHANGED_EVENT));
   return data;
 }
 
@@ -87,6 +89,18 @@ export const acceptInvitation = (invitation: any) => post("/auth/accept-invitati
 export const resetPassword = (data: any) => post("/auth/reset-password", data);
 export const changePassword = (data: any) => post("/auth/change-password", data);
 export const issueResetCode = (userId: number) => post(`/users/${userId}/reset-code`, {});
+export const forgotPassword = (email: string) => post("/auth/forgot-password", { email });
+export const verifyEmail = (token: string) => post("/auth/verify-email", { token });
+export const resendVerification = () => post("/auth/resend-verification", {});
+export const me = () => api("/users/me");
+
+// "Try the demo": a private demo company, seen as the boss, a mechanic or a customer
+export const startDemo = (role: string) => post("/demo", { role });
+export const switchDemo = (role: string) => api("/demo/switch", { method: "POST", body: JSON.stringify({ role }) }, false);
+
+// The "Get set up" guide on a new company's dashboard
+export const setupGuide = () => api("/company/setup");
+export const dismissSetup = () => post("/company/setup/dismiss", {});
 
 // Plans, company signup and billing
 export const plans = () => api("/plans");

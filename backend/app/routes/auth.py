@@ -13,11 +13,13 @@ from flask_jwt_extended import (
 )
 
 from app import db
+from app.models.company import Company
 from app.models.customer import Customer
 from app.models.invitation import Invitation
 from app.models.security import PasswordReset
 from app.models.user import User
 from app.services import rate_limit
+from app.services.accounts import mark_verified, send_password_reset, send_verification, user_for_reset, user_for_verification
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
 from app.utils.validation import ValidationError, json_body, text
@@ -28,6 +30,7 @@ MIN_PASSWORD_LENGTH = 8
 
 
 def user_payload(user):
+    company = db.session.get(Company, user.company_id)
     return {
         "id": user.id,
         "name": user.name,
@@ -35,7 +38,15 @@ def user_payload(user):
         "role": user.role,
         "company_id": user.company_id,
         "customer_id": user.customer_id,
+        "email_verified": user.email_verified_at is not None,
+        # A visitor's private demo company: when it will be deleted.
+        "demo_until": company.demo_expires_at.isoformat() if company and company.is_demo else None,
     }
+
+
+def demo_ended(user):
+    company = db.session.get(Company, user.company_id)
+    return company is not None and company.is_demo and company.demo_expires_at <= utcnow()
 
 
 def claims_for(user):
@@ -88,7 +99,7 @@ def login():
 @jwt_required(refresh=True)
 def refresh():
     user = db.session.get(User, int(get_jwt_identity()))
-    if not user or get_jwt().get("tv") != user.token_version:
+    if not user or get_jwt().get("tv") != user.token_version or demo_ended(user):
         response = jsonify(error="Your session has ended. Please sign in again.")
         unset_jwt_cookies(response)
         return response, 401
@@ -149,13 +160,59 @@ def accept_invitation():
     return jsonify(message="Invitation accepted"), 201
 
 
+@bp.post("/verify-email")
+def verify_email():
+    """The link in the verification email. Works without signing in: the signed link is the proof."""
+    user = user_for_verification(json_body().get("token"))
+    mark_verified(user)
+    db.session.commit()
+    return jsonify(message="Your email address is confirmed.", email=user.email)
+
+
+@bp.post("/resend-verification")
+@roles("boss", "mechanic", "customer")
+def resend_verification():
+    user = current_user()
+    if user.email_verified_at:
+        return jsonify(message="Your email address is already confirmed.", sent=False)
+    key = f"verify-mail:{user.id}"
+    rate_limit.check(key, setting="EMAIL_RATE_LIMIT")
+    rate_limit.record(key)
+    if not send_verification(user):
+        raise ValidationError("The email couldn't be sent just now. Please try again in a few minutes.", 503)
+    return jsonify(message=f"We sent a new link to {user.email}.", sent=True)
+
+
+@bp.post("/forgot-password")
+def forgot_password():
+    """Email a reset link. The answer is the same whether or not the address has an account."""
+    data = json_body()
+    email = read_email(data)
+    ip_key, email_key = f"forgot-ip:{rate_limit.client_ip()}", f"forgot-email:{email}"
+    rate_limit.check(ip_key)
+    rate_limit.check(email_key, setting="EMAIL_RATE_LIMIT")
+    rate_limit.record(ip_key, email_key)
+    user = User.query.filter_by(email=email).first()
+    if user:
+        send_password_reset(user)
+    return jsonify(message="If an account uses that email, we've sent it a link to choose a new password. The link works for 1 hour.")
+
+
 @bp.post("/reset-password")
 def reset_password():
-    """Set a new password with a one-time code issued by the user's manager."""
+    """Set a new password with the link from a reset email, or with a one-time code from the
+    user's manager."""
     key = f"reset-ip:{rate_limit.client_ip()}"
     rate_limit.check(key)
     rate_limit.record(key)
     data = json_body()
+    if data.get("token") is not None:
+        user = user_for_reset(data.get("token"))
+        user.set_password(new_password(data))
+        # Only the owner of the address could open the link.
+        mark_verified(user)
+        db.session.commit()
+        return jsonify(message="Password updated. You can now sign in.", email=user.email)
     email = read_email(data)
     code = text(data, "code", "Reset code", required=True, max_length=40)
     password = new_password(data)

@@ -22,7 +22,8 @@ button {
   place-items: center;
   background: linear-gradient(135deg, #071a31, #1265a8);
 }
-.login form {
+.login form,
+.login .loginCard {
   background: #fff;
   width: 410px;
   max-width: 92vw;
@@ -666,11 +667,12 @@ header {
   font-size: 11px;
 }
 @media (max-width: 850px) {
+  /* minmax(0, 1fr): columns may shrink below their content, so nothing pushes past a phone's edge. */
   .stats {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .grid2 {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .customerGrid {
     grid-template-columns: 1fr 1fr;
@@ -696,10 +698,10 @@ header {
     width: 100%;
   }
   .stats {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .customerGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .mechanicJob {
     display: block;
@@ -1342,4 +1344,14 @@ body {
 .changePassword h3 {
   margin: 0;
   font-size: 14px;
+}
+
+/* Read by screen readers, not shown. */
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

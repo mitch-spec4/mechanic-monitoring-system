@@ -12,6 +12,7 @@ from flask import current_app
 
 from app import db
 from app.models.billing import Payment, Subscription
+from app.models.company import Company
 from app.models.invitation import Invitation
 from app.models.media import JobFile
 from app.models.user import User
@@ -74,6 +75,8 @@ def create_payment(user, plan, interval):
     checkout = provider()
     if not checkout:
         raise ValidationError("Online payments aren't set up yet. Start with the free trial.", 409)
+    if checkout.name != "test" and db.session.get(Company, user.company_id).is_demo:
+        raise ValidationError("This is a demo company, so it can't take real payments.", 403)
     payment = Payment(
         company_id=user.company_id,
         user_id=user.id,

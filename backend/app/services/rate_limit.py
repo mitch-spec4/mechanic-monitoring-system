@@ -33,12 +33,12 @@ def client_ip():
     return request.remote_addr or "unknown"
 
 
-def check(*keys):
-    """Raise 429 if any key has used up any configured limit."""
+def check(*keys, setting="LOGIN_RATE_LIMIT"):
+    """Raise 429 if any key has used up any limit in the given setting."""
     if not current_app.config.get("RATELIMIT_ENABLED", True):
         return
     now = utcnow()
-    for limit, seconds in parse_limits(current_app.config["LOGIN_RATE_LIMIT"]):
+    for limit, seconds in parse_limits(current_app.config[setting]):
         since = now - timedelta(seconds=seconds)
         for key in keys:
             if AuthAttempt.query.filter(AuthAttempt.key == key, AuthAttempt.created_at >= since).count() >= limit:

@@ -16,6 +16,11 @@ os.environ.update(
         "APP_ENV": "development",
         "DATABASE_URL": f"sqlite:///{DB_PATH.as_posix()}",
         "LOGIN_RATE_LIMIT": "1000 per minute",
+        "EMAIL_RATE_LIMIT": "1000 per minute",
+        "DEMO_RATE_LIMIT": "1000 per minute",
+        # Emails go to the log; the tests read them back from /api/test/outbox to open their links.
+        "EMAIL_BACKEND": "log",
+        "TEST_OUTBOX": "1",
     }
 )
 DB_PATH.unlink(missing_ok=True)
