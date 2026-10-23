@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { confirmDialog, failOnPageErrors, openPage, signIn } from "./helpers";
+import { confirmDialog, failOnPageErrors, openPage, setUpTwoFactor, signIn } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 
@@ -152,12 +152,14 @@ test("invited customer joins with the code and signs in", async ({ page, context
   await page.getByLabel("Full name").fill("Delta Industries");
   await page.getByLabel("Email").fill("delta@example.com");
   await page.getByLabel("Password").fill("delta-password");
+  await page.getByLabel(/I agree to the privacy policy/).check();
   await page.getByRole("button", { name: "Accept invitation" }).click();
   await expect(page.locator(".success")).toContainText("Invitation accepted");
 
   await page.getByLabel("Email").fill("delta@example.com");
   await page.getByLabel("Password").fill("delta-password");
   await page.getByRole("button", { name: "Sign in" }).click();
+  await setUpTwoFactor(page, "delta@example.com");
   await expect(page.getByRole("heading", { name: /Welcome, Delta/ })).toBeVisible();
 });
 

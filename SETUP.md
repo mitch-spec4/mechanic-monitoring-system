@@ -57,7 +57,7 @@ Open http://localhost:5173. The frontend calls `/api` on its own address, and Vi
 
 ## Demo accounts (local only)
 
-`seed.py` creates one demo company. Every demo account uses the password `password`.
+`seed.py` creates one demo company. Every demo account uses the password `password`, and has two-step sign-in turned on with the same authenticator key, `MECHANICPRODEMO2`. Add that key to an authenticator app on your phone (Google Authenticator, Microsoft Authenticator...: "enter a setup key", time-based) to get the codes; tick **Remember this device for 30 days** to be asked less often. A database seeded before two-step sign-in existed has no key: each account sets one up at its next sign-in.
 
 | Role | Email |
 | --- | --- |
@@ -90,6 +90,18 @@ To change or add wording, wrap the English in `t("...")` (or `mark("...")` for l
 **Testing location on a real phone.** Phones only share location with secure (https) pages. With the backend running, start the frontend with `npm run dev:phone` instead of `npm run dev`. Then open the `https://<your computer's IP>:5173` address it prints, on a phone on the same Wi-Fi. The certificate is self-signed, so the phone warns once: choose to continue. Also try it with location blocked for the site, and outdoors.
 
 **Forgot password?** on the sign-in page emails a link to choose a new password. It works once, for 1 hour, and opening it also confirms the email address. The answer on screen is the same whether or not the address has an account. For someone who can't get to their email, the manager can still click **Reset password** next to them under **Technicians** or **Customers**; the person enters that one-time code under **Forgot password? → Have a reset code from your manager?** It expires after 24 hours. Anyone can change their own password under **Settings**. Changing or resetting a password signs that account out everywhere else.
+
+**Two-step sign-in.** Everyone signs in with their password and a 6-digit code from an authenticator app on their phone. Anyone without it set up (new managers, people who just joined) is taken to a setup screen before anything else: scan the QR code (or type the key), confirm a code, and save the 10 backup codes shown once, each usable one time instead of a code. **Remember this device for 30 days** skips the code on that browser; changing or resetting the password forgets every remembered device. Under **Settings** people see whether it's on and how many backup codes are left, make new backup codes (asks for the password), or set it up on a new phone. A manager can **Reset two-step sign-in** next to a technician or customer who lost their phone and backup codes; the person is signed out and sets it up again at their next sign-in. A manager who lost both is reset from the server with `flask --app run.py reset-2fa their@email`. "Try the demo" copies don't ask for it. Outside production it can be turned off with `TWO_FACTOR_REQUIRED=0`; in production it's always on.
+
+**Lockout.** Five wrong passwords or codes in a row lock the account for 15 minutes, and its owner gets an email saying so. A right password and code resets the count.
+
+**Activity log.** Managers see **Activity** in the sidebar: sign-ins, wrong attempts and lockouts, password and two-step sign-in changes, invitations, people joining and being removed, deleted jobs, customers and equipment, plan payments, exports and deletion requests, with who, when and from which IP address. Entries are kept for 12 months.
+
+**Export your data.** Under **Settings**, a manager downloads everything the company has (after typing their password) as a ZIP: a CSV per kind of record (opens in Excel or Google Sheets), the same as one `data.json`, and a `files.csv` listing every photo, video and signature with a download link that works for 7 days. The files aren't inside the ZIP, as a company can have up to 100 GB. Passwords, two-step keys and backup codes are never exported. Three exports an hour per company (`EXPORT_RATE_LIMIT`).
+
+**Deleting a company.** Under **Settings → Delete your company**, a manager types the company's name and their password. Everyone is signed out at once, a banner shows the deletion date to anyone who signs in, and any manager can **Cancel the deletion** for 30 days. After that, the daily clean-up deletes the company, its people and every file. Demo companies can't be deleted this way (they delete themselves).
+
+**Privacy policy and terms.** `#/privacy` and `#/terms` show `backend/legal/privacy.md` and `backend/legal/terms.md`, linked from the homepage footer. **Both are placeholder text: replace them with your own before launch.** The first line of each is `Version: ...`; change it whenever the text changes. Signing up and joining a company need an **I agree** tick, and the version agreed to and when are saved on the account.
 
 **Emails while developing.** In development nothing is sent: each email is written to the backend's log (look for `Email not sent (EMAIL_BACKEND=log)`), links included. Open the link from there to confirm an email or reset a password. See [Email](#email) for sending real emails.
 
@@ -164,6 +176,8 @@ All backend settings live in `backend/.env` (see `backend/.env.example`).
 | `EMAIL_RATE_LIMIT` | `1 per minute;5 per hour` | Verification and password-reset emails to one address |
 | `DEMO_RATE_LIMIT` | `10 per hour` | "Try the demo" copies one IP address can start |
 | `CRON_SECRET` | | A long random value that turns on `/api/cron/daily` for a scheduler. See [Daily clean-up](#daily-clean-up) |
+| `TWO_FACTOR_REQUIRED` | on | `0` turns two-step sign-in off outside production. Always on in production |
+| `EXPORT_RATE_LIMIT` | `3 per hour` | "Export your data" downloads per company |
 
 Live positions taken during jobs are deleted after 30 days. The app removes old ones whenever new positions arrive; in production, also run the [daily clean-up](#daily-clean-up).
 
@@ -200,10 +214,10 @@ If sending fails, the request still succeeds and the error is logged: signup car
 
 ## Daily clean-up
 
-Once a day, three things should be cleared away: demo companies whose 24 hours are up, uploads that were started but never finished, and live positions older than 30 days. Either:
+Once a day, five things should be cleared away: demo companies whose 24 hours are up, uploads that were started but never finished, live positions older than 30 days, activity-log entries older than 12 months, and companies whose 30 days after a deletion request are up (with all their files). Either:
 
 - call `GET /api/cron/daily` with the header `Authorization: Bearer <CRON_SECRET>` from your host's scheduler (Vercel Cron sends exactly this header when `CRON_SECRET` is set), or
-- run `flask --app run.py purge-demos`, `purge-uploads` and `purge-locations` from cron.
+- run `flask --app run.py purge-demos`, `purge-uploads`, `purge-locations`, `purge-activity` and `delete-due-companies` from cron.
 
 Without a `CRON_SECRET`, the URL doesn't exist.
 
@@ -263,7 +277,9 @@ To try it locally: open http://localhost:5173, choose a plan, and sign up with a
 ## Production notes (until the deployment guide is written)
 
 - Run `flask --app run.py db upgrade` on every deploy. Never run `seed.py`.
-- Run the [daily clean-up](#daily-clean-up).
+- Run the [daily clean-up](#daily-clean-up): it is also what finally deletes companies whose owners asked for it.
+- Replace the placeholder `backend/legal/privacy.md` and `backend/legal/terms.md` with your own, reviewed text.
+- `SECRET_KEY` also encrypts the two-step sign-in keys. Changing it makes every authenticator app's codes stop working (backup codes still do, and people can then set up their phone again under **Settings**, or be reset), so keep it stable.
 - Set up [email](#email) before launch: the app won't start in production without it.
 - Use `STORAGE_BACKEND=s3` unless the app runs on one server with a lasting disk.
 - Map tiles come from the free OpenStreetMap servers, which are not meant for heavy commercial use. Switch to a paid tile provider before launch.

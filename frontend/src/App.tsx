@@ -18,7 +18,10 @@ import Sidebar from "./components/Sidebar";
 import DemoBar from "./components/DemoBar";
 import { LocationIndicator, ShiftProvider } from "./components/Shift";
 import { FeedbackHost } from "./components/Feedback";
-import { clearSession, logout as endSession, saveSession, SESSION_EXPIRED_EVENT, type User } from "./services/api";
+import { LegalPage } from "./components/Legal";
+import TwoFactorSetupPage from "./components/TwoFactor";
+import { DeletionBanner } from "./components/CompanyData";
+import { clearSession, logout as endSession, me, saveSession, SESSION_EXPIRED_EVENT, TWO_FACTOR_SETUP_EVENT, type User } from "./services/api";
 import { setTimeZone, setUnits } from "./lib/format";
 import { LANGUAGE_CHANGED_EVENT, setLanguage, t } from "./i18n";
 import "./style.css";
@@ -126,6 +129,27 @@ function Screens() {
 		return () => window.removeEventListener(SESSION_EXPIRED_EVENT, expired);
 	}, []);
 
+	// The server asked for two-step sign-in to be set up first (e.g. a manager reset it): reload
+	// the profile, which brings up the setup screen.
+	useEffect(() => {
+		const setupNeeded = () =>
+			me()
+				.then((data) => updateUser(data.user))
+				.catch(() => {});
+		window.addEventListener(TWO_FACTOR_SETUP_EVENT, setupNeeded);
+		return () => window.removeEventListener(TWO_FACTOR_SETUP_EVENT, setupNeeded);
+	}, []);
+
+	// The privacy policy and terms are open to everyone, signed in or not.
+	if (route.path === "/privacy" || route.path === "/terms") {
+		return <LegalPage key={route.path} name={route.path === "/privacy" ? "privacy" : "terms"} />;
+	}
+
+	// Two-step sign-in comes before anything else in the app, paying for a plan included.
+	if (user?.two_factor_setup_needed && !["/verify", "/join", "/reset"].includes(route.path)) {
+		return <TwoFactorSetupPage onDone={updateUser} onLogout={logout} />;
+	}
+
 	// Paying for a plan happens on its own page, after signup or from Billing.
 	if (route.path.startsWith("/checkout/")) {
 		return (
@@ -208,6 +232,7 @@ function Screens() {
 			<Sidebar user={user} active={openJobId || openCustomerId ? "" : active} onNavigate={navigate} />
 			<div className="appMain">
 				<Profile user={user} onLogout={logout} />
+				<DeletionBanner user={user} onUserChanged={updateUser} />
 				{user.role === "mechanic" && <LocationIndicator />}
 				<div id="content" tabIndex={-1}>
 					{dashboard}

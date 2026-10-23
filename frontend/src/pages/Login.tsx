@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
-import { acceptInvitation, forgotPassword, login, resetPassword, saveSession, type User } from "../services/api";
+import { acceptInvitation, ApiError, forgotPassword, login, resetPassword, saveSession, verifyTwoFactor, type User } from "../services/api";
+import { TermsAgreement } from "../components/Legal";
 import { go } from "../lib/route";
 import { errorMessage } from "../lib/format";
 import LanguagePicker from "../components/LanguagePicker";
@@ -36,6 +37,11 @@ export default function Login({ done, mode: startMode = "signin", code: startCod
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  // After a right password, people with two-step sign-in send a code with this ticket.
+  const [ticket, setTicket] = useState("");
+  const [otp, setOtp] = useState("");
+  const [remember, setRemember] = useState(false);
+  const [agreed, setAgreed] = useState(false);
 
   const switchTo = (next: LoginMode) => {
     setMode(next);
@@ -43,6 +49,8 @@ export default function Login({ done, mode: startMode = "signin", code: startCod
     setMessage("");
     setCode("");
     setPassword("");
+    setTicket("");
+    setOtp("");
   };
   const signInWith = (text: string, address = email) => {
     switchTo("signin");
@@ -57,7 +65,7 @@ export default function Login({ done, mode: startMode = "signin", code: startCod
     setBusy(true);
     try {
       if (mode === "invite") {
-        await acceptInvitation({ code, name, email, password });
+        await acceptInvitation({ code, name, email, password, accept_terms: agreed });
         signInWith(t("Invitation accepted. You can now sign in."));
       } else if (mode === "forgot") {
         setMessage((await forgotPassword(email)).message);
@@ -66,6 +74,11 @@ export default function Login({ done, mode: startMode = "signin", code: startCod
         signInWith(t("Password updated. You can now sign in."), result.email || email);
       } else {
         const data = await login(email, password);
+        if (data.two_factor_required) {
+          setTicket(data.ticket);
+          setPassword("");
+          return;
+        }
         saveSession(data.user);
         done(data.user);
       }
@@ -75,6 +88,66 @@ export default function Login({ done, mode: startMode = "signin", code: startCod
       setBusy(false);
     }
   };
+
+  const submitCode = async (event: FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setBusy(true);
+    try {
+      const data = await verifyTwoFactor(ticket, otp, remember);
+      saveSession(data.user);
+      done(data.user);
+    } catch (problem) {
+      // A ticket that ran out (or a password changed meanwhile) means starting again.
+      if (problem instanceof ApiError && problem.data?.restart) switchTo("signin");
+      setError(errorMessage(problem));
+      setOtp("");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (ticket) {
+    return (
+      <main className="login">
+        <form onSubmit={submitCode}>
+          <div className="brand">
+            🔧 <span>MECHANIC</span>PRO
+          </div>
+          <h1>{t("Enter your sign-in code")}</h1>
+          <p>{t("Open your authenticator app and type the 6-digit code for MechanicPro. Lost your phone? Type one of your backup codes instead.")}</p>
+          {error && (
+            <div className="error" role="alert">
+              {error}
+            </div>
+          )}
+          <label>
+            {t("Sign-in code")}
+            <input
+              className="codeInput"
+              value={otp}
+              onChange={(event) => setOtp(event.target.value)}
+              inputMode="text"
+              autoComplete="one-time-code"
+              autoFocus
+              maxLength={12}
+              required
+            />
+          </label>
+          <label className="checkRow">
+            <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+            {t("Remember this device for 30 days")}
+          </label>
+          <button className="primary" disabled={busy}>
+            {t("Verify")}
+          </button>
+          <button type="button" className="loginSwitch" onClick={() => switchTo("signin")}>
+            {t("Back to sign in")}
+          </button>
+        </form>
+      </main>
+    );
+  }
 
   const [heading, subheading] = HEADINGS[mode];
   const signingIn = mode === "signin";
@@ -133,6 +206,7 @@ export default function Login({ done, mode: startMode = "signin", code: startCod
             />
           </label>
         )}
+        {mode === "invite" && <TermsAgreement checked={agreed} onChange={setAgreed} />}
         <button className="primary" disabled={busy}>
           {t(SUBMIT[mode])}
         </button>

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { failOnPageErrors, signIn } from "./helpers";
+import { failOnPageErrors, finishSignIn, setUpTwoFactor, signIn } from "./helpers";
 
 // Emails are written to the server log in the browser tests; /api/test/outbox reads them back.
 test.describe.configure({ mode: "serial" });
@@ -50,7 +50,9 @@ test("a new manager confirms their email, then the setup guide walks them throug
   await page.getByLabel("Your name").fill("Achieng Odhiambo");
   await page.getByLabel("Work email").fill("achieng@lakebasin.test");
   await page.getByLabel("Password").fill("lake-basin-1");
+  await page.getByLabel(/I agree to the privacy policy/).check();
   await page.getByRole("button", { name: /Start 14-day free trial/ }).click();
+  await setUpTwoFactor(page, "achieng@lakebasin.test");
 
   const banner = page.locator(".verifyBanner");
   await expect(banner).toContainText("We sent a link to achieng@lakebasin.test");
@@ -111,6 +113,10 @@ test("an emailed invitation link fills in the join form, and a forgotten passwor
   await expect(page.getByLabel("Email")).toHaveValue("otieno@dkengineering.test");
   await page.getByLabel("Full name").fill("Otieno Were");
   await page.getByLabel("New password").fill("otieno-first-1");
+  // Joining needs the "I agree" box.
+  const agree = page.getByLabel(/I agree to the privacy policy/);
+  expect(await agree.evaluate((box: HTMLInputElement) => box.validity.valueMissing)).toBe(true);
+  await agree.check();
   await page.getByRole("button", { name: "Accept invitation" }).click();
   await expect(page.locator(".success")).toContainText("Invitation accepted");
   await expect(page).toHaveURL(/#\/signin$/);
@@ -128,6 +134,7 @@ test("an emailed invitation link fills in the join form, and a forgotten passwor
   await expect(page.getByLabel("Email")).toHaveValue("otieno@dkengineering.test");
   await page.getByLabel("Password").fill("otieno-second-2");
   await page.getByRole("button", { name: "Sign in" }).click();
+  await setUpTwoFactor(page, "otieno@dkengineering.test");
   await expect(page.locator(".sidebarUser")).toContainText("Otieno Were");
   noErrors();
 });

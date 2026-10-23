@@ -9,11 +9,13 @@ import { ROLE_NAMES } from "./Sidebar";
 import { setTheme, theme, THEMES, type Theme } from "../lib/theme";
 import { t } from "../i18n";
 import { Loading } from "./States";
+import { TwoFactorSettings } from "./TwoFactor";
+import { CompanyDataSettings } from "./CompanyData";
 
 type Props = { user: User; onUserChanged: (user: User) => void };
 
 /** Settings and Profile: who you are, your language, the company's settings (managers), location
- *  sharing (technicians) and your password. */
+ *  sharing (technicians), your password and two-step sign-in, and the company's data (managers). */
 export default function SettingsPanel({ user, onUserChanged }: Props) {
   return (
     <div className="settingsStack">
@@ -55,6 +57,8 @@ export default function SettingsPanel({ user, onUserChanged }: Props) {
       {user.role === "boss" && <CompanySettingsForm user={user} onUserChanged={onUserChanged} />}
       {user.role === "mechanic" && <LocationSettings />}
       <ChangePassword />
+      <TwoFactorSettings user={user} onUserChanged={onUserChanged} />
+      {user.role === "boss" && <CompanyDataSettings user={user} onUserChanged={onUserChanged} />}
     </div>
   );
 }

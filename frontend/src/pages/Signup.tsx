@@ -5,6 +5,7 @@ import { usePricing, type Interval } from "../components/Plans";
 import { PeriodToggle, SiteNav } from "./Home";
 import { errorMessage } from "../lib/format";
 import LanguagePicker from "../components/LanguagePicker";
+import { TermsAgreement } from "../components/Legal";
 import { t } from "../i18n";
 import "./Home.css";
 
@@ -17,6 +18,7 @@ export default function Signup({ query, onSignedIn }: Props) {
   const [plan, setPlan] = useState(query.get("plan") || "professional");
   const [interval, setPeriod] = useState<Interval>(query.get("interval") === "year" ? "year" : "month");
   const [form, setForm] = useState({ company_name: "", name: "", email: "", password: "" });
+  const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState<Busy>("");
   const [error, setError] = useState("");
   // A link to a plan that doesn't exist (or no longer does) falls back to Professional.
@@ -32,7 +34,7 @@ export default function Signup({ query, onSignedIn }: Props) {
     setError("");
     setBusy(payNow ? "checkout" : "creating");
     try {
-      const data = await signup({ ...form, plan: chosen.key, interval, pay_now: payNow });
+      const data = await signup({ ...form, plan: chosen.key, interval, pay_now: payNow, accept_terms: agreed });
       saveSession(data.user);
       onSignedIn(data.user, data.checkout_url);
     } catch (problem) {
@@ -101,6 +103,7 @@ export default function Signup({ query, onSignedIn }: Props) {
               <PeriodToggle value={interval} onChange={setPeriod} freeMonths={12 - pricing.yearly_months} />
             </>
           )}
+          <TermsAgreement checked={agreed} onChange={setAgreed} />
           <button className="btn primary wide" disabled={!!busy || !chosen}>
             {busy === "creating" ? t("Creating your account…") : `${t("Start {days}-day free trial", { days: trialDays })} →`}
           </button>

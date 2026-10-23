@@ -1128,3 +1128,48 @@ body:has(.site) {
 .site .footLanguage {
   color: var(--muted);
 }
+
+/* ---------- The "I agree" box (signup) ---------- */
+.site .checkRow,
+.site .formCard > label.checkRow {
+  display: flex;
+  font-weight: 600;
+  color: #dce9f7;
+}
+.site .checkRow a {
+  color: #65adff;
+}
+
+/* ---------- Privacy policy and terms ---------- */
+.site .footLinks {
+  display: flex;
+  gap: 16px;
+}
+.site .footLinks a {
+  color: inherit;
+}
+.site .footLinks a:hover {
+  color: #fff;
+}
+.site .legalBody {
+  max-width: 760px;
+  padding: 48px 20px 80px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.7;
+}
+.site .legalBody :is(h1, h2, h3) {
+  color: var(--text);
+  line-height: 1.25;
+}
+.site .legalBody h1 {
+  font-size: clamp(28px, 4vw, 38px);
+  letter-spacing: -1px;
+}
+.site .legalBody strong {
+  color: var(--text);
+}
+.site .legalVersion {
+  margin-top: 36px;
+  font-size: 12px;
+}

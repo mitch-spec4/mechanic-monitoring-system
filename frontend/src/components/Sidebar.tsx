@@ -2,7 +2,7 @@ import { useState } from "react";
 import { reports } from "../services/api";
 import { usePolling } from "../lib/usePolling";
 import { mark, t } from "../i18n";
-import { BarChart3, Bell, ClipboardList, Clock, Cog, CreditCard, FileText, Gauge, HelpCircle, ListChecks, Map as MapIcon, MessageSquare, Star, UserRound, Users, Wrench } from "lucide-react";
+import { BarChart3, Bell, ClipboardList, Clock, Cog, CreditCard, FileText, Gauge, HelpCircle, History, ListChecks, Map as MapIcon, MessageSquare, Star, UserRound, Users, Wrench } from "lucide-react";
 
 function BellIcon() {
   return <Bell size={16} />;
@@ -25,6 +25,7 @@ const roleLinks = {
     [BarChart3, mark("Reports")],
     [CreditCard, mark("Billing")],
     [BellIcon, mark("Notifications")],
+    [History, mark("Activity")],
   ],
   mechanic: [
     [ClipboardList, mark("Assigned Jobs")],

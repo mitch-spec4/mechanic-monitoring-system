@@ -502,6 +502,10 @@ export default function Home({ onDemo }: { onDemo: (user: User) => void }) {
             © {new Date().getFullYear()} MechanicPro. {t("Field service management.")}
           </span>
           <LanguagePicker className="footLanguage" />
+          <nav className="footLinks" aria-label={t("Legal")}>
+            <a href="#/privacy">{t("Privacy policy")}</a>
+            <a href="#/terms">{t("Terms of service")}</a>
+          </nav>
           <span>{t("Built for service teams.")}</span>
         </div>
       </footer>

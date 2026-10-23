@@ -9,6 +9,7 @@ import {
   Cog,
   FileText,
   HelpCircle,
+  History,
   ListChecks,
   Map as MapIcon,
   MessageSquare,
@@ -20,7 +21,21 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
-import { company, customers, jobs, machines, mechanics, notifications, reports, requests, reviews, services, updateCustomer, type User } from "../services/api";
+import {
+  company,
+  customers,
+  jobs,
+  machines,
+  mechanics,
+  notifications,
+  reports,
+  requests,
+  resetTwoFactor,
+  reviews,
+  services,
+  updateCustomer,
+  type User,
+} from "../services/api";
 import ChecklistManager from "../components/ChecklistManager";
 import MachinesByCustomer from "../components/MachinesByCustomer";
 import { machineSummary } from "./BossDashboard";
@@ -32,6 +47,8 @@ import InviteForm from "../components/InviteForm";
 import VerifyBanner from "../components/VerifyBanner";
 import ResetPassword from "../components/ResetPassword";
 import SettingsPanel from "../components/SettingsPanel";
+import { ActivityLog } from "../components/CompanyData";
+import { confirmAction, toast } from "../components/Feedback";
 import { ROLE_NAMES } from "../components/Sidebar";
 import { errorMessage, formatBytes, formatDate } from "../lib/format";
 import { mark, t } from "../i18n";
@@ -109,6 +126,11 @@ const resources: Record<string, Resource> = {
   "Team Map": { label: mark("Clocked-in technicians"), description: mark("Where your clocked-in technicians were last seen."), icon: MapIcon },
   Shifts: { label: mark("Shifts"), description: mark("Clock-in and clock-out times and hours for your team."), icon: Clock },
   "My Shifts": { label: mark("My shifts"), description: mark("Your clock-in and clock-out times and hours."), icon: Clock },
+  Activity: {
+    label: mark("Activity"),
+    description: mark("Sign-ins, security changes, deletions and exports in your company, kept for 12 months."),
+    icon: History,
+  },
 };
 
 export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, onUserChanged = () => {} }: Props) {
@@ -160,6 +182,22 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
     setEditing(null);
     setReloadKey((key) => key + 1);
   };
+  // For someone who lost their phone and their backup codes.
+  const resetSecondStep = async (userId: number, name: string) => {
+    const ok = await confirmAction({
+      title: t("Reset two-step sign-in"),
+      message: t("{name} is signed out, and sets up two-step sign-in again with their phone the next time they sign in.", { name }),
+      confirmLabel: t("Reset"),
+    });
+    if (!ok) return;
+    try {
+      await resetTwoFactor(userId);
+      toast(t("Two-step sign-in reset for {name}", { name }));
+      setReloadKey((key) => key + 1);
+    } catch (problem) {
+      toast(errorMessage(problem), "error");
+    }
+  };
   const rowActions = (item: Row) => {
     if (!isBoss) return null;
     const resetId = title === "Technicians" ? item.id : title === "Customers" ? item.user_id : null;
@@ -173,6 +211,11 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
         {resetId && (
           <button className="listAction" onClick={() => setResetting({ id: resetId, name: item.name })}>
             {t("Reset password")}
+          </button>
+        )}
+        {resetId && item.two_factor_enabled && (
+          <button className="listAction" onClick={() => resetSecondStep(resetId, item.name)}>
+            {t("Reset two-step sign-in")}
           </button>
         )}
       </>
@@ -201,6 +244,8 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
         return <ShiftsView user={user} />;
       case "Messages":
         return <EmptyState icon={<MessageSquare size={26} />} title={t("Messaging is not connected")} text={t("Conversation storage and permissions will appear here when the messaging service is enabled.")} />;
+      case "Activity":
+        return <ActivityLog />;
       case "Settings":
       case "Profile":
         return <SettingsPanel user={user} onUserChanged={onUserChanged} />;

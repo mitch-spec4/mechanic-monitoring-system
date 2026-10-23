@@ -15,6 +15,7 @@ Built with React + TypeScript (Vite) on the frontend and Flask, SQLAlchemy, Alem
 - **Equipment by customer.** Each customer's page lists their equipment, the pieces that need work first, and why: an open job, an open service request, or a status of Under Maintenance or Under Repair. Managers can create a job for a piece of equipment in one click. The Equipment page groups equipment under its customer, with a "Needs work only" filter.
 - **Photos, videos and customer sign-off.** Technicians add before and after photos (shrunk on the phone before upload) and short videos while they work. Completing a job takes the customer's signature on the phone, or a recorded reason they couldn't sign. Every completed job has a PDF report that can be shared straight from the phone. Files are stored on disk or in any S3-compatible bucket (Cloudflare R2, Backblaze B2, AWS S3).
 - **English and Kiswahili, light and dark.** Everyone picks their language in Settings, and their screens, emails and notifications follow it. Managers set the company's time zone, currency and units, and anyone can switch to dark mode.
+- **Security and data rights.** Two-step sign-in with an authenticator app for everyone (with backup codes and "remember this device"), lockout after five wrong attempts, an activity log for managers, a one-click export of all the company's data, deleting the company with 30 days to change your mind, and privacy policy and terms pages with recorded agreement. A test checks that every route taking an ID refuses people from other companies.
 - **Job history.** Every status change, assignment, edit, part, checklist tick and note is logged with who and when, and managers see it as a timeline.
 - **Permanent service history.** Records, reviews and customer service requests can't be deleted; finished jobs lock their worksheet.
 - **Notifications** for assignments, status changes, requests and reviews.
@@ -47,4 +48,4 @@ Then open http://localhost:5173.
 
 ## Status
 
-Under active development. Production deployment configuration, a real payment provider, email delivery and two-factor authentication haven't been built yet. Don't use the demo data or demo passwords outside local development.
+Under active development. Production deployment configuration and a real payment provider haven't been built yet, and the privacy policy and terms are placeholders. Don't use the demo data or demo passwords outside local development.
