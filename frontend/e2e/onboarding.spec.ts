@@ -24,7 +24,7 @@ test("Try the demo opens a private company that can be seen as each role", async
   await expect(page.locator(".job")).toHaveCount(6);
   await expect(demoBar(page).getByRole("button", { name: "Boss" })).toHaveAttribute("aria-pressed", "true");
 
-  await demoBar(page).getByRole("button", { name: "Mechanic", exact: true }).click();
+  await demoBar(page).getByRole("button", { name: "Technician", exact: true }).click();
   await expect(page.getByRole("heading", { name: /Mitch/ })).toBeVisible();
   await expect(page.locator(".sidebarUser")).toContainText("Mitch Kamau");
   await demoBar(page).getByRole("button", { name: "Customer", exact: true }).click();
@@ -38,9 +38,9 @@ test("Try the demo opens a private company that can be seen as each role", async
 
 test("each role card on the homepage opens the demo as that role", async ({ page }) => {
   await page.goto("/");
-  await page.locator(".role", { hasText: "Mechanic" }).getByRole("button", { name: /Try it as Mechanic/ }).click();
+  await page.locator(".role", { hasText: "Technician" }).getByRole("button", { name: /Try it as Technician/ }).click();
   await expect(page.getByRole("heading", { name: /Mitch/ })).toBeVisible();
-  await expect(demoBar(page).getByRole("button", { name: "Mechanic", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(demoBar(page).getByRole("button", { name: "Technician", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
 
 test("a new manager confirms their email, then the setup guide walks them through", async ({ page }) => {
@@ -61,7 +61,7 @@ test("a new manager confirms their email, then the setup guide walks them throug
   const invite = page.locator("form.form-upgraded");
   await invite.locator("input[name=name]").fill("Kisumu Mills");
   await invite.locator("input[name=email]").fill("ops@kisumumills.test");
-  await invite.getByRole("button", { name: "Generate Invitation Code" }).click();
+  await invite.getByRole("button", { name: "Send invitation" }).click();
   await expect(invite.locator(".error")).toContainText("Confirm your email address first");
   await page.getByRole("button", { name: "Close" }).click();
   await banner.getByRole("button", { name: "Resend link" }).click();
@@ -76,12 +76,12 @@ test("a new manager confirms their email, then the setup guide walks them throug
   await guide.getByRole("button", { name: "Invite a customer" }).click();
   await invite.locator("input[name=name]").fill("Kisumu Mills");
   await invite.locator("input[name=email]").fill("ops@kisumumills.test");
-  await invite.getByRole("button", { name: "Generate Invitation Code" }).click();
+  await invite.getByRole("button", { name: "Send invitation" }).click();
   await expect(page.locator(".modal")).toContainText("We emailed an invitation to ops@kisumumills.test");
   await page.getByRole("button", { name: "Done" }).click();
   await expect(guide).toContainText("2 of 5 done");
-  // Machines belong to a customer, so that step waits for one to join.
-  await expect(guide.getByRole("button", { name: "Add a machine" })).toBeDisabled();
+  // Equipment belongs to a customer, so that step waits for one to join.
+  await expect(guide.getByRole("button", { name: "Add equipment" })).toBeDisabled();
 
   await guide.getByRole("button", { name: "Hide the setup guide" }).click();
   await expect(guide).toHaveCount(0);
@@ -94,11 +94,11 @@ test("a new manager confirms their email, then the setup guide walks them throug
 test("an emailed invitation link fills in the join form, and a forgotten password is reset by email", async ({ page }) => {
   const noErrors = failOnPageErrors(page);
   await signIn(page, "james@mechanicpro.test");
-  await page.getByRole("button", { name: "+ Add mechanic" }).click();
+  await page.getByRole("button", { name: "+ Add technician" }).click();
   const invite = page.locator("form.form-upgraded");
   await invite.locator("input[name=name]").fill("Otieno Were");
   await invite.locator("input[name=email]").fill("otieno@dkengineering.test");
-  await invite.getByRole("button", { name: "Generate Invitation Code" }).click();
+  await invite.getByRole("button", { name: "Send invitation" }).click();
   await expect(page.locator(".modal")).toContainText("We emailed an invitation to otieno@dkengineering.test");
   const code = (await page.getByTestId("share-code").textContent()) ?? "";
   await page.getByRole("button", { name: "Done" }).click();

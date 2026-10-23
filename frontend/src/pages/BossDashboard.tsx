@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { Ban, Pencil, Plus, ClipboardList, Wrench, Trash2, CheckCircle2 } from "lucide-react";
 import {
   customers,
@@ -19,23 +19,44 @@ import InviteForm from "../components/InviteForm";
 import SetupGuide, { type SetupStep } from "../components/SetupGuide";
 import VerifyBanner from "../components/VerifyBanner";
 import { AddMachine } from "../components/MachineForms";
+import { confirmAction, toast } from "../components/Feedback";
 import { errorMessage, formatDate, greeting } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
+import { PRIORITIES, REQUEST_STATUSES } from "../lib/labels";
+import type { User } from "../services/api";
+import { t } from "../i18n";
 import { PlanBanner } from "./BillingPage";
-type Props = { u: any; onOpenJob: (id: number) => void; onOpenCustomer: (id: number) => void; onOpenBilling?: () => void; onUserChanged?: (user: any) => void };
+
+type Props = { u: User; onOpenJob: (id: number) => void; onOpenCustomer: (id: number) => void; onOpenBilling?: () => void; onUserChanged?: (user: User) => void };
+type Job = {
+  id: number;
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  location?: string | null;
+  due_date?: string | null;
+  mechanic_id?: number | null;
+  customer_id?: number | null;
+  machine_id?: number | null;
+  job_type?: string | null;
+};
+type Person = { id: number; name: string; email: string };
+
+const FINISHED = ["Completed", "Cancelled"];
 
 export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBilling = () => {}, onUserChanged = () => {} }: Props) {
-  const [data, setData] = useState<any[]>([]),
-    [cs, setCs] = useState<any[]>([]),
-    [ms, setMs] = useState<any[]>([]),
-    [rs, setRs] = useState<any[]>([]),
-    [machineList, setMachineList] = useState<any[]>([]),
-    [modal, setModalState] = useState(""),
-    [formError, setFormError] = useState(""),
-    [notice, setNotice] = useState(""),
-    [editingJob, setEditingJob] = useState<any>(null),
-    [jobTypes, setJobTypes] = useState<string[]>([]),
-    [selectedMechanic, setSelectedMechanic] = useState(null);
+  const [data, setData] = useState<Job[]>([]);
+  const [cs, setCs] = useState<any[]>([]);
+  const [ms, setMs] = useState<Person[]>([]);
+  const [rs, setRs] = useState<any[]>([]);
+  const [machineList, setMachineList] = useState<any[]>([]);
+  const [modal, setModalState] = useState("");
+  const [formError, setFormError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [editingJob, setEditingJob] = useState<Job | null>(null);
+  const [jobTypes, setJobTypes] = useState<string[]>([]);
+  const [selectedMechanic, setSelectedMechanic] = useState<Person | null>(null);
   const load = () =>
     Promise.all([jobs(), customers(), mechanics(), requests(), machines(), checklists()])
       .then(([j, c, m, r, mc, cl]) => {
@@ -44,7 +65,7 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBill
         setMs(m.mechanics);
         setRs(r.requests);
         setMachineList(mc.machines);
-        setJobTypes(cl.checklists.map((template: any) => template.job_type));
+        setJobTypes(cl.checklists.map((template: { job_type: string }) => template.job_type));
       })
       .catch(() => {});
   usePolling(load, 30000);
@@ -53,17 +74,19 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBill
     setModalState(name);
   };
   // Runs a change, reloads, and reports failures instead of failing silently.
-  const act = async (change: () => Promise<unknown>) => {
+  const act = async (change: () => Promise<unknown>, done?: string) => {
     setNotice("");
     try {
       await change();
+      if (done) toast(done);
     } catch (error) {
       setNotice(errorMessage(error));
     }
     load();
   };
   const changeRequestStatus = (id: number, status: string) => act(() => updateRequest(id, { status }));
-  const activeRequestCount = rs.filter((x) => !["Completed", "Cancelled"].includes(x.status)).length;
+  const activeRequestCount = rs.filter((x) => !FINISHED.includes(x.status)).length;
+  const upcoming = data.filter((job) => !FINISHED.includes(job.status));
   return (
     <>
       <Header u={u} />
@@ -73,11 +96,11 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBill
         <SetupGuide onAction={(step: SetupStep) => setModal(SETUP_MODALS[step])} />
         <div className="welcome">
           <div>
-            <h1>{greeting()}, {u.name.split(" ")[0]}.</h1>
-            <p>Here's what's happening across your service team.</p>
+            <h1>{t("{greeting}, {name}.", { greeting: greeting(), name: u.name.split(" ")[0] })}</h1>
+            <p>{t("Here's what's happening across your service team.")}</p>
           </div>
           <button className="primary" onClick={() => setModal("job")}>
-            <Plus size={17} /> Create Job
+            <Plus size={17} /> {t("Create job")}
           </button>
         </div>
         {notice && (
@@ -86,29 +109,29 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBill
           </div>
         )}
         <div className="stats">
-          <Stat icon={<ClipboardList />} n={data.length} t="Total jobs" />
-          <Stat icon={<ClipboardList />} n={activeRequestCount} t="Pending requests" />
-          <Stat icon={<Wrench />} n={data.filter((x) => ["In Progress", "Paused"].includes(x.status)).length} t="In progress" />
-          <Stat icon={<CheckCircle2 />} n={data.filter((x) => x.status === "Completed").length} t="Completed jobs" />
+          <Stat icon={<ClipboardList />} n={data.length} label={t("Total jobs")} />
+          <Stat icon={<ClipboardList />} n={activeRequestCount} label={t("Pending requests")} />
+          <Stat icon={<Wrench />} n={data.filter((x) => ["In Progress", "Paused"].includes(x.status)).length} label={t("In progress")} />
+          <Stat icon={<CheckCircle2 />} n={data.filter((x) => x.status === "Completed").length} label={t("Completed jobs")} />
         </div>
         <div className="grid2">
           <Panel
-            title="Active jobs"
+            title={t("Active jobs")}
             action={
               <button className="link" onClick={() => setModal("job")}>
-                + New job
+                + {t("New job")}
               </button>
             }
           >
             {data.slice(0, 8).map((j) => (
-              <Job
+              <JobRow
                 key={j.id}
                 j={j}
                 mechanics={ms}
-                onAssign={(id: number, mechanic_id: number) => act(() => updateJob(id, { mechanic_id }))}
-                onDelete={(id: number) => act(() => deleteJob(id))}
-                onCancel={(id: number) => act(() => updateJob(id, { status: "Cancelled" }))}
-                onEdit={(job: any) => {
+                onAssign={(id, mechanic_id) => act(() => updateJob(id, { mechanic_id }), t("Technician assigned"))}
+                onDelete={(id) => act(() => deleteJob(id), t("Job deleted"))}
+                onCancel={(id) => act(() => updateJob(id, { status: "Cancelled" }), t("Job cancelled"))}
+                onEdit={(job) => {
                   setFormError("");
                   setEditingJob(job);
                 }}
@@ -117,12 +140,8 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBill
             ))}
           </Panel>
           <Panel
-            title="Customer requests"
-            action={
-              <span className="pill">
-                {activeRequestCount} open
-              </span>
-            }
+            title={t("Customer requests")}
+            action={<span className="pill">{t("{count} open", { count: activeRequestCount })}</span>}
           >
             {rs.slice(0, 6).map((r) => (
               <div className="request" key={r.id}>
@@ -131,14 +150,12 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBill
                   <span>{r.description}</span>
                 </div>
                 <div className="requestActions">
-                  <span className="priority">{r.priority}</span>
-                  <select
-                    aria-label={`Status for ${r.subject}`}
-                    value={r.status}
-                    onChange={(e) => changeRequestStatus(r.id, e.target.value)}
-                  >
-                    {["Submitted", "Received", "Reviewing", "Approved", "Mechanic Assigned", "Scheduled", "In Progress", "Completed", "Cancelled"].map((status) => (
-                      <option key={status} value={status}>{status}</option>
+                  <span className="priority">{t(r.priority)}</span>
+                  <select aria-label={t("Status for {subject}", { subject: r.subject })} value={r.status} onChange={(e) => changeRequestStatus(r.id, e.target.value)}>
+                    {REQUEST_STATUSES.map((status) => (
+                      <option key={status} value={status}>
+                        {t(status)}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -148,21 +165,16 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBill
         </div>
         <div className="panel">
           <div className="panelHead">
-            <h2>Customers</h2>
+            <h2>{t("Customers")}</h2>
             <button className="primary-sm" onClick={() => setModal("invite")}>
-              <Plus size={14} /> Add customer
+              <Plus size={14} /> {t("Add customer")}
             </button>
           </div>
           <div className="customerGrid">
             {[...cs]
               .sort((a, b) => Number(b.needs_work_count > 0) - Number(a.needs_work_count > 0))
               .map((c) => (
-                <button
-                  key={c.id}
-                  className={`customer-card ${c.needs_work_count ? "needsWork" : ""}`}
-                  onClick={() => onOpenCustomer(c.id)}
-                  style={{ border: "none", background: "none", cursor: "pointer" }}
-                >
+                <button key={c.id} className={`customer-card plainButton ${c.needs_work_count ? "needsWork" : ""}`} onClick={() => onOpenCustomer(c.id)}>
                   <div className="avatar-lg">{c.name[0]}</div>
                   <div className="customer-info">
                     <b>{c.name}</b>
@@ -173,11 +185,43 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBill
           </div>
         </div>
         <div className="dashboardGrid bossOverviewGrid">
-          <Panel title="Upcoming jobs" action={<span className="pill">{data.filter((job) => job.status !== "Completed" && job.status !== "Cancelled").length}</span>}>
-            {data.filter((job) => job.status !== "Completed" && job.status !== "Cancelled").slice(0, 5).map((job) => <div className="request" key={job.id}><div><button className="titleLink" onClick={() => onOpenJob(job.id)}><b>{job.title}</b></button><span>{job.location || "Location not set"} · {formatDate(job.due_date) || "Date not set"}</span></div><span className="status">{job.status}</span></div>)}
+          <Panel title={t("Upcoming jobs")} action={<span className="pill">{upcoming.length}</span>}>
+            {upcoming.slice(0, 5).map((job) => (
+              <div className="request" key={job.id}>
+                <div>
+                  <button className="titleLink" onClick={() => onOpenJob(job.id)}>
+                    <b>{job.title}</b>
+                  </button>
+                  <span>
+                    {job.location || t("Site not set")} · {formatDate(job.due_date) || t("Date not set")}
+                  </span>
+                </div>
+                <span className="status">{t(job.status)}</span>
+              </div>
+            ))}
           </Panel>
-          <Panel title="Team overview" action={<button className="link" onClick={() => setModal("addmech")}>+ Add mechanic</button>}>
-            {ms.length === 0 ? <p className="muted">No mechanics added yet.</p> : ms.map((mechanic) => <button key={mechanic.id} className="customer" onClick={() => setSelectedMechanic(mechanic)} style={{ border: "none", background: "none", cursor: "pointer", width: "100%", textAlign: "left" }}><div className="avatar">{mechanic.name[0]}</div><div><b>{mechanic.name}</b><span>{mechanic.email}</span></div><strong>{data.filter((job) => job.mechanic_id === mechanic.id && !["Completed", "Cancelled"].includes(job.status)).length} active</strong></button>)}
+          <Panel
+            title={t("Team overview")}
+            action={
+              <button className="link" onClick={() => setModal("addmech")}>
+                + {t("Add technician")}
+              </button>
+            }
+          >
+            {ms.length === 0 ? (
+              <p className="muted">{t("No technicians added yet.")}</p>
+            ) : (
+              ms.map((mechanic) => (
+                <button key={mechanic.id} className="customer teamMember" onClick={() => setSelectedMechanic(mechanic)}>
+                  <div className="avatar">{mechanic.name[0]}</div>
+                  <div>
+                    <b>{mechanic.name}</b>
+                    <span>{mechanic.email}</span>
+                  </div>
+                  <strong>{t("{count} active", { count: data.filter((job) => job.mechanic_id === mechanic.id && !FINISHED.includes(job.status)).length })}</strong>
+                </button>
+              ))
+            )}
           </Panel>
         </div>
       </main>
@@ -191,15 +235,16 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBill
         />
       )}
       {editingJob && (
-        <Modal title="Edit job" onClose={() => setEditingJob(null)}>
+        <Modal title={t("Edit job")} onClose={() => setEditingJob(null)}>
           <form
             className="form"
-            onSubmit={async (e: any) => {
+            onSubmit={async (e: FormEvent<HTMLFormElement>) => {
               e.preventDefault();
               setFormError("");
               try {
                 await updateJob(editingJob.id, Object.fromEntries(new FormData(e.currentTarget)));
                 setEditingJob(null);
+                toast(t("Job saved"));
                 load();
               } catch (error) {
                 setFormError(errorMessage(error));
@@ -207,30 +252,31 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBill
             }}
           >
             {formError && <div className="error">{formError}</div>}
-            <input name="title" defaultValue={editingJob.title} placeholder="Job title" required />
-            <textarea name="description" defaultValue={editingJob.description} placeholder="Problem / job description" required />
+            <input name="title" defaultValue={editingJob.title} placeholder={t("Job title")} aria-label={t("Job title")} required />
+            <textarea name="description" defaultValue={editingJob.description} placeholder={t("Problem / job description")} aria-label={t("Problem / job description")} required />
             <div className="row">
-              <select name="priority" defaultValue={editingJob.priority}>
-                <option>Low</option>
-                <option>Medium</option>
-                <option>High</option>
-                <option>Urgent</option>
+              <select name="priority" defaultValue={editingJob.priority} aria-label={t("Priority")}>
+                {PRIORITIES.map((priority) => (
+                  <option key={priority} value={priority}>
+                    {t(priority)}
+                  </option>
+                ))}
               </select>
-              <input name="location" defaultValue={editingJob.location || ""} placeholder="Job site" />
+              <input name="location" defaultValue={editingJob.location || ""} placeholder={t("Site")} aria-label={t("Site")} />
             </div>
             <div className="row">
-              <select name="machine_id" defaultValue={editingJob.machine_id || ""} aria-label="Machine">
-                <option value="">No machine</option>
+              <select name="machine_id" defaultValue={editingJob.machine_id || ""} aria-label={t("Equipment")}>
+                <option value="">{t("No equipment")}</option>
                 {machineList
                   .filter((m) => !editingJob.customer_id || m.customer_id === editingJob.customer_id)
                   .map((m) => (
                     <option key={m.id} value={m.id}>{m.name} ({m.serial_no})</option>
                   ))}
               </select>
-              <input name="due_date" type="date" defaultValue={editingJob.due_date || ""} aria-label="Due date" title="Due date" />
+              <input name="due_date" type="date" defaultValue={editingJob.due_date || ""} aria-label={t("Due date")} title={t("Due date")} />
             </div>
             <JobTypeSelect types={jobTypes} value={editingJob.job_type} />
-            <button className="primary">Save changes</button>
+            <button className="primary">{t("Save changes")}</button>
           </form>
         </Modal>
       )}
@@ -253,7 +299,7 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBill
 }
 // Which dialog each "Get set up" step opens.
 const SETUP_MODALS: Record<SetupStep, string> = { verify: "", customer: "invite", machine: "machine", mechanic: "addmech", job: "job" };
-function Header({ u }: { u: any }) {
+function Header({ u }: { u: User }) {
   return (
     <header>
       <div className="logo">
@@ -269,18 +315,18 @@ function Header({ u }: { u: any }) {
     </header>
   );
 }
-function Stat({ icon, n, t }: any) {
+function Stat({ icon, n, label }: { icon: ReactNode; n: number; label: string }) {
   return (
     <div className="stat">
       <div className="statIcon">{icon}</div>
       <div>
         <b>{n}</b>
-        <span>{t}</span>
+        <span>{label}</span>
       </div>
     </div>
   );
 }
-function Panel({ title, action, children }: any) {
+function Panel({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
     <section className="panel">
       <div className="panelHead">
@@ -291,14 +337,27 @@ function Panel({ title, action, children }: any) {
     </section>
   );
 }
-export function machineSummary(customer: any) {
-  const machines = `${customer.machine_count ?? 0} machine${customer.machine_count === 1 ? "" : "s"}`;
-  return customer.needs_work_count ? `${machines} · ${customer.needs_work_count} need${customer.needs_work_count === 1 ? "s" : ""} work` : machines;
+export function machineSummary(customer: { machine_count?: number; needs_work_count?: number }) {
+  const count = customer.machine_count ?? 0;
+  const pieces = count === 1 ? t("1 piece of equipment") : t("{count} pieces of equipment", { count });
+  const needing = customer.needs_work_count ?? 0;
+  if (!needing) return pieces;
+  return `${pieces} · ${needing === 1 ? t("1 needs work") : t("{count} need work", { count: needing })}`;
 }
 // Jobs that have not started can be deleted; any unfinished job can be cancelled.
 const DELETABLE = ["Pending", "Assigned"];
 const CANCELLABLE = ["Pending", "Assigned", "Accepted", "In Progress", "Paused"];
-function Job({ j, mechanics, onAssign, onDelete, onCancel, onEdit, onOpen }: any) {
+type JobProps = {
+  j: Job;
+  mechanics: Person[];
+  onAssign: (id: number, mechanicId: number) => void;
+  onDelete: (id: number) => void;
+  onCancel: (id: number) => void;
+  onEdit: (job: Job) => void;
+  onOpen: (id: number) => void;
+};
+
+function JobRow({ j, mechanics, onAssign, onDelete, onCancel, onEdit, onOpen }: JobProps) {
   return (
     <div className="job">
       <div className="jobMain">
@@ -306,40 +365,39 @@ function Job({ j, mechanics, onAssign, onDelete, onCancel, onEdit, onOpen }: any
           <button className="titleLink" onClick={() => onOpen(j.id)}>
             <b>{j.title}</b>
           </button>
-          <span
-            className={`status ${j.status.replaceAll(" ", "").toLowerCase()}`}
-          >
-            {j.status}
-          </span>
+          <span className={`status ${j.status.replace(/ /g, "").toLowerCase()}`}>{t(j.status)}</span>
         </div>
         <p>{j.description}</p>
         <small>
-          📍 {j.location || "No location"} · Due {formatDate(j.due_date) || "Not set"}
+          📍 {j.location || t("No site")} · {t("Due {date}", { date: formatDate(j.due_date) || t("Not set") })}
         </small>
       </div>
-      <select
-        value={j.mechanic_id || ""}
-        onChange={(e) =>
-          e.target.value && onAssign(j.id, Number(e.target.value))
-        }
-      >
-        <option value="">Assign</option>
-        {mechanics.map((m: any) => (
-          <option key={m.id} value={m.id}>{m.name}</option>
+      <select value={j.mechanic_id || ""} aria-label={t("Technician for {title}", { title: j.title })} onChange={(e) => e.target.value && onAssign(j.id, Number(e.target.value))}>
+        <option value="">{t("Assign")}</option>
+        {mechanics.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.name}
+          </option>
         ))}
       </select>
       {CANCELLABLE.includes(j.status) && (
-        <button className="iconButton" title="Edit job" aria-label={`Edit ${j.title}`} onClick={() => onEdit(j)}>
+        <button className="iconButton" title={t("Edit job")} aria-label={t("Edit {title}", { title: j.title })} onClick={() => onEdit(j)}>
           <Pencil size={15} />
         </button>
       )}
       {CANCELLABLE.includes(j.status) && (
         <button
           className="iconButton"
-          title="Cancel job"
-          aria-label={`Cancel ${j.title}`}
-          onClick={() => {
-            if (confirm("Cancel this job? The assigned mechanic will be notified.")) onCancel(j.id);
+          title={t("Cancel job")}
+          aria-label={t("Cancel {title}", { title: j.title })}
+          onClick={async () => {
+            const ok = await confirmAction({
+              title: t("Cancel this job?"),
+              message: t("The assigned technician will be notified."),
+              confirmLabel: t("Cancel job"),
+              danger: true,
+            });
+            if (ok) onCancel(j.id);
           }}
         >
           <Ban size={15} />
@@ -348,10 +406,11 @@ function Job({ j, mechanics, onAssign, onDelete, onCancel, onEdit, onOpen }: any
       {DELETABLE.includes(j.status) && (
         <button
           className="iconButton"
-          title="Delete job"
-          aria-label={`Delete ${j.title}`}
-          onClick={() => {
-            if (confirm("Delete this job?")) onDelete(j.id);
+          title={t("Delete job")}
+          aria-label={t("Delete {title}", { title: j.title })}
+          onClick={async () => {
+            const ok = await confirmAction({ title: t("Delete this job?"), message: t("This can't be undone."), confirmLabel: t("Delete job"), danger: true });
+            if (ok) onDelete(j.id);
           }}
         >
           <Trash2 size={15} />

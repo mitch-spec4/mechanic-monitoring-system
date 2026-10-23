@@ -67,6 +67,7 @@ def test_people_choose_their_own_language(client, data, auth):
     assert db.session.get(User, data["customer"]).language == "sw"
     assert client.patch("/api/users/me", headers=auth("cust@acme.test"), json={"language": "xx"}).status_code == 400
     assert client.get("/api/users/me", headers=auth("cust@acme.test")).get_json()["user"]["timezone"] == "Africa/Nairobi"
+    assert client.get("/api/users/me", headers=auth("cust@acme.test")).get_json()["user"]["units"] == "metric"
 
 
 def test_new_accounts_start_in_the_language_the_app_is_in(client):

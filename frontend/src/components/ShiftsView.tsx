@@ -1,18 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { AlertTriangle, Clock, MapPin } from "lucide-react";
 import Modal from "./Modal";
 import { correctShift, mechanics, shiftList } from "../services/api";
-import { errorMessage, formatDate } from "../lib/format";
+import { asDate, errorMessage, formatDay as day, formatTime as time, fromZoneInput, toZoneInput } from "../lib/format";
 import { mapLink } from "../lib/location";
+import { t } from "../i18n";
 import "./Team.css";
 
-const asDate = (value: string) => new Date(value.endsWith("Z") ? value : `${value}Z`);
-const time = (value?: string | null) => (value ? asDate(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "");
-const day = (value: string) => formatDate(asDate(value).toISOString());
-// "YYYY-MM-DDTHH:MM" in local time, for a datetime-local input.
-const localInput = (date: Date) => new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-
-/** Shift times and hours. Managers see everyone and can fix a clock-out; mechanics see their own. */
+/** Shift times and hours. Managers see everyone and can fix a clock-out; technicians see their own. */
 export default function ShiftsView({ user }: { user: any }) {
   const isBoss = user.role === "boss";
   const [shifts, setShifts] = useState<any[] | null>(null);
@@ -40,9 +35,9 @@ export default function ShiftsView({ user }: { user: any }) {
       <div className="shiftFilters">
         {isBoss && (
           <label>
-            Mechanic
+            {t("Technician")}
             <select value={mechanicId} onChange={(e) => setMechanicId(e.target.value ? Number(e.target.value) : "")}>
-              <option value="">Everyone</option>
+              <option value="">{t("Everyone")}</option>
               {people.map((person) => (
                 <option key={person.id} value={person.id}>
                   {person.name}
@@ -52,78 +47,80 @@ export default function ShiftsView({ user }: { user: any }) {
           </label>
         )}
         <label>
-          Period
+          {t("Period")}
           <select value={days} onChange={(e) => setDays(Number(e.target.value))}>
-            <option value={7}>Last 7 days</option>
-            <option value={14}>Last 14 days</option>
-            <option value={30}>Last 30 days</option>
-            <option value={90}>Last 90 days</option>
+            {[7, 14, 30, 90].map((count) => (
+              <option key={count} value={count}>
+                {t("Last {count} days", { count })}
+              </option>
+            ))}
           </select>
         </label>
         <span className="shiftTotal">
-          <Clock size={14} /> {total.toFixed(1)} h total
+          <Clock size={14} /> {t("{hours} h total", { hours: total.toFixed(1) })}
         </span>
       </div>
       {shifts && shifts.length === 0 ? (
         <div className="subEmpty">
-          <strong>No shifts in this period</strong>
-          <span>Shifts appear here when mechanics clock in.</span>
+          <strong>{t("No shifts in this period")}</strong>
+          <span>{t("Shifts appear here when technicians clock in.")}</span>
         </div>
       ) : (
-        <div className={`shiftTable ${isBoss ? "" : "own"}`} role="table" aria-label="Shifts">
+        <div className={`shiftTable ${isBoss ? "" : "own"}`} role="table" aria-label={t("Shifts")}>
           <div className="shiftRow shiftHead" role="row">
-            {isBoss && <span role="columnheader">Mechanic</span>}
-            <span role="columnheader">Date</span>
-            <span role="columnheader">In</span>
-            <span role="columnheader">Out</span>
-            <span role="columnheader">Hours</span>
-            <span role="columnheader">Clock-in place</span>
+            {isBoss && <span role="columnheader">{t("Technician")}</span>}
+            <span role="columnheader">{t("Date")}</span>
+            <span role="columnheader">{t("In")}</span>
+            <span role="columnheader">{t("Out")}</span>
+            <span role="columnheader">{t("Hours")}</span>
+            <span role="columnheader">{t("Clock-in place")}</span>
             {isBoss && <span role="columnheader" />}
           </div>
           {shifts?.map((shift) => (
             <div className={`shiftRow ${shift.open ? "open" : ""}`} role="row" key={shift.id}>
               {isBoss && (
-                <strong role="cell" data-label="Mechanic">
+                <strong role="cell" data-label={t("Technician")}>
                   {shift.mechanic}
                 </strong>
               )}
-              <span role="cell" data-label="Date">
+              <span role="cell" data-label={t("Date")}>
                 {day(shift.clocked_in_at)}
               </span>
-              <span role="cell" data-label="In">
+              <span role="cell" data-label={t("In")}>
                 {time(shift.clocked_in_at)}
               </span>
-              <span role="cell" data-label="Out">
-                {shift.open ? <em className="shiftBadge on">On shift</em> : time(shift.clocked_out_at)}
+              <span role="cell" data-label={t("Out")}>
+                {shift.open ? <em className="shiftBadge on">{t("On shift")}</em> : time(shift.clocked_out_at)}
                 {shift.edited && (
-                  <small title={shift.original_clocked_out_at ? `Originally ${time(shift.original_clocked_out_at)}` : "Clock-out set by a manager"}>
-                    Set by {shift.edited_by}
-                    {shift.original_clocked_out_at ? ` (was ${time(shift.original_clocked_out_at)})` : ""}
+                  <small title={shift.original_clocked_out_at ? t("Originally {time}", { time: time(shift.original_clocked_out_at) }) : t("Clock-out set by a manager")}>
+                    {shift.original_clocked_out_at
+                      ? t("Set by {name} (was {time})", { name: shift.edited_by, time: time(shift.original_clocked_out_at) })
+                      : t("Set by {name}", { name: shift.edited_by })}
                   </small>
                 )}
               </span>
-              <span role="cell" data-label="Hours">
+              <span role="cell" data-label={t("Hours")}>
                 {shift.hours.toFixed(1)}
                 {shift.long && (
-                  <em className="shiftBadge warn" title="Longer than 12 hours: check the clock-out time">
-                    <AlertTriangle size={11} /> Over 12 h
+                  <em className="shiftBadge warn" title={t("Longer than 12 hours: check the clock-out time")}>
+                    <AlertTriangle size={11} /> {t("Over 12 h")}
                   </em>
                 )}
               </span>
-              <span role="cell" data-label="Clock-in place">
+              <span role="cell" data-label={t("Clock-in place")}>
                 {shift.clock_in_location?.latitude != null ? (
                   <a href={mapLink(shift.clock_in_location.latitude, shift.clock_in_location.longitude)} target="_blank" rel="noreferrer">
-                    <MapPin size={11} /> Map
+                    <MapPin size={11} /> {t("Map")}
                   </a>
                 ) : (
-                  <span className="muted">Not shared</span>
+                  <span className="muted">{t("Not shared")}</span>
                 )}
               </span>
               {isBoss && (
                 <span role="cell" className="shiftAction">
                   {(shift.open || shift.long || shift.edited) && (
                     <button className="listAction" onClick={() => setFixing(shift)}>
-                      {shift.open ? "Clock out" : "Fix clock-out"}
+                      {shift.open ? t("Clock out") : t("Fix clock-out")}
                     </button>
                   )}
                 </span>
@@ -147,42 +144,43 @@ export default function ShiftsView({ user }: { user: any }) {
 }
 
 function FixShift({ shift, onClose, onSaved }: { shift: any; onClose: () => void; onSaved: () => void }) {
+  // The input shows the company's clock, the same times as the table.
   const start = asDate(shift.clocked_in_at);
   const suggested = shift.clocked_out_at ? asDate(shift.clocked_out_at) : new Date(Math.min(Date.now(), start.getTime() + 8 * 3600000));
-  const [value, setValue] = useState(localInput(suggested));
+  const [value, setValue] = useState(toZoneInput(suggested));
   const [error, setError] = useState("");
-  const save = async (event: any) => {
+  const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
     try {
-      await correctShift(shift.id, new Date(value).toISOString());
+      await correctShift(shift.id, fromZoneInput(value).toISOString());
       onSaved();
     } catch (e) {
       setError(errorMessage(e));
     }
   };
   return (
-    <Modal title={`Clock-out for ${shift.mechanic}`} icon={<Clock size={20} />} onClose={onClose}>
+    <Modal title={t("Clock-out for {name}", { name: shift.mechanic })} icon={<Clock size={20} />} onClose={onClose}>
       <form className="form form-upgraded" onSubmit={save}>
         {error && <div className="error">{error}</div>}
         <p className="muted">
-          Clocked in {day(shift.clocked_in_at)} at {time(shift.clocked_in_at)}.
-          {shift.open ? " Setting a clock-out time ends this shift now and pauses any job in progress." : ""} The change is
-          recorded with your name, and the mechanic is notified.
+          {t("Clocked in {day} at {time}.", { day: day(shift.clocked_in_at), time: time(shift.clocked_in_at) })}{" "}
+          {shift.open ? `${t("Setting a clock-out time ends this shift now and pauses any job in progress.")} ` : ""}
+          {t("The change is recorded with your name, and the technician is notified.")}
         </p>
         <div className="formGroup">
-          <label htmlFor="field-clocked_out_at">Clock-out time</label>
+          <label htmlFor="field-clocked_out_at">{t("Clock-out time")}</label>
           <input
             id="field-clocked_out_at"
             type="datetime-local"
             value={value}
-            min={localInput(start)}
-            max={localInput(new Date())}
+            min={toZoneInput(start)}
+            max={toZoneInput(new Date())}
             onChange={(e) => setValue(e.target.value)}
             required
           />
         </div>
-        <button className="primary">Save clock-out</button>
+        <button className="primary">{t("Save clock-out")}</button>
       </form>
     </Modal>
   );

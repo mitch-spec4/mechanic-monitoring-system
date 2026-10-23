@@ -1,11 +1,12 @@
 import { confirmUpload, requestUpload, sendUpload } from "../services/api";
+import { t } from "../i18n";
 
 export type Limits = { photo_mb: number; video_mb: number; video_seconds: number };
 
 /** Shrink a photo on the phone before upload: at most 1600 px on the long side, as JPEG. */
 export async function compressImage(file: File, maxPx = 1600, quality = 0.8): Promise<Blob> {
   const bitmap = await createImageBitmap(file).catch(() => null);
-  if (!bitmap) throw new Error("This photo format can't be read here. Take a new photo or choose a JPEG.");
+  if (!bitmap) throw new Error(t("This photo format can't be read here. Take a new photo or choose a JPEG."));
   const scale = Math.min(1, maxPx / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(bitmap.width * scale);
@@ -13,7 +14,7 @@ export async function compressImage(file: File, maxPx = 1600, quality = 0.8): Pr
   canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
-  if (!blob) throw new Error("Couldn't prepare the photo. Please try again.");
+  if (!blob) throw new Error(t("Couldn't prepare the photo. Please try again."));
   return blob;
 }
 
@@ -29,7 +30,7 @@ export function videoSeconds(file: File): Promise<number> {
     };
     video.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error("This video can't be read here. Record it again or choose an MP4."));
+      reject(new Error(t("This video can't be read here. Record it again or choose an MP4.")));
     };
     video.src = url;
   });
@@ -41,9 +42,9 @@ export async function uploadMedia(jobId: number, kind: string, file: File, limit
   let contentType = file.type || "application/octet-stream";
   let name = file.name || "upload";
   if (kind === "video") {
-    if (file.size > limits.video_mb * 1024 * 1024) throw new Error(`Videos can be at most ${limits.video_mb} MB.`);
+    if (file.size > limits.video_mb * 1024 * 1024) throw new Error(t("Videos can be at most {size} MB.", { size: limits.video_mb }));
     const seconds = await videoSeconds(file);
-    if (seconds > limits.video_seconds + 0.5) throw new Error(`Videos can be at most ${limits.video_seconds} seconds long.`);
+    if (seconds > limits.video_seconds + 0.5) throw new Error(t("Videos can be at most {count} seconds long.", { count: limits.video_seconds }));
   } else {
     body = await compressImage(file);
     contentType = "image/jpeg";

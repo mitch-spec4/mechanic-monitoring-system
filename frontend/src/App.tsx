@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import Login from "./pages/Login";
 import VerifyEmail from "./pages/VerifyEmail";
 import BossDashboard from "./pages/BossDashboard";
@@ -17,16 +17,48 @@ import Profile from "./components/Profile";
 import Sidebar from "./components/Sidebar";
 import DemoBar from "./components/DemoBar";
 import { LocationIndicator, ShiftProvider } from "./components/Shift";
-import { clearSession, logout as endSession, saveSession, SESSION_EXPIRED_EVENT } from "./services/api";
+import { FeedbackHost } from "./components/Feedback";
+import { clearSession, logout as endSession, saveSession, SESSION_EXPIRED_EVENT, type User } from "./services/api";
+import { setTimeZone, setUnits } from "./lib/format";
+import { LANGUAGE_CHANGED_EVENT, setLanguage, t } from "./i18n";
 import "./style.css";
 import "./components/DashboardShell.css";
 import "./components/Buttons.css";
 
 export default function App() {
-	const [user, setUser] = useState<any>(() => {
-		const storedUser = localStorage.getItem("user");
-		return storedUser ? JSON.parse(storedUser) : null;
-	});
+	return (
+		<>
+			<Screens />
+			<FeedbackHost />
+		</>
+	);
+}
+
+function storedUser(): User | null {
+	try {
+		const stored = localStorage.getItem("user");
+		return stored ? JSON.parse(stored) : null;
+	} catch {
+		return null;
+	}
+}
+
+function Screens() {
+	const [user, setUser] = useState<User | null>(storedUser);
+	// Switching language re-renders the whole app (nothing below is memoised), keeping the page that's open.
+	const [, setLanguageVersion] = useState(0);
+	useEffect(() => {
+		const changed = () => setLanguageVersion((version) => version + 1);
+		window.addEventListener(LANGUAGE_CHANGED_EVENT, changed);
+		return () => window.removeEventListener(LANGUAGE_CHANGED_EVENT, changed);
+	}, []);
+	// A signed-in person sees the app in their account's language, and times on the company's clock.
+	useLayoutEffect(() => {
+		if (!user) return;
+		setTimeZone(user.timezone);
+		setUnits(user.units);
+		if (user.language) setLanguage(user.language);
+	}, [user?.language, user?.timezone, user?.units]);
 	const [active, setActive] = useState("Dashboard");
 	const [openJobId, setOpenJobId] = useState<number | null>(null);
 	const [openCustomerId, setOpenCustomerId] = useState<number | null>(null);
@@ -59,18 +91,18 @@ export default function App() {
 		signedOut();
 		go("/signin");
 	};
-	const signedIn = (loggedInUser: any) => {
+	const signedIn = (loggedInUser: User) => {
 		setUser(loggedInUser);
 		setOpenJobId(null);
 		setOpenCustomerId(null);
 		setActive("Dashboard");
 	};
 	// The profile kept for reloads changes too, e.g. once the email address is confirmed.
-	const updateUser = (changed: any) => {
+	const updateUser = (changed: User) => {
 		saveSession(changed);
 		setUser(changed);
 	};
-	const afterLogin = (loggedInUser: any) => {
+	const afterLogin = (loggedInUser: User) => {
 		signedIn(loggedInUser);
 		const next = route.query.get("next") || "";
 		// "Already using MechanicPro?" on the homepage leads to Billing, with the chosen plan picked out.
@@ -168,11 +200,16 @@ export default function App() {
 
 	const shell = (
 		<div className={`appShell role-${user.role}${user.demo_until ? " hasDemoBar" : ""}`}>
+			<button className="skipLink" onClick={() => document.getElementById("content")?.focus()}>
+				{t("Skip to content")}
+			</button>
 			<Sidebar user={user} active={openJobId || openCustomerId ? "" : active} onNavigate={navigate} />
 			<div className="appMain">
 				<Profile user={user} onLogout={logout} />
 				{user.role === "mechanic" && <LocationIndicator />}
-				{dashboard}
+				<div id="content" tabIndex={-1}>
+					{dashboard}
+				</div>
 				{user.demo_until && (
 					<DemoBar
 						user={user}

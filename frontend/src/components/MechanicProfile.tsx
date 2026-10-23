@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { X, Star, CheckCircle2, Clock, Wrench } from "lucide-react";
 import { jobs, reviews } from "../services/api";
+import { t } from "../i18n";
 
 type Props = { mechanic: any; onClose: () => void };
 
@@ -26,10 +27,10 @@ export default function MechanicProfile({ mechanic, onClose }: Props) {
 
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="modal profileModal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+      <div className="modal profileModal" role="dialog" aria-modal="true" aria-labelledby="technician-profile-title" onClick={(e) => e.stopPropagation()}>
         <div className="modalHeader">
-          <h2>Mechanic Profile</h2>
-          <button className="closeBtn" onClick={onClose}>
+          <h2 id="technician-profile-title">{t("Technician profile")}</h2>
+          <button className="closeBtn" onClick={onClose} aria-label={t("Close")}>
             <X size={20} />
           </button>
         </div>
@@ -47,14 +48,14 @@ export default function MechanicProfile({ mechanic, onClose }: Props) {
               <Wrench size={20} />
               <div>
                 <strong>{jobsData.length}</strong>
-                <span>Total jobs</span>
+                <span>{t("Total jobs")}</span>
               </div>
             </div>
             <div className="statCard">
               <CheckCircle2 size={20} />
               <div>
                 <strong>{completed}</strong>
-                <span>Completed</span>
+                <span>{t("Completed")}</span>
               </div>
             </div>
             {avgRating && (
@@ -62,7 +63,7 @@ export default function MechanicProfile({ mechanic, onClose }: Props) {
                 <Star size={20} />
                 <div>
                   <strong>{avgRating}</strong>
-                  <span>Avg rating ({reviewsData.length})</span>
+                  <span>{t("Average rating ({count})", { count: reviewsData.length })}</span>
                 </div>
               </div>
             )}
@@ -70,7 +71,7 @@ export default function MechanicProfile({ mechanic, onClose }: Props) {
 
           {reviewsData.length > 0 && (
             <div className="profileSection">
-              <h4>Recent reviews</h4>
+              <h4>{t("Recent reviews")}</h4>
               <div className="reviewsList">
                 {reviewsData.slice(0, 5).map((r) => (
                   <div key={r.id} className="reviewItem">
@@ -94,17 +95,15 @@ export default function MechanicProfile({ mechanic, onClose }: Props) {
 
           {jobsData.length > 0 && (
             <div className="profileSection">
-              <h4>Recent work</h4>
+              <h4>{t("Recent work")}</h4>
               <div className="jobsList">
                 {jobsData.slice(0, 5).map((j) => (
                   <div key={j.id} className="jobItem">
                     <div>
                       <b>{j.title}</b>
-                      <small>{j.location || "No location"}</small>
+                      <small>{j.location || t("No site")}</small>
                     </div>
-                    <span className={`status ${j.status.replace(/ /g, "").toLowerCase()}`}>
-                      {j.status}
-                    </span>
+                    <span className={`status ${j.status.replace(/ /g, "").toLowerCase()}`}>{t(j.status)}</span>
                   </div>
                 ))}
               </div>

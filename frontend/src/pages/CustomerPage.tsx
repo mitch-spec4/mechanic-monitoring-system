@@ -5,12 +5,26 @@ import { CreateJobModal } from "../components/JobForms";
 import { AddMachine, EditMachine } from "../components/MachineForms";
 import { errorMessage, formatDate } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
+import { t } from "../i18n";
 import "./JobPage.css";
 import "./CustomerPage.css";
 
 type Props = { customerId: number; onBack: () => void; onOpenJob: (id: number) => void };
 
-/** A customer with all their machines, the ones needing work first, and their service history. */
+/** Why a piece of equipment needs work: an open job, an open service request, or its own status. */
+type WorkReason = { type: "job" | "request" | "status"; id?: number; title?: string; status: string };
+export type EquipmentSummary = {
+  id: number;
+  customer_id: number;
+  name: string;
+  model?: string | null;
+  serial_no: string;
+  status: string;
+  needs_work: boolean;
+  work: WorkReason[];
+};
+
+/** A customer with all their equipment, the pieces needing work first, and their service history. */
 export default function CustomerPage({ customerId, onBack, onOpenJob }: Props) {
   const [customer, setCustomer] = useState<any>(null);
   const [error, setError] = useState("");
@@ -30,49 +44,48 @@ export default function CustomerPage({ customerId, onBack, onOpenJob }: Props) {
     return (
       <main className="jobPage customerPage">
         <BackButton onBack={onBack} />
-        {error ? <div className="error">{error}</div> : <p className="muted">Loading customer…</p>}
+        {error ? <div className="error">{error}</div> : <p className="muted">{t("Loading customer…")}</p>}
       </main>
     );
   }
 
-  const machines = customer.machines;
+  const machines: EquipmentSummary[] = customer.machines;
+  const needing = customer.needs_work_count;
   return (
     <main className="jobPage customerPage">
       <BackButton onBack={onBack} />
-      <section className="jobHero" aria-label="Customer summary">
+      <section className="jobHero" aria-label={t("Customer summary")}>
         <div className="jobHeroTop">
-          <span className="eyebrow">Customer</span>
-          {customer.needs_work_count > 0 ? (
+          <span className="eyebrow">{t("Customer")}</span>
+          {needing > 0 ? (
             <span className="jobStatusPill needsWorkPill">
-              <AlertTriangle size={12} /> {customer.needs_work_count} machine{customer.needs_work_count === 1 ? "" : "s"} need{customer.needs_work_count === 1 ? "s" : ""} work
+              <AlertTriangle size={12} /> {needing === 1 ? t("1 piece of equipment needs work") : t("{count} pieces of equipment need work", { count: needing })}
             </span>
           ) : (
-            <span className="jobStatusPill completed">All machines OK</span>
+            <span className="jobStatusPill completed">{t("All equipment OK")}</span>
           )}
         </div>
         <h1>{customer.name}</h1>
         <dl className="jobMeta">
           <div>
-            <dt>Email</dt>
+            <dt>{t("Email")}</dt>
             <dd>
               <Mail size={13} /> {customer.email}
             </dd>
           </div>
           <div>
-            <dt>Phone</dt>
+            <dt>{t("Phone")}</dt>
             <dd>
-              <Phone size={13} /> {customer.phone || "Not recorded"}
+              <Phone size={13} /> {customer.phone || t("Not recorded")}
             </dd>
           </div>
           <div>
-            <dt>Machines</dt>
+            <dt>{t("Equipment")}</dt>
             <dd>{machines.length}</dd>
           </div>
           <div>
-            <dt>Jobs</dt>
-            <dd>
-              {customer.job_count} ({customer.completed_job_count} completed)
-            </dd>
+            <dt>{t("Jobs")}</dt>
+            <dd>{t("{count} ({completed} completed)", { count: customer.job_count, completed: customer.completed_job_count })}</dd>
           </div>
         </dl>
       </section>
@@ -81,17 +94,17 @@ export default function CustomerPage({ customerId, onBack, onOpenJob }: Props) {
         <section className="jobCard wide">
           <div className="jobCardHead">
             <h2>
-              <Wrench size={16} /> Machines
+              <Wrench size={16} /> {t("Equipment")}
             </h2>
             <button className="primary-sm" onClick={() => setAddingMachine(true)}>
-              <Plus size={14} /> Add machine
+              <Plus size={14} /> {t("Add equipment")}
             </button>
           </div>
           {machines.length === 0 ? (
-            <p className="muted jobEmpty">No machines yet. Add the first one for this customer.</p>
+            <p className="muted jobEmpty">{t("No equipment yet. Add the first piece for this customer.")}</p>
           ) : (
             <ul className="machineCards">
-              {machines.map((machine: any) => (
+              {machines.map((machine) => (
                 <MachineCard
                   key={machine.id}
                   machine={machine}
@@ -107,16 +120,16 @@ export default function CustomerPage({ customerId, onBack, onOpenJob }: Props) {
         <section className="jobCard wide">
           <div className="jobCardHead">
             <h2>
-              <FileText size={16} /> Service history
+              <FileText size={16} /> {t("Service history")}
             </h2>
             <span className="jobBadge">{customer.records.length}</span>
           </div>
           {customer.records.length === 0 ? (
-            <p className="muted jobEmpty">No service records yet.</p>
+            <p className="muted jobEmpty">{t("No service records yet.")}</p>
           ) : (
             <ul className="historyList">
               {customer.records.map((record: any) => {
-                const machine = machines.find((m: any) => m.id === record.machine_id);
+                const machine = machines.find((m) => m.id === record.machine_id);
                 return (
                   <li key={record.id}>
                     <span className="historyDate">{formatDate(record.service_date)}</span>
@@ -130,7 +143,7 @@ export default function CustomerPage({ customerId, onBack, onOpenJob }: Props) {
                       )}
                       <span>
                         {machine ? `${machine.name} · ` : ""}
-                        {record.work_done || record.problem || "No summary recorded"}
+                        {record.work_done || record.problem || t("No summary recorded")}
                       </span>
                     </div>
                   </li>
@@ -143,7 +156,7 @@ export default function CustomerPage({ customerId, onBack, onOpenJob }: Props) {
 
       {creatingFor && (
         <CreateJobModal
-          preset={{ customer_id: customer.id, machine_id: creatingFor.id, title: `Service ${creatingFor.name}` }}
+          preset={{ customer_id: customer.id, machine_id: creatingFor.id, title: t("Service {name}", { name: creatingFor.name }) }}
           onClose={() => setCreatingFor(null)}
           onCreated={() => {
             setCreatingFor(null);
@@ -175,9 +188,9 @@ export default function CustomerPage({ customerId, onBack, onOpenJob }: Props) {
   );
 }
 
-const REQUEST_LABEL = "Customer requested service";
+type CardProps = { machine: EquipmentSummary; onOpenJob: (id: number) => void; onCreateJob?: () => void; onEdit?: () => void };
 
-export function MachineCard({ machine, onOpenJob, onCreateJob, onEdit }: any) {
+export function MachineCard({ machine, onOpenJob, onCreateJob, onEdit }: CardProps) {
   const statusClass = String(machine.status).replace(/ /g, "").toLowerCase();
   return (
     <li className={`machineCard ${machine.needs_work ? "needsWork" : ""}`}>
@@ -185,37 +198,37 @@ export function MachineCard({ machine, onOpenJob, onCreateJob, onEdit }: any) {
         <div>
           <strong>{machine.name}</strong>
           <small>
-            {machine.model || "Model not recorded"} · {machine.serial_no}
+            {machine.model || t("Model not recorded")} · {machine.serial_no}
           </small>
         </div>
-        <span className={`machineStatus ${statusClass}`}>{machine.status}</span>
+        <span className={`machineStatus ${statusClass}`}>{t(machine.status)}</span>
       </div>
       {machine.needs_work ? (
-        <ul className="workReasons" aria-label={`Why ${machine.name} needs work`}>
-          {machine.work.map((reason: any, index: number) => (
+        <ul className="workReasons" aria-label={t("Why {name} needs work", { name: machine.name })}>
+          {machine.work.map((reason, index) => (
             <li key={index}>
               {reason.type === "job" ? (
                 <>
                   <ClipboardList size={13} />
                   <span>
-                    Job:{" "}
-                    <button className="titleLink reasonLink" onClick={() => onOpenJob(reason.id)}>
+                    {t("Job:")}{" "}
+                    <button className="titleLink reasonLink" onClick={() => reason.id && onOpenJob(reason.id)}>
                       {reason.title}
                     </button>{" "}
-                    <em>{reason.status}</em>
+                    <em>{t(reason.status)}</em>
                   </span>
                 </>
               ) : reason.type === "request" ? (
                 <>
                   <AlertTriangle size={13} />
                   <span>
-                    {REQUEST_LABEL}: {reason.title} <em>{reason.status}</em>
+                    {t("Customer requested service:")} {reason.title} <em>{t(reason.status)}</em>
                   </span>
                 </>
               ) : (
                 <>
                   <Wrench size={13} />
-                  <span>Status: {reason.status}</span>
+                  <span>{t("Status: {status}", { status: t(reason.status) })}</span>
                 </>
               )}
             </li>
@@ -223,18 +236,18 @@ export function MachineCard({ machine, onOpenJob, onCreateJob, onEdit }: any) {
         </ul>
       ) : (
         <p className="machineOk">
-          <CheckCircle2 size={13} /> {machine.status === "Retired" ? "Retired" : "No work needed"}
+          <CheckCircle2 size={13} /> {machine.status === "Retired" ? t("Retired") : t("No work needed")}
         </p>
       )}
       <div className="machineCardActions">
         {onCreateJob && machine.status !== "Retired" && (
           <button className="listAction" onClick={onCreateJob}>
-            <Plus size={12} /> Create job
+            <Plus size={12} /> {t("Create job")}
           </button>
         )}
         {onEdit && (
           <button className="listAction" onClick={onEdit}>
-            <Pencil size={12} /> Edit
+            <Pencil size={12} /> {t("Edit")}
           </button>
         )}
       </div>
@@ -245,7 +258,7 @@ export function MachineCard({ machine, onOpenJob, onCreateJob, onEdit }: any) {
 function BackButton({ onBack }: { onBack: () => void }) {
   return (
     <button className="link jobBack" onClick={onBack}>
-      <ArrowLeft size={15} /> Back
+      <ArrowLeft size={15} /> {t("Back")}
     </button>
   );
 }

@@ -32,7 +32,7 @@ test("session cookies are httpOnly and never exposed to page scripts", async ({ 
 test("an expired access token is refreshed silently", async ({ page, context }) => {
   await signIn(page, "abc@example.com");
   await context.clearCookies({ name: "access_token_cookie" });
-  await openPage(page, "My Machines");
+  await openPage(page, "My Equipment");
   await expect(page.locator(".subPageList")).toContainText("Generator G-102");
 });
 
@@ -64,8 +64,8 @@ test("user changes their own password in Settings", async ({ page }) => {
   await expect(form.locator(".error")).toHaveText("The new passwords do not match");
   await form.getByLabel("Confirm new password").fill("xyz-new-password");
   await form.getByRole("button", { name: "Update password" }).click();
-  await expect(form.locator(".success")).toContainText("Password changed");
-  await openPage(page, "My Machines"); // still signed in here
+  await expect(page.locator(".toast")).toContainText("Password changed");
+  await openPage(page, "My Equipment"); // still signed in here
   await expect(page.locator(".subPageList")).toContainText("Conveyor Line CL-4");
   await page.getByRole("button", { name: "Open profile menu" }).click();
   await page.getByRole("button", { name: "Log out" }).click();

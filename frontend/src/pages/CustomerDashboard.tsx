@@ -1,136 +1,174 @@
-import { useState } from "react";
-import { Wrench, Plus, Star, ClipboardList } from "lucide-react";
-import {
-  jobs,
-  machines,
-  services,
-  createRequest,
-  createReview,
-  reviews,
-  requests,
-} from "../services/api";
+import { useState, type FormEvent } from "react";
+import { ClipboardList, Plus, Star, Wrench } from "lucide-react";
+import { createRequest, createReview, jobs, machines, requests, reviews, services, type User } from "../services/api";
 import Notifications from "../components/Notifications";
 import Modal from "../components/Modal";
+import { toast } from "../components/Feedback";
 import { errorMessage } from "../lib/format";
+import { PRIORITIES } from "../lib/labels";
 import { usePolling } from "../lib/usePolling";
-export default function CustomerDashboard({ u, onOpenJob }: { u: any; onOpenJob: (id: number) => void }) {
-  const [j, setJ] = useState<any[]>([]),
-    [m, setM] = useState<any[]>([]),
-    [s, setS] = useState<any[]>([]),
-    [r, setR] = useState<any[]>([]),
-    [q, setQ] = useState<any[]>([]),
-    [modal, setModalState] = useState<any>(null),
-    [formError, setFormError] = useState("");
+import { mark, t } from "../i18n";
+
+// Lists from the API, read loosely: each panel uses a few fields.
+type Row = Record<string, any>;
+type ModalState = null | "request" | Row;
+
+const FINISHED = ["Completed", "Cancelled"];
+const RATINGS: [number, string][] = [
+  [5, mark("Excellent")],
+  [4, mark("Very good")],
+  [3, mark("Good")],
+  [2, mark("Needs improvement")],
+  [1, mark("Poor")],
+];
+
+export default function CustomerDashboard({ u, onOpenJob }: { u: User; onOpenJob: (id: number) => void }) {
+  const [jobList, setJobList] = useState<Row[]>([]);
+  const [equipment, setEquipment] = useState<Row[]>([]);
+  const [records, setRecords] = useState<Row[]>([]);
+  const [reviewList, setReviewList] = useState<Row[]>([]);
+  const [requestList, setRequestList] = useState<Row[]>([]);
+  const [modal, setModalState] = useState<ModalState>(null);
+  const [formError, setFormError] = useState("");
   const load = () =>
     Promise.all([jobs(), machines(), services(), reviews(), requests()])
       .then(([a, b, c, d, e]) => {
-        setJ(a.jobs);
-        setM(b.machines);
-        setS(c.records);
-        setR(d.reviews);
-        setQ(e.requests);
+        setJobList(a.jobs);
+        setEquipment(b.machines);
+        setRecords(c.records);
+        setReviewList(d.reviews);
+        setRequestList(e.requests);
       })
       .catch(() => {});
   usePolling(load, 60000);
-  const setModal = (value: any) => {
+  const setModal = (value: ModalState) => {
     setFormError("");
     setModalState(value);
   };
-  const submit = (send: (data: any) => Promise<unknown>) => async (e: any) => {
+  const submit = (send: (data: Record<string, FormDataEntryValue>) => Promise<unknown>, done: string) => async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormError("");
     try {
       await send(Object.fromEntries(new FormData(e.currentTarget)));
       setModal(null);
+      toast(done);
       load();
     } catch (error) {
       setFormError(errorMessage(error));
     }
   };
-  const req = submit(createRequest);
-  const rev = submit(createReview);
-  const openJobs = j.filter((x) => !["Completed", "Cancelled"].includes(x.status));
+  const openJobs = jobList.filter((x) => !FINISHED.includes(x.status));
+  const activeRequests = requestList.filter((x) => !FINISHED.includes(x.status)).length;
   return (
     <>
       <Header u={u} />
       <main className="page">
         <div className="welcome">
           <div>
-            <h1>Welcome, {u.name.split(" ")[0]}.</h1>
-            <p>
-              Everything about your machines and service history in one place.
-            </p>
+            <h1>{t("Welcome, {name}.", { name: u.name.split(" ")[0] })}</h1>
+            <p>{t("Everything about your equipment and service history in one place.")}</p>
           </div>
           <button className="primary" onClick={() => setModal("request")}>
-            <Plus size={17} /> Request service
+            <Plus size={17} /> {t("Request service")}
           </button>
         </div>
         <div className="stats">
           <div className="stat">
             <Wrench />
             <div>
-              <b>{m.length}</b>
-              <span>Machines</span>
+              <b>{equipment.length}</b>
+              <span>{t("Equipment")}</span>
             </div>
           </div>
           <div className="stat">
             <ClipboardList />
             <div>
-              <b>{q.filter((x) => !["Completed", "Cancelled"].includes(x.status)).length}</b>
-              <span>Active requests</span>
+              <b>{activeRequests}</b>
+              <span>{t("Active requests")}</span>
             </div>
           </div>
           <div className="stat">
             <div>
-              <b>{s.length}</b>
-              <span>Service visits</span>
+              <b>{records.length}</b>
+              <span>{t("Service visits")}</span>
             </div>
           </div>
           <div className="stat">
             <div>
               <b>{openJobs.length}</b>
-              <span>Open jobs</span>
+              <span>{t("Open jobs")}</span>
             </div>
           </div>
           <div className="stat">
             <Star />
             <div>
-              <b>{r.length}</b>
-              <span>Your reviews</span>
+              <b>{reviewList.length}</b>
+              <span>{t("Your reviews")}</span>
             </div>
           </div>
         </div>
         <section className="panel">
           <div className="panelHead">
-            <h2>Your machines</h2>
+            <h2>{t("Your equipment")}</h2>
           </div>
-          {m.map((x) => (
+          {equipment.map((x) => (
             <div className="machine" key={x.id}>
               <div>
                 <b>{x.name}</b>
-                <span>
-                  {x.model} · Serial {x.serial_no}
-                </span>
+                <span>{t("{model} · Serial {serial}", { model: x.model || t("Model not recorded"), serial: x.serial_no })}</span>
               </div>
-              <strong>{x.status}</strong>
+              <strong>{t(x.status)}</strong>
             </div>
           ))}
         </section>
         <div className="grid2">
           <section className="panel">
-            <div className="panelHead"><h2>Active requests</h2><span className="pill">{q.filter((x) => !["Completed", "Cancelled"].includes(x.status)).length} open</span></div>
-            {q.length === 0 ? <p className="muted">No active service requests.</p> : q.slice(0, 5).map((request) => <div className="request" key={request.id}><div><b>{request.subject}</b><span>{request.status} · {request.description}</span></div><span className="priority">{request.priority}</span></div>)}
+            <div className="panelHead">
+              <h2>{t("Active requests")}</h2>
+              <span className="pill">{t("{count} open", { count: activeRequests })}</span>
+            </div>
+            {requestList.length === 0 ? (
+              <p className="muted">{t("No active service requests.")}</p>
+            ) : (
+              requestList.slice(0, 5).map((request) => (
+                <div className="request" key={request.id}>
+                  <div>
+                    <b>{request.subject}</b>
+                    <span>
+                      {t(request.status)} · {request.description}
+                    </span>
+                  </div>
+                  <span className="priority">{t(request.priority)}</span>
+                </div>
+              ))
+            )}
           </section>
-          <section className="panel"><div className="panelHead"><h2>Upcoming services</h2></div>{openJobs.slice(0, 5).map((job) => <div className="request" key={job.id}><div><button className="titleLink" onClick={() => onOpenJob(job.id)}><b>{job.title}</b></button><span>{job.location || "Location not set"}</span></div><span className="status">{job.status}</span></div>)}{openJobs.length === 0 && <p className="muted">No upcoming services.</p>}</section>
+          <section className="panel">
+            <div className="panelHead">
+              <h2>{t("Upcoming services")}</h2>
+            </div>
+            {openJobs.slice(0, 5).map((job) => (
+              <div className="request" key={job.id}>
+                <div>
+                  <button className="titleLink" onClick={() => onOpenJob(job.id)}>
+                    <b>{job.title}</b>
+                  </button>
+                  <span>{job.location || t("Site not set")}</span>
+                </div>
+                <span className="status">{t(job.status)}</span>
+              </div>
+            ))}
+            {openJobs.length === 0 && <p className="muted">{t("No upcoming services.")}</p>}
+          </section>
         </div>
         <section className="panel">
           <div className="panelHead">
-            <h2>Service history</h2>
+            <h2>{t("Service history")}</h2>
           </div>
-          {s.length === 0 ? (
-            <p className="muted">No service history yet.</p>
+          {records.length === 0 ? (
+            <p className="muted">{t("No service history yet.")}</p>
           ) : (
-            s.map((x) => (
+            records.map((x) => (
               <div className="record" key={x.id}>
                 <div>
                   {x.job_id ? (
@@ -143,12 +181,12 @@ export default function CustomerDashboard({ u, onOpenJob }: { u: any; onOpenJob:
                   <span>{x.work_done}</span>
                 </div>
                 <div>
-                  <small>Parts: {x.parts_replaced || "None"}</small>
-                  <small>Solution: {x.solution || "Not recorded"}</small>
-                  <small>Advice: {x.advice || "None"}</small>
-                  {!r.some((z) => z.service_record_id === x.id) && (
+                  <small>{t("Parts: {value}", { value: x.parts_replaced || t("None") })}</small>
+                  <small>{t("Solution: {value}", { value: x.solution || t("Not recorded") })}</small>
+                  <small>{t("Advice: {value}", { value: x.advice || t("None") })}</small>
+                  {!reviewList.some((z) => z.service_record_id === x.id) && (
                     <button className="link" onClick={() => setModal(x)}>
-                      Leave review
+                      {t("Leave review")}
                     </button>
                   )}
                 </div>
@@ -158,57 +196,54 @@ export default function CustomerDashboard({ u, onOpenJob }: { u: any; onOpenJob:
         </section>
       </main>
       {modal === "request" && (
-        <Modal title="Request a service" onClose={() => setModal(null)}>
-          <form className="form" onSubmit={req}>
+        <Modal title={t("Request a service")} onClose={() => setModal(null)}>
+          <form className="form" onSubmit={submit(createRequest, t("Request sent"))}>
             {formError && <div className="error">{formError}</div>}
-            {m.length === 0 && <p className="muted">No machines are registered to your account yet. Ask your service company to add them.</p>}
-            <select name="machine_id" required>
-              <option value="">Select machine</option>
-              {m.map((x) => (
-                <option key={x.id} value={x.id}>{x.name}</option>
+            {equipment.length === 0 && <p className="muted">{t("No equipment is registered to your account yet. Ask your service company to add it.")}</p>}
+            <select name="machine_id" aria-label={t("Equipment")} required>
+              <option value="">{t("Select equipment")}</option>
+              {equipment.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.name}
+                </option>
               ))}
             </select>
-            <input name="subject" placeholder="What do you need?" required />
-            <textarea
-              name="description"
-              placeholder="Describe the issue"
-              required
-            />
-            <select name="priority" defaultValue="Medium">
-              <option>Low</option>
-              <option>Medium</option>
-              <option>High</option>
-              <option>Urgent</option>
+            <input name="subject" placeholder={t("What do you need?")} aria-label={t("What do you need?")} required />
+            <textarea name="description" placeholder={t("Describe the issue")} aria-label={t("Describe the issue")} required />
+            <select name="priority" defaultValue="Medium" aria-label={t("Priority")}>
+              {PRIORITIES.map((priority) => (
+                <option key={priority} value={priority}>
+                  {t(priority)}
+                </option>
+              ))}
             </select>
-            <button className="primary">Send request</button>
+            <button className="primary">{t("Send request")}</button>
           </form>
         </Modal>
       )}
       {modal && modal !== "request" && (
-        <Modal title="Review service" onClose={() => setModal(null)}>
-          <form className="form" onSubmit={rev}>
+        <Modal title={t("Review service")} onClose={() => setModal(null)}>
+          <form className="form" onSubmit={submit(createReview, t("Thanks for your review"))}>
             {formError && <div className="error">{formError}</div>}
             <input type="hidden" name="service_record_id" value={modal.id} />
-            <select name="rating">
-              <option value="5">★★★★★ Excellent</option>
-              <option value="4">★★★★ Very good</option>
-              <option value="3">★★★ Good</option>
-              <option value="2">★★ Needs improvement</option>
-              <option value="1">★ Poor</option>
+            <select name="rating" aria-label={t("Rating")}>
+              {RATINGS.map(([stars, label]) => (
+                <option key={stars} value={stars}>
+                  {"★".repeat(stars)} {t(label)}
+                </option>
+              ))}
             </select>
-            <textarea name="comment" placeholder="Tell us about the service" />
-            <textarea
-              name="advice"
-              placeholder="Advice for the mechanic/company"
-            />
-            <button className="primary">Submit review</button>
+            <textarea name="comment" placeholder={t("Tell us about the service")} aria-label={t("Tell us about the service")} />
+            <textarea name="advice" placeholder={t("Advice for the technician or company")} aria-label={t("Advice for the technician or company")} />
+            <button className="primary">{t("Submit review")}</button>
           </form>
         </Modal>
       )}
     </>
   );
 }
-function Header({ u }: any) {
+
+function Header({ u }: { u: User }) {
   return (
     <header>
       <div className="logo">
@@ -219,7 +254,9 @@ function Header({ u }: any) {
       </div>
       <div className="headerRight">
         <Notifications />
-        <button className="avatarBtn">{u.name[0]}</button>
+        <button className="avatarBtn" aria-label={u.name}>
+          {u.name[0]}
+        </button>
       </div>
     </header>
   );

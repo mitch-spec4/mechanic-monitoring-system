@@ -15,6 +15,14 @@ export async function openPage(page: Page, label: string) {
   await expect(page.locator(".subPage h1")).toHaveText(label);
 }
 
+/** Answers the app's own confirm dialog (it replaced the browser's confirm()). */
+export async function confirmDialog(page: Page, button: string | RegExp) {
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: button }).click();
+  await expect(dialog).toHaveCount(0);
+}
+
 /** Fail the test on uncaught page errors. */
 export function failOnPageErrors(page: Page) {
   const errors: string[] = [];

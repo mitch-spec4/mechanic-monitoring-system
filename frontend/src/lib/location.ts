@@ -1,3 +1,5 @@
+import { t } from "../i18n";
+
 // The phone's position, in the shape the API expects. A failure becomes `location_error`
 // so the server can record why there is no position instead of guessing.
 export type Fix = { latitude: number; longitude: number; accuracy: number };
@@ -46,13 +48,13 @@ export function getPosition(timeoutMs = 15000): Promise<PositionResult> {
 export function locationHelp(error: LocationError) {
   switch (error) {
     case "denied":
-      return "Location is blocked for this site. Allow it in your browser's site settings (the icon next to the address), and check that location is on for your browser in your phone's settings. Then try again.";
+      return t("Location is blocked for this site. Allow it in your browser's site settings (the icon next to the address), and check that location is on for your browser in your phone's settings. Then try again.");
     case "timeout":
-      return "Your phone couldn't find your position in time. Step outside or near a window for a better signal, then try again.";
+      return t("Your phone couldn't find your position in time. Step outside or near a window for a better signal, then try again.");
     case "unsupported":
-      return "This browser can't share location here. Open the app over https (or on this computer at localhost) in Chrome, Safari, Edge or Firefox.";
+      return t("This browser can't share location here. Open the app over https (or on this computer at localhost) in Chrome, Safari, Edge or Firefox.");
     default:
-      return "Your phone couldn't work out where you are. Turn on location (GPS) in your phone's settings, then try again.";
+      return t("Your phone couldn't work out where you are. Turn on location (GPS) in your phone's settings, then try again.");
   }
 }
 

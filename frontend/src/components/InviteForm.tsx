@@ -4,23 +4,25 @@ import Modal from "./Modal";
 import ShareCode, { formatExpiry } from "./ShareCode";
 import { invite } from "../services/api";
 import { errorMessage } from "../lib/format";
+import { mark, t } from "../i18n";
+import { Trans } from "../i18n/Trans";
 
 type Props = { role: "customer" | "mechanic"; onClose: () => void; onDone?: () => void };
 
 const COPY = {
   customer: {
-    title: "Add New Customer",
+    title: mark("Add New Customer"),
     icon: <Users size={20} />,
-    nameLabel: "Company/Organization Name",
-    namePlaceholder: "Enter customer name",
+    nameLabel: mark("Company/Organization Name"),
+    namePlaceholder: mark("Enter customer name"),
     emailPlaceholder: "customer@company.com",
   },
   mechanic: {
-    title: "Add Mechanic to Team",
+    title: mark("Add Technician to Team"),
     icon: <UserPlus size={20} />,
-    nameLabel: "Mechanic Full Name",
-    namePlaceholder: "Enter mechanic's name",
-    emailPlaceholder: "mechanic@example.com",
+    nameLabel: mark("Technician's Full Name"),
+    namePlaceholder: mark("Enter the technician's name"),
+    emailPlaceholder: "technician@example.com",
   },
 };
 
@@ -48,7 +50,7 @@ export default function InviteForm({ role, onClose, onDone }: Props) {
   const finish = () => (onDone ?? onClose)();
 
   return (
-    <Modal title={text.title} icon={text.icon} onClose={result ? finish : onClose}>
+    <Modal title={t(text.title)} icon={text.icon} onClose={result ? finish : onClose}>
       {result ? (
         <ShareCode
           code={result.code}
@@ -56,43 +58,47 @@ export default function InviteForm({ role, onClose, onDone }: Props) {
           onDone={finish}
           summary={
             result.emailed ? (
-              <>
-                We emailed an invitation to <b>{result.email}</b>. You can also send <b>{result.name}</b> the code yourself, for example on
-                WhatsApp. It works once, only for that address, and expires in 7 days.
-              </>
+              <Trans
+                text="We emailed an invitation to {email}. You can also send {name} the code yourself, for example on WhatsApp. It works once, only for that address, and expires in 7 days."
+                values={{ email: <b>{result.email}</b>, name: <b>{result.name}</b> }}
+              />
             ) : (
-              <>
-                Invitation created for <b>{result.name}</b>. Share this code with them. It works once, only for <b>{result.email}</b>, and
-                expires in 7 days.
-              </>
+              <Trans
+                text="Invitation created for {name}. Share this code with them. It works once, only for {email}, and expires in 7 days."
+                values={{ email: <b>{result.email}</b>, name: <b>{result.name}</b> }}
+              />
             )
           }
-          subject="Your MechanicPro invitation"
+          subject={t("Your MechanicPro invitation")}
           lines={[
-            `Hi ${result.name},`,
+            t("Hi {name},", { name: result.name }),
             "",
-            "You've been invited to join our team on MechanicPro.",
+            t("You've been invited to join our team on MechanicPro."),
             "",
-            `Accept the invitation: ${window.location.origin}/#/join?${new URLSearchParams({ code: result.code, email: result.email })}`,
+            t("Accept the invitation: {link}", { link: `${window.location.origin}/#/join?${new URLSearchParams({ code: result.code, email: result.email })}` }),
             "",
-            `Or open ${window.location.origin}, choose "Have an invitation code?" and enter ${result.code} with this email address (${result.email}).`,
+            t('Or open {address}, choose "Have an invitation code?" and enter {code} with this email address ({email}).', {
+              address: window.location.origin,
+              code: result.code,
+              email: result.email,
+            }),
             "",
-            `The code works once and expires on ${formatExpiry(result.expires_at)}.`,
+            t("The code works once and expires on {date}.", { date: formatExpiry(result.expires_at) }),
           ]}
         />
       ) : (
         <form className="form form-upgraded" onSubmit={submit}>
           {formError && <div className="error">{formError}</div>}
           <div className="formGroup">
-            <label htmlFor="field-name">{text.nameLabel}</label>
-            <input id="field-name" name="name" placeholder={text.namePlaceholder} required />
+            <label htmlFor="field-name">{t(text.nameLabel)}</label>
+            <input id="field-name" name="name" placeholder={t(text.namePlaceholder)} required />
           </div>
           <div className="formGroup">
-            <label htmlFor="field-email">Email Address</label>
+            <label htmlFor="field-email">{t("Email Address")}</label>
             <input id="field-email" name="email" type="email" placeholder={text.emailPlaceholder} required />
           </div>
           <button className="primary" style={{ marginTop: "10px" }} disabled={sending}>
-            {role === "customer" ? <Mail size={15} /> : <UserPlus size={15} />} Generate Invitation Code
+            {role === "customer" ? <Mail size={15} /> : <UserPlus size={15} />} {t("Send invitation")}
           </button>
         </form>
       )}

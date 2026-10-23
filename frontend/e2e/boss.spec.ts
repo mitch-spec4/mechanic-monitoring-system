@@ -1,18 +1,18 @@
 import { expect, test } from "@playwright/test";
-import { failOnPageErrors, openPage, signIn } from "./helpers";
+import { confirmDialog, failOnPageErrors, openPage, signIn } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 
 test("boss creates and assigns a job with a real due date", async ({ page }) => {
   const noErrors = failOnPageErrors(page);
   await signIn(page, "james@mechanicpro.test");
-  await page.getByRole("button", { name: "Create Job" }).click();
+  await page.getByRole("button", { name: "Create job" }).click();
   const form = page.locator("form.form");
   await form.locator("input[name=title]").fill("E2E boiler check");
   await form.locator("textarea[name=description]").fill("Annual check");
   await form.locator("select[name=customer_id]").selectOption({ label: "Kenya Motors" });
   await expect(form.locator("select[name=machine_id] option")).toHaveText([
-    "Machine (optional)",
+    "Equipment (optional)",
     "Compressor C-55 (C55-77890)",
     "Hydraulic Pump H-21 (H21-44012)",
   ]);
@@ -20,7 +20,7 @@ test("boss creates and assigns a job with a real due date", async ({ page }) => 
   await form.locator("select[name=mechanic_id]").selectOption({ label: "Amina Otieno" });
   await form.locator("select[name=priority]").selectOption("Low");
   await form.locator("input[name=due_date]").fill("2026-11-05");
-  await form.getByRole("button", { name: "Create & notify mechanic" }).click();
+  await form.getByRole("button", { name: "Create & notify technician" }).click();
 
   const created = page.locator(".job", { hasText: "E2E boiler check" });
   await expect(created).toContainText("Due 05 Nov 2026");
@@ -37,8 +37,8 @@ test("started jobs can be cancelled but not deleted", async ({ page }) => {
   await expect(page.locator(".job", { hasText: "Repair Hydraulic Pump H-21" }).getByTitle("Delete job")).toBeVisible();
   await expect(page.locator(".job", { hasText: "Conveyor Line CL-4 inspection" }).getByTitle("Cancel job")).toHaveCount(0);
 
-  page.once("dialog", (dialog) => dialog.accept());
   await started.getByTitle("Cancel job").click();
+  await confirmDialog(page, "Cancel job");
   await expect(started.locator(".status")).toHaveText("Cancelled");
   await expect(started.getByTitle("Cancel job")).toHaveCount(0);
 });
@@ -61,12 +61,12 @@ test("customers show their machines and which need work", async ({ page }) => {
   const noErrors = failOnPageErrors(page);
   await signIn(page, "james@mechanicpro.test");
   const card = page.locator(".customer-card", { hasText: "ABC Engineering" });
-  await expect(card).toContainText("2 machines · 2 need work");
+  await expect(card).toContainText("2 pieces of equipment · 2 need work");
   await card.click();
 
   const customerPage = page.locator(".customerPage");
   await expect(customerPage.locator("h1")).toHaveText("ABC Engineering");
-  await expect(customerPage.locator(".needsWorkPill")).toContainText("2 machines need work");
+  await expect(customerPage.locator(".needsWorkPill")).toContainText("2 pieces of equipment need work");
   const generator = customerPage.locator(".machineCard", { hasText: "Generator G-102" });
   await expect(generator).toHaveClass(/needsWork/);
   await expect(generator.locator(".workReasons")).toContainText("Service Generator G-102");
@@ -93,7 +93,7 @@ test("customers show their machines and which need work", async ({ page }) => {
 
 test("machines are grouped by customer with a needs-work filter", async ({ page }) => {
   await signIn(page, "james@mechanicpro.test");
-  await openPage(page, "Machines");
+  await openPage(page, "Equipment");
   const groups = page.locator(".machineGroup");
   await expect(groups.first()).toBeVisible();
   const xyz = page.locator(".machineGroup", { hasText: "XYZ Factory" });
@@ -109,16 +109,16 @@ test("machines are grouped by customer with a needs-work filter", async ({ page 
 
 test("boss adds a machine and duplicate serials are rejected", async ({ page }) => {
   await signIn(page, "james@mechanicpro.test");
-  await openPage(page, "Machines");
-  await page.getByRole("button", { name: /Add Machine/ }).click();
+  await openPage(page, "Equipment");
+  await page.getByRole("button", { name: /Add equipment/ }).click();
   const form = page.locator("form.form-upgraded");
   await form.locator("select[name=customer_id]").selectOption({ label: "XYZ Factory" });
   await form.locator("input[name=name]").fill("Boiler B-7");
   await form.locator("input[name=serial_no]").fill("C55-77890");
-  await form.getByRole("button", { name: "Add machine" }).click();
+  await form.getByRole("button", { name: "Add equipment" }).click();
   await expect(form.locator(".error")).toContainText("serial number already exists");
   await form.locator("input[name=serial_no]").fill("B7-0001");
-  await form.getByRole("button", { name: "Add machine" }).click();
+  await form.getByRole("button", { name: "Add equipment" }).click();
   await expect(page.locator(".machineGroup", { hasText: "XYZ Factory" })).toContainText("Boiler B-7");
 });
 
@@ -130,7 +130,7 @@ test("invited customer joins with the code and signs in", async ({ page, context
   const form = page.locator("form.form-upgraded");
   await form.locator("input[name=name]").fill("Delta Industries");
   await form.locator("input[name=email]").fill("delta@example.com");
-  await form.getByRole("button", { name: "Generate Invitation Code" }).click();
+  await form.getByRole("button", { name: "Send invitation" }).click();
 
   const code = (await page.getByTestId("share-code").textContent()) ?? "";
   expect(code).toMatch(/^DK-[0-9A-F]{10}$/);
@@ -164,7 +164,7 @@ test("invited customer joins with the code and signs in", async ({ page, context
 test("boss workspace pages load real data", async ({ page }) => {
   await signIn(page, "james@mechanicpro.test");
   for (const [label, expected] of [
-    ["Mechanics", "Amina Otieno"],
+    ["Technicians", "Amina Otieno"],
     ["Notifications", "New service request"],
     ["Reports", "Jobs by status"],
   ]) {
@@ -177,11 +177,11 @@ test("boss workspace pages load real data", async ({ page }) => {
 
 test("inviting an email that already has an account is refused immediately", async ({ page }) => {
   await signIn(page, "james@mechanicpro.test");
-  await page.getByRole("button", { name: "+ Add mechanic" }).click();
+  await page.getByRole("button", { name: "+ Add technician" }).click();
   const form = page.locator("form.form-upgraded");
   await form.locator("input[name=name]").fill("Amina again");
   await form.locator("input[name=email]").fill("amina@mechanicpro.test");
-  await form.getByRole("button", { name: "Generate Invitation Code" }).click();
+  await form.getByRole("button", { name: "Send invitation" }).click();
   await expect(form.locator(".error")).toHaveText("This email address already has an account");
 });
 
@@ -200,7 +200,7 @@ test("boss edits a job", async ({ page }) => {
 
 test("boss edits a machine and a customer", async ({ page }) => {
   await signIn(page, "james@mechanicpro.test");
-  await openPage(page, "Machines");
+  await openPage(page, "Equipment");
   await page.locator(".machineCard", { hasText: "Industrial Mixer MX-08" }).getByRole("button", { name: "Edit" }).click();
   const machineForm = page.locator(".modal form");
   await machineForm.locator("select[name=status]").selectOption("Under Repair");
@@ -219,7 +219,7 @@ test("boss edits a machine and a customer", async ({ page }) => {
 
 test("manager reset code lets a customer choose a new password", async ({ page }) => {
   await signIn(page, "james@mechanicpro.test");
-  await openPage(page, "Mechanics");
+  await openPage(page, "Technicians");
   await expect(page.locator(".subPageList article", { hasText: "Brian Kariuki" }).getByRole("button", { name: "Reset password" })).toBeVisible();
   await openPage(page, "Customers");
   await page.locator(".subPageList article", { hasText: "Kenya Motors" }).getByRole("button", { name: "Reset password" }).click();
@@ -257,13 +257,13 @@ test("boss creates a checklist and uses it as a job type", async ({ page }) => {
   await expect(card.locator("em")).toHaveCount(2);
 
   await page.locator(".sidebarLink", { hasText: "Dashboard" }).click();
-  await page.getByRole("button", { name: "Create Job" }).click();
+  await page.getByRole("button", { name: "Create job" }).click();
   const form = page.locator("form.form");
   await form.locator("input[name=title]").fill("Install new compressor");
   await form.locator("textarea[name=description]").fill("Fit and commission");
   await form.locator("select[name=mechanic_id]").selectOption({ label: "Amina Otieno" });
   await form.locator("select[name=job_type]").selectOption("Installation");
-  await form.getByRole("button", { name: "Create & notify mechanic" }).click();
+  await form.getByRole("button", { name: "Create & notify technician" }).click();
   await page.locator(".job", { hasText: "Install new compressor" }).locator(".titleLink").click();
   await expect(page.locator(".jobHero .eyebrow")).toContainText("Installation");
   await expect(page.locator(".jobCard", { hasText: "Checklist" })).toContainText("The checklist appears when work starts.");

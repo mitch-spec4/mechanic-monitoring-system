@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { verifyEmail } from "../services/api";
 import { go } from "../lib/route";
 import { errorMessage } from "../lib/format";
+import { t } from "../i18n";
 
 type Props = { token: string; user: any; onVerified: (user: any) => void };
 
@@ -27,18 +28,18 @@ export default function VerifyEmail({ token, user, onVerified }: Props) {
         <div className="brand">
           🔧 <span>MECHANIC</span>PRO
         </div>
-        {state === "working" && <h1>Confirming your email…</h1>}
+        {state === "working" && <h1>{t("Confirming your email…")}</h1>}
         {state === "done" && (
           <>
-            <h1>Email confirmed</h1>
+            <h1>{t("Email confirmed")}</h1>
             <div className="success" role="status">
-              Thanks. You can now invite your team and customers.
+              {t("Thanks. You can now invite your team and customers.")}
             </div>
           </>
         )}
         {state === "failed" && (
           <>
-            <h1>That link didn't work</h1>
+            <h1>{t("That link didn't work")}</h1>
             <div className="error" role="alert">
               {error}
             </div>
@@ -46,7 +47,7 @@ export default function VerifyEmail({ token, user, onVerified }: Props) {
         )}
         {state !== "working" && (
           <button className="primary" onClick={() => go(user ? "/" : "/signin")}>
-            {user ? "Go to your dashboard" : "Sign in"}
+            {user ? t("Go to your dashboard") : t("Sign in")}
           </button>
         )}
       </section>

@@ -8,7 +8,8 @@
     "dev:phone": "vite --mode phone",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test:e2e": "playwright test --project=chromium"
+    "test:e2e": "playwright test --project=chromium",
+    "i18n:check": "node scripts/i18n-check.mjs"
   },
   "dependencies": {
     "leaflet": "^1.9.4",

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   BarChart3,
   Bell,
@@ -17,21 +17,9 @@ import {
   UserRound,
   Users,
   Wrench,
+  type LucideIcon,
 } from "lucide-react";
-import {
-  changePassword,
-  company,
-  customers,
-  jobs,
-  machines,
-  mechanics,
-  notifications,
-  reports,
-  requests,
-  reviews,
-  services,
-  updateCustomer,
-} from "../services/api";
+import { company, customers, jobs, machines, mechanics, notifications, reports, requests, reviews, services, updateCustomer, type User } from "../services/api";
 import ChecklistManager from "../components/ChecklistManager";
 import MachinesByCustomer from "../components/MachinesByCustomer";
 import { machineSummary } from "./BossDashboard";
@@ -39,96 +27,103 @@ import "./CustomerPage.css";
 import { AddMachine, EditForm, EditMachine } from "../components/MachineForms";
 import ShiftsView from "../components/ShiftsView";
 import TeamMap from "../components/TeamMap";
-import { LocationSettings } from "../components/Shift";
 import InviteForm from "../components/InviteForm";
 import VerifyBanner from "../components/VerifyBanner";
 import ResetPassword from "../components/ResetPassword";
+import SettingsPanel from "../components/SettingsPanel";
+import { ROLE_NAMES } from "../components/Sidebar";
 import { errorMessage, formatBytes, formatDate } from "../lib/format";
+import { mark, t } from "../i18n";
 
-type Props = { title: string; user: any; onOpenJob?: (id: number) => void; onOpenCustomer?: (id: number) => void; onUserChanged?: (user: any) => void };
+type Props = { title: string; user: User; onOpenJob?: (id: number) => void; onOpenCustomer?: (id: number) => void; onUserChanged?: (user: User) => void };
+type Icon = LucideIcon;
+// Rows differ by page (jobs, customers, reviews...), so they're read loosely.
+type Row = Record<string, any>;
 type Resource = {
+  /** The list's name, shown translated. */
   label: string;
-  icon: any;
+  /** One line under the page title. */
+  description: string;
+  icon: Icon;
   load?: () => Promise<any>;
   key?: string;
-  filter?: (item: any) => boolean;
+  filter?: (item: Row) => boolean;
+  /** What "Add" says on pages where managers can add to the list. */
+  addLabel?: string;
 };
-const isActiveJob = (job: any) => !["Completed", "Cancelled"].includes(job.status);
+
+const isActiveJob = (job: Row) => !["Completed", "Cancelled"].includes(job.status);
+const JOB_PAGES = ["My Jobs", "Assigned Jobs", "Jobs / Requests"];
+
+// Keys are the page names the sidebar uses (in English); labels and descriptions are shown translated.
 const resources: Record<string, Resource> = {
-  "Jobs / Requests": {
-    label: "Jobs / requests",
-    icon: ClipboardList,
-    load: jobs,
-    key: "jobs",
-  },
-  "My Jobs": { label: "Jobs", icon: ClipboardList, load: jobs, key: "jobs" },
+  "Jobs / Requests": { label: mark("Jobs / requests"), description: mark("Every job across your team."), icon: ClipboardList, load: jobs, key: "jobs" },
+  "My Jobs": { label: mark("Jobs"), description: mark("Assigned work, status, priority, and scheduled visits."), icon: ClipboardList, load: jobs, key: "jobs" },
   "Assigned Jobs": {
-    label: "Assigned jobs",
+    label: mark("Assigned jobs"),
+    description: mark("Jobs assigned to you that are not finished yet."),
     icon: ClipboardList,
     load: jobs,
     key: "jobs",
     filter: isActiveJob,
   },
   Customers: {
-    label: "Customers",
+    label: mark("Customers"),
+    description: mark("Customers connected to your service company."),
     icon: Users,
     load: customers,
     key: "customers",
+    addLabel: mark("Add customer"),
   },
-  Mechanics: { label: "Mechanics", icon: Users, load: mechanics, key: "mechanics" },
-  Machines: {
-    label: "Machines",
+  Technicians: {
+    label: mark("Technicians"),
+    description: mark("The technicians on your service team."),
+    icon: Users,
+    load: mechanics,
+    key: "mechanics",
+    addLabel: mark("Add technician"),
+  },
+  Equipment: {
+    label: mark("Equipment"),
+    description: mark("Tracked equipment and current operating status."),
     icon: Wrench,
     load: machines,
     key: "machines",
+    addLabel: mark("Add equipment"),
   },
-  "Service Records": {
-    label: "Service records",
-    icon: FileText,
-    load: services,
-    key: "records",
-  },
-  "Service History": {
-    label: "Service history",
-    icon: FileText,
-    load: services,
-    key: "records",
-  },
-  Reviews: { label: "Reviews", icon: Star, load: reviews, key: "reviews" },
-  Notifications: { label: "Notifications", icon: Bell, load: notifications, key: "notifications" },
-  "My Machines": {
-    label: "My machines",
-    icon: Wrench,
-    load: machines,
-    key: "machines",
-  },
-  "Service Requests": { label: "Service requests", icon: ClipboardList, load: requests, key: "requests" },
-  "My Company": { label: "My company", icon: Users, load: company, key: "company" },
-  Reports: { label: "Reports", icon: BarChart3, load: reports, key: "report" },
-  Messages: { label: "Messages", icon: MessageSquare },
-  Settings: { label: "Settings", icon: Cog },
-  Profile: { label: "Profile", icon: UserRound },
-  "Help & Support": { label: "Help & support", icon: HelpCircle },
-  Checklists: { label: "Checklists", icon: ListChecks },
-  "Team Map": { label: "Clocked-in mechanics", icon: MapIcon },
-  Shifts: { label: "Shifts", icon: Clock },
-  "My Shifts": { label: "My shifts", icon: Clock },
+  "Service Records": { label: mark("Service records"), description: mark("A searchable history of completed service work."), icon: FileText, load: services, key: "records" },
+  "Service History": { label: mark("Service history"), description: mark("Every service visit recorded on your equipment."), icon: FileText, load: services, key: "records" },
+  Reviews: { label: mark("Reviews"), description: mark("Ratings and feedback visible according to your role."), icon: Star, load: reviews, key: "reviews" },
+  Notifications: { label: mark("Notifications"), description: mark("Updates about your jobs, requests, and reviews."), icon: Bell, load: notifications, key: "notifications" },
+  "My Equipment": { label: mark("My equipment"), description: mark("Equipment registered to your account."), icon: Wrench, load: machines, key: "machines" },
+  "Service Requests": { label: mark("Service requests"), description: mark("Service you have requested and its current status."), icon: ClipboardList, load: requests, key: "requests" },
+  "My Company": { label: mark("My company"), description: mark("The service company that looks after your equipment."), icon: Users, load: company, key: "company" },
+  Reports: { label: mark("Reports"), description: mark("Operational performance for the data you are allowed to see."), icon: BarChart3, load: reports, key: "report" },
+  Messages: { label: mark("Messages"), description: mark("Company conversations and job communication."), icon: MessageSquare },
+  Settings: { label: mark("Settings"), description: mark("Your language, account and company settings."), icon: Cog },
+  Profile: { label: mark("Profile"), description: mark("Your account details and access."), icon: UserRound },
+  "Help & Support": { label: mark("Help & support"), description: mark("Support resources for your service workspace."), icon: HelpCircle },
+  Checklists: { label: mark("Checklists"), description: mark("Checklists your technicians complete for each type of job."), icon: ListChecks },
+  "Team Map": { label: mark("Clocked-in technicians"), description: mark("Where your clocked-in technicians were last seen."), icon: MapIcon },
+  Shifts: { label: mark("Shifts"), description: mark("Clock-in and clock-out times and hours for your team."), icon: Clock },
+  "My Shifts": { label: mark("My shifts"), description: mark("Your clock-in and clock-out times and hours."), icon: Clock },
 };
 
 export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, onUserChanged = () => {} }: Props) {
   const resource = resources[title] || resources.Profile;
   const Icon = resource.icon;
-  const [items, setItems] = useState<any[]>([]);
-  const [summary, setSummary] = useState<any>(null);
+  const [items, setItems] = useState<Row[]>([]);
+  const [summary, setSummary] = useState<Row | null>(null);
   const [query, setQuery] = useState("");
-  const [companyInfo, setCompanyInfo] = useState<any>(null);
+  const [companyInfo, setCompanyInfo] = useState<Row | null>(null);
   const [error, setError] = useState("");
   const [adding, setAdding] = useState(false);
-  const [editing, setEditing] = useState<any>(null);
+  const [editing, setEditing] = useState<Row | null>(null);
   const [resetting, setResetting] = useState<{ id: number; name: string } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
-  // The Machines page groups machines under their customer.
-  const [customerList, setCustomerList] = useState<any[]>([]);
+  // The Equipment page groups equipment under its customer.
+  const [customerList, setCustomerList] = useState<Row[]>([]);
+  const isBoss = user.role === "boss";
 
   useEffect(() => {
     setItems([]);
@@ -148,60 +143,93 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
           setItems(resource.filter ? rows.filter(resource.filter) : rows);
         }
       })
-      .catch((errorValue) => setError(errorValue.message));
-    if (title === "Machines" && user.role === "boss") {
+      .catch((problem) => setError(errorMessage(problem)));
+    if (title === "Equipment" && isBoss) {
       customers()
         .then((data) => setCustomerList(data.customers))
-        .catch((errorValue) => setError(errorValue.message));
+        .catch((problem) => setError(errorMessage(problem)));
     }
   }, [title, reloadKey]);
 
-  const filtered = items.filter((item) =>
-    JSON.stringify(item).toLowerCase().includes(query.toLowerCase()),
-  );
-  const canAdd =
-    user.role === "boss" && ["Customers", "Machines", "Mechanics"].includes(title);
+  const filtered = items.filter((item) => JSON.stringify(item).toLowerCase().includes(query.toLowerCase()));
+  const canAdd = isBoss && !!resource.addLabel;
   const added = () => {
     setAdding(false);
     setEditing(null);
     setReloadKey((key) => key + 1);
   };
-  const isBoss = user.role === "boss";
-  const rowActions = (item: any) => {
+  const rowActions = (item: Row) => {
     if (!isBoss) return null;
-    const resetId = title === "Mechanics" ? item.id : title === "Customers" ? item.user_id : null;
+    const resetId = title === "Technicians" ? item.id : title === "Customers" ? item.user_id : null;
     return (
       <>
-        {(title === "Machines" || title === "Customers") && (
+        {(title === "Equipment" || title === "Customers") && (
           <button className="listAction" onClick={() => setEditing(item)}>
-            Edit
+            {t("Edit")}
           </button>
         )}
         {resetId && (
           <button className="listAction" onClick={() => setResetting({ id: resetId, name: item.name })}>
-            Reset password
+            {t("Reset password")}
           </button>
         )}
       </>
     );
   };
+
+  const body = () => {
+    if (error) return <Empty title={t("Unable to load data")} text={error} />;
+    switch (title) {
+      case "My Company":
+        return companyInfo ? <CompanyView company={companyInfo} /> : <Empty title={t("Loading")} text={t("Fetching your company details.")} />;
+      case "Help & Support":
+        return (
+          <Empty
+            title={t("Need help?")}
+            text={t("Contact your company manager for access, invitations, or questions about a job. Use the sidebar to move between your jobs, records, and notifications.")}
+          />
+        );
+      case "Checklists":
+        return <ChecklistManager />;
+      case "Team Map":
+        return <TeamMap onOpenJob={onOpenJob} />;
+      case "Shifts":
+      case "My Shifts":
+        return <ShiftsView user={user} />;
+      case "Messages":
+        return <Empty title={t("Messaging is not connected")} text={t("Conversation storage and permissions will appear here when the messaging service is enabled.")} />;
+      case "Settings":
+      case "Profile":
+        return <SettingsPanel user={user} onUserChanged={onUserChanged} />;
+    }
+    if (title === "Equipment" && isBoss && items.length) {
+      return <MachinesByCustomer machines={items} customers={customerList} query={query} onOpenJob={onOpenJob} onOpenCustomer={onOpenCustomer} onChanged={added} />;
+    }
+    if (!filtered.length) {
+      return <Empty title={t("Nothing here yet")} text={t("New records will appear here as your team uses the workspace.")} />;
+    }
+    return (
+      <div className="subPageList">
+        {(title === "Customers" ? sortByNeedsWork(filtered) : filtered).map((item, index) => (
+          <ResourceRow key={item.id || index} item={item} title={title} Icon={Icon} actions={rowActions(item)} onOpenJob={onOpenJob} onOpenCustomer={onOpenCustomer} />
+        ))}
+      </div>
+    );
+  };
+
   return (
     <main className="subPage">
       <div className="subPageHeading">
         <div>
-          <span className="eyebrow">
-            MECHANIC PRO / {user.role.toUpperCase()}
-          </span>
-          <h1>{title}</h1>
-          <p>{description(title)}</p>
+          <span className="eyebrow">MECHANIC PRO / {t(ROLE_NAMES[user.role] ?? user.role).toUpperCase()}</span>
+          <h1>{t(title)}</h1>
+          <p>{t(resource.description)}</p>
         </div>
         <span className="subPageUser">
           {user.name} · {user.email}
         </span>
       </div>
-      {isBoss && user.email_verified === false && (title === "Customers" || title === "Mechanics") && (
-        <VerifyBanner user={user} onVerified={onUserChanged} />
-      )}
+      {isBoss && user.email_verified === false && (title === "Customers" || title === "Technicians") && <VerifyBanner user={user} onVerified={onUserChanged} />}
       {summary ? (
         <ReportSummary summary={summary} />
       ) : !resource.load || resource.key === "company" ? null : (
@@ -209,182 +237,91 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
           <div>
             <Icon size={20} />
             <strong>{items.length}</strong>
-            <span>{resource.label}</span>
+            <span>{t(resource.label)}</span>
           </div>
           <div>
             <CheckCircle2 size={20} />
-            <strong>{items.length ? "Connected" : "Ready"}</strong>
-            <span>{error || "Live workspace data"}</span>
+            <strong>{items.length ? t("Connected") : t("Ready")}</strong>
+            <span>{error || t("Live workspace data")}</span>
           </div>
         </div>
       )}
+      {/* Reports are the charts above; there is no list under them. */}
+      {!summary && (
       <section className="subPagePanel">
         <div className="subPagePanelHead">
           <h2>
             <Icon size={16} />
-            {resource.label}
+            {t(resource.label)}
           </h2>
           <div className="subPageTools">
             {items.length > 0 && (
               <label className="searchBox">
                 <Search size={14} />
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search"
-                />
+                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("Search")} aria-label={t("Search")} />
               </label>
             )}
             {canAdd && (
               <button className="primary" onClick={() => setAdding(true)}>
-                <Plus size={14} /> Add {resource.label.slice(0, -1)}
+                <Plus size={14} /> {t(resource.addLabel!)}
               </button>
             )}
           </div>
         </div>
-        {error ? (
-          <Empty title="Unable to load data" text={error} />
-        ) : title === "My Company" ? (
-          companyInfo ? <CompanyView company={companyInfo} /> : <Empty title="Loading" text="Fetching your company details." />
-        ) : title === "Help & Support" ? (
-          <Empty
-            title="Need help?"
-            text="Contact your company manager for access, invitations, or questions about a job. Use the sidebar to move between your jobs, records, and notifications."
-          />
-        ) : title === "Checklists" ? (
-          <ChecklistManager />
-        ) : title === "Team Map" ? (
-          <TeamMap onOpenJob={onOpenJob} />
-        ) : title === "Shifts" || title === "My Shifts" ? (
-          <ShiftsView user={user} />
-        ) : title === "Messages" ? (
-          <Empty
-            title="Messaging is not connected"
-            text="Conversation storage and permissions will appear here when the messaging service is enabled."
-          />
-        ) : title === "Settings" || title === "Profile" ? (
-          <>
-            <Settings user={user} />
-            {user.role === "mechanic" && <LocationSettings />}
-            <ChangePassword />
-          </>
-        ) : title === "Machines" && isBoss && items.length ? (
-          <MachinesByCustomer
-            machines={items}
-            customers={customerList}
-            query={query}
-            onOpenJob={onOpenJob}
-            onOpenCustomer={onOpenCustomer}
-            onChanged={added}
-          />
-        ) : filtered.length ? (
-          <div className="subPageList">
-            {(title === "Customers" ? sortByNeedsWork(filtered) : filtered).map((item, index) => (
-              <ResourceRow
-                key={item.id || index}
-                item={item}
-                title={title}
-                Icon={Icon}
-                actions={rowActions(item)}
-                onOpenJob={onOpenJob}
-                onOpenCustomer={onOpenCustomer}
-              />
-            ))}
-          </div>
-        ) : (
-          <Empty
-            title={`No ${resource.label.toLowerCase()} yet`}
-            text="New records will appear here as your team uses the workspace."
-          />
-        )}
+        {body()}
       </section>
-      {adding && title === "Machines" && <AddMachine onClose={() => setAdding(false)} onAdded={added} />}
-      {adding && (title === "Customers" || title === "Mechanics") && (
+      )}
+      {adding && title === "Equipment" && <AddMachine onClose={() => setAdding(false)} onAdded={added} />}
+      {adding && (title === "Customers" || title === "Technicians") && (
         <InviteForm role={title === "Customers" ? "customer" : "mechanic"} onClose={() => setAdding(false)} onDone={added} />
       )}
-      {editing && title === "Machines" && <EditMachine machine={editing} onClose={() => setEditing(null)} onSaved={added} />}
+      {editing && title === "Equipment" && <EditMachine machine={editing as any} onClose={() => setEditing(null)} onSaved={added} />}
       {editing && title === "Customers" && <EditCustomer customer={editing} onClose={() => setEditing(null)} onSaved={added} />}
       {resetting && <ResetPassword userId={resetting.id} name={resetting.name} onClose={() => setResetting(null)} />}
     </main>
   );
 }
 
-function EditCustomer({ customer, onClose, onSaved }: any) {
+function EditCustomer({ customer, onClose, onSaved }: { customer: Row; onClose: () => void; onSaved: () => void }) {
   return (
-    <EditForm title="Edit customer" onClose={onClose} save={async (data: any) => { await updateCustomer(customer.id, data); onSaved(); }}>
+    <EditForm
+      title={t("Edit customer")}
+      onClose={onClose}
+      save={async (data) => {
+        await updateCustomer(customer.id, data);
+        onSaved();
+      }}
+    >
       <div className="formGroup">
-        <label htmlFor="field-name">Company/Organization Name</label>
+        <label htmlFor="field-name">{t("Company or organisation name")}</label>
         <input id="field-name" name="name" defaultValue={customer.name} required />
       </div>
       <div className="formGroup">
-        <label htmlFor="field-email">Contact email</label>
+        <label htmlFor="field-email">{t("Contact email")}</label>
         <input id="field-email" name="email" type="email" defaultValue={customer.email} required />
       </div>
       <div className="formGroup">
-        <label htmlFor="field-phone">Phone</label>
+        <label htmlFor="field-phone">{t("Phone")}</label>
         <input id="field-phone" name="phone" defaultValue={customer.phone || ""} />
       </div>
     </EditForm>
   );
 }
 
-function ChangePassword() {
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-  const submit = async (event: any) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const data = Object.fromEntries(new FormData(form)) as Record<string, string>;
-    setError("");
-    setMessage("");
-    if (data.new_password !== data.confirm_password) {
-      setError("The new passwords do not match");
-      return;
-    }
-    try {
-      await changePassword({ current_password: data.current_password, new_password: data.new_password });
-      form.reset();
-      setMessage("Password changed. You've been signed out on your other devices.");
-    } catch (e) {
-      setError(errorMessage(e));
-    }
-  };
-  return (
-    <form className="form form-upgraded changePassword" onSubmit={submit}>
-      <h3>Change password</h3>
-      {error && <div className="error">{error}</div>}
-      {message && <div className="success">{message}</div>}
-      <div className="formGroup">
-        <label htmlFor="field-current_password">Current password</label>
-        <input id="field-current_password" name="current_password" type="password" autoComplete="current-password" required />
-      </div>
-      <div className="formGroup">
-        <label htmlFor="field-new_password">New password</label>
-        <input id="field-new_password" name="new_password" type="password" autoComplete="new-password" minLength={8} required />
-      </div>
-      <div className="formGroup">
-        <label htmlFor="field-confirm_password">Confirm new password</label>
-        <input id="field-confirm_password" name="confirm_password" type="password" autoComplete="new-password" minLength={8} required />
-      </div>
-      <button className="primary">Update password</button>
-    </form>
-  );
-}
-
-function CompanyView({ company }: any) {
+function CompanyView({ company }: { company: Row }) {
   return (
     <div className="settingsView">
       <div>
-        <span>Company</span>
+        <span>{t("Company")}</span>
         <strong>{company.name}</strong>
       </div>
       <div>
-        <span>Location</span>
-        <strong>{company.location || "Not recorded"}</strong>
+        <span>{t("Location")}</span>
+        <strong>{company.location || t("Not recorded")}</strong>
       </div>
-      {company.contacts.map((contact: any) => (
+      {company.contacts.map((contact: { name: string; email: string }) => (
         <div key={contact.email}>
-          <span>Manager</span>
+          <span>{t("Manager")}</span>
           <strong>
             {contact.name} · {contact.email}
           </strong>
@@ -394,59 +331,28 @@ function CompanyView({ company }: any) {
   );
 }
 
-function description(title: string) {
-  return (
-    (
-      {
-        "My Jobs": "Assigned work, status, priority, and scheduled visits.",
-        Customers: "Customers connected to your service company.",
-        Machines: "Tracked equipment and current operating status.",
-        "Service Records": "A searchable history of completed service work.",
-        Reviews: "Ratings and feedback visible according to your role.",
-        Reports: "Operational performance for the data you are allowed to see.",
-        Mechanics: "The mechanics on your service team.",
-        Checklists: "Checklists your mechanics complete for each type of job.",
-        "Team Map": "Where your clocked-in mechanics were last seen.",
-        Shifts: "Clock-in and clock-out times and hours for your team.",
-        "My Shifts": "Your clock-in and clock-out times and hours.",
-        Notifications: "Updates about your jobs, requests, and reviews.",
-        "Service Requests": "Service you have requested and its current status.",
-        "Service History": "Every service visit recorded on your machines.",
-        "My Machines": "Machines registered to your account.",
-        "My Company": "The service company that looks after your machines.",
-        "Assigned Jobs": "Jobs assigned to you that are not finished yet.",
-        Messages: "Company conversations and job communication.",
-        Settings: "Workspace preferences and account controls.",
-        Profile: "Your account details and access.",
-        "Help & Support": "Support resources for your service workspace.",
-      } as Record<string, string>
-    )[title] || "Service operations workspace."
-  );
-}
-const sortByNeedsWork = (rows: any[]) => [...rows].sort((a, b) => Number(b.needs_work_count > 0) - Number(a.needs_work_count > 0));
+const sortByNeedsWork = (rows: Row[]) => [...rows].sort((a, b) => Number(b.needs_work_count > 0) - Number(a.needs_work_count > 0));
 
-function ResourceRow({ item, title, Icon, actions, onOpenJob, onOpenCustomer }: any) {
-  const isJob = ["My Jobs", "Assigned Jobs", "Jobs / Requests"].includes(title);
+type RowProps = { item: Row; title: string; Icon: Icon; actions: ReactNode; onOpenJob?: (id: number) => void; onOpenCustomer?: (id: number) => void };
+
+function ResourceRow({ item, title, Icon, actions, onOpenJob, onOpenCustomer }: RowProps) {
+  const isJob = JOB_PAGES.includes(title);
   const isCustomer = title === "Customers" && onOpenCustomer;
   // Jobs, and service records that belong to a job, open the job's worksheet.
   const jobId = isJob ? item.id : item.job_id;
-  const heading =
-    item.title ||
-    item.name ||
-    item.service_type ||
-    item.subject ||
-    `${title} item`;
+  const heading = item.title || item.name || item.service_type || item.subject || t("Untitled");
   const detail = isJob
-    ? [item.priority || "Medium", item.location || "No location", item.due_date ? `Due ${formatDate(item.due_date)}` : ""]
-        .filter(Boolean)
-        .join(" · ")
-    : item.email ||
-      item.message ||
-      item.work_done ||
-      item.description ||
-      item.comment ||
-      item.model ||
-      "No additional details";
+    ? [t(item.priority || "Medium"), item.location || t("No site"), item.due_date ? t("Due {date}", { date: formatDate(item.due_date) }) : ""].filter(Boolean).join(" · ")
+    : item.email || item.message || item.work_done || item.description || item.comment || item.model || t("No additional details");
+  const badge = item.status
+    ? t(item.status)
+    : title === "Reviews"
+      ? `${item.rating}/5`
+      : title === "Notifications"
+        ? item.is_read
+          ? t("Read")
+          : t("New")
+        : t("Active");
   return (
     <article>
       <span className="listIcon">
@@ -474,85 +380,107 @@ function ResourceRow({ item, title, Icon, actions, onOpenJob, onOpenCustomer }: 
           )}
         </small>
       </div>
-      <span
-        className={`dataStatus ${String(item.status || "Active")
-          .replace(/ /g, "")
-          .toLowerCase()}`}
-      >
-        {item.status ||
-          (title === "Reviews" ? `${item.rating}/5` : title === "Notifications" ? (item.is_read ? "Read" : "New") : "Active")}
-      </span>
+      <span className={`dataStatus ${String(item.status || "Active").replace(/ /g, "").toLowerCase()}`}>{badge}</span>
       {actions}
     </article>
   );
 }
-function ReportSummary({ summary }: any) {
+
+// The report's numbers, in the order they're shown.
+const REPORT_LABELS: Record<string, string> = {
+  total: mark("Total jobs"),
+  completed: mark("Completed"),
+  pending: mark("Pending"),
+  in_progress: mark("In progress"),
+  cancelled: mark("Cancelled"),
+  rating: mark("Average rating"),
+  storage_used: mark("Storage used"),
+};
+const SEGMENT_COLORS = { pending: "#f59e0b", progress: "#3b82f6", completed: "#10b981", rest: "#e5e7eb" };
+
+function ReportSummary({ summary }: { summary: Row }) {
   const jobSummary = summary.jobs || {};
-  const chartItems = [
-    ["Pending", jobSummary.pending || 0, "pending"],
-    ["In progress", jobSummary.in_progress || 0, "progress"],
-    ["Completed", jobSummary.completed || 0, "completed"],
-    ["Cancelled", jobSummary.cancelled || 0, "cancelled"],
-  ] as const;
-  const total = chartItems.reduce((sum, item) => sum + item[1], 0);
   const pending = jobSummary.pending || 0;
   const inProgress = jobSummary.in_progress || 0;
   const completed = jobSummary.completed || 0;
-  
-  // Calculate angles for conic gradient
-  const pendingPercent = total ? (pending / total) * 100 : 0;
-  const progressPercent = total ? (inProgress / total) * 100 : 0;
-  const completedPercent = total ? (completed / total) * 100 : 0;
-  
-  const angle1 = (pendingPercent / 100) * 360;
-  const angle2 = angle1 + (progressPercent / 100) * 360;
-  const angle3 = angle2 + (completedPercent / 100) * 360;
-  
-  const gradient = `conic-gradient(
-    #f59e0b ${angle1}deg,
-    #3b82f6 ${angle1}deg ${angle2}deg,
-    #10b981 ${angle2}deg ${angle3}deg,
-    #e5e7eb ${angle3}deg 360deg
-  )`;
+  const cancelled = jobSummary.cancelled || 0;
+  const chartItems = [
+    [t("Pending"), pending, "pending"],
+    [t("In progress"), inProgress, "progress"],
+    [t("Completed"), completed, "completed"],
+    [t("Cancelled"), cancelled, "cancelled"],
+  ] as const;
+  const total = pending + inProgress + completed + cancelled;
+  // Where each slice of the workload donut ends, in degrees.
+  const share = (count: number) => (total ? (count / total) * 360 : 0);
+  const angle1 = share(pending);
+  const angle2 = angle1 + share(inProgress);
+  const angle3 = angle2 + share(completed);
+  const gradient = `conic-gradient(${SEGMENT_COLORS.pending} ${angle1}deg, ${SEGMENT_COLORS.progress} ${angle1}deg ${angle2}deg, ${SEGMENT_COLORS.completed} ${angle2}deg ${angle3}deg, ${SEGMENT_COLORS.rest} ${angle3}deg 360deg)`;
+  const numbers: Record<string, string | number> = {
+    ...jobSummary,
+    rating: summary.rating == null ? "-" : Number(summary.rating).toFixed(1),
+    ...(summary.totals?.storage_bytes != null ? { storage_used: formatBytes(summary.totals.storage_bytes) } : {}),
+  };
 
   return (
     <div className="reportArea">
       <div className="reportGrid">
-        {Object.entries({
-          ...jobSummary,
-          rating: summary.rating == null ? "-" : Number(summary.rating).toFixed(1),
-          ...(summary.totals?.storage_bytes != null ? { storage_used: formatBytes(summary.totals.storage_bytes) } : {}),
-        }).map(([label, value]) => <div key={label}><strong>{String(value)}</strong><span>{label.replace(/_/g, " ")}</span></div>)}
+        {Object.entries(numbers).map(([key, value]) => (
+          <div key={key}>
+            <strong>{String(value)}</strong>
+            <span>{t(REPORT_LABELS[key] ?? key)}</span>
+          </div>
+        ))}
       </div>
       <div className="chartGrid">
-        <section className="chartPanel"><div className="chartHeading"><h2>Jobs by status</h2><span>{total} total</span></div><div className="barChart">{chartItems.map(([label, value, tone]) => <div className="barItem" key={label}><div className="barValue"><span>{label}</span><b>{value}</b></div><div className="barTrack"><i className={`barFill ${tone}`} style={{ width: `${total ? Math.max((value / total) * 100, value ? 8 : 0) : 0}%` }} /></div></div>)}</div></section>
-        <section className="chartPanel completionChart"><div className="chartHeading"><h2>Workload breakdown</h2><span>Pending, in progress, completed</span></div><div className="donut" style={{ background: gradient }}><div><strong>{total}</strong><span>total jobs</span></div></div><div className="chartLegend"><span><i className="legendPending" style={{backgroundColor: "#f59e0b"}} /> Pending ({pending})</span><span><i className="legendProgress" style={{backgroundColor: "#3b82f6"}} /> In Progress ({inProgress})</span><span><i className="legendCompleted" style={{backgroundColor: "#10b981"}} /> Completed ({completed})</span></div></section>
+        <section className="chartPanel">
+          <div className="chartHeading">
+            <h2>{t("Jobs by status")}</h2>
+            <span>{t("{count} total", { count: total })}</span>
+          </div>
+          <div className="barChart">
+            {chartItems.map(([label, value, tone]) => (
+              <div className="barItem" key={tone}>
+                <div className="barValue">
+                  <span>{label}</span>
+                  <b>{value}</b>
+                </div>
+                <div className="barTrack">
+                  <i className={`barFill ${tone}`} style={{ width: `${total ? Math.max((value / total) * 100, value ? 8 : 0) : 0}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="chartPanel completionChart">
+          <div className="chartHeading">
+            <h2>{t("Workload breakdown")}</h2>
+            <span>{t("Pending, in progress, completed")}</span>
+          </div>
+          <div className="donut" style={{ background: gradient }}>
+            <div>
+              <strong>{total}</strong>
+              <span>{t("total jobs")}</span>
+            </div>
+          </div>
+          <div className="chartLegend">
+            <span>
+              <i style={{ backgroundColor: SEGMENT_COLORS.pending }} /> {t("Pending ({count})", { count: pending })}
+            </span>
+            <span>
+              <i style={{ backgroundColor: SEGMENT_COLORS.progress }} /> {t("In progress ({count})", { count: inProgress })}
+            </span>
+            <span>
+              <i style={{ backgroundColor: SEGMENT_COLORS.completed }} /> {t("Completed ({count})", { count: completed })}
+            </span>
+          </div>
+        </section>
       </div>
     </div>
   );
 }
-function Settings({ user }: any) {
-  return (
-    <div className="settingsView">
-      <div>
-        <span>Full name</span>
-        <strong>{user.name}</strong>
-      </div>
-      <div>
-        <span>Email</span>
-        <strong>{user.email}</strong>
-      </div>
-      <div>
-        <span>Role</span>
-        <strong>{user.role}</strong>
-      </div>
-      <div>
-        <span>Company</span>
-        <strong>Company workspace #{user.company_id}</strong>
-      </div>
-    </div>
-  );
-}
+
 function Empty({ title, text }: { title: string; text: string }) {
   return (
     <div className="subEmpty">

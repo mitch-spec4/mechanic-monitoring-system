@@ -3,20 +3,19 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { MapPin } from "lucide-react";
 import { teamLocations } from "../services/api";
-import { errorMessage } from "../lib/format";
+import { ago, errorMessage, formatDistance } from "../lib/format";
 import { mapLink } from "../lib/location";
 import { usePolling } from "../lib/usePolling";
+import { mark, t } from "../i18n";
 import "./Team.css";
 
-const asDate = (value: string) => new Date(value.endsWith("Z") ? value : `${value}Z`);
-export function ago(value: string) {
-  const minutes = Math.max(0, Math.round((Date.now() - asDate(value).getTime()) / 60000));
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.floor(minutes / 60);
-  return `${hours} h ${minutes % 60} min ago`;
-}
-const SEEN = { clock_in: "at clock-in", clock_out: "at clock-out", job_start: "starting a job", job_complete: "completing a job", live: "while working" } as Record<string, string>;
+const SEEN: Record<string, string> = {
+  clock_in: mark("Seen {ago} at clock-in"),
+  clock_out: mark("Seen {ago} at clock-out"),
+  job_start: mark("Seen {ago} starting a job"),
+  job_complete: mark("Seen {ago} completing a job"),
+  live: mark("Seen {ago} while working"),
+};
 // Letters and digits only: initials go into the marker's HTML.
 const initials = (name: string) =>
   name
@@ -32,7 +31,7 @@ const textNode = (text: string) => {
   return span;
 };
 
-/** Managers: the last known position of every clocked-in mechanic. */
+/** Managers: the last known position of every clocked-in technician. */
 export default function TeamMap({ onOpenJob }: { onOpenJob?: (id: number) => void }) {
   const [team, setTeam] = useState<any[] | null>(null);
   const [error, setError] = useState("");
@@ -98,16 +97,15 @@ export default function TeamMap({ onOpenJob }: { onOpenJob?: (id: number) => voi
   return (
     <div className="teamMap">
       {error && <div className="error">{error}</div>}
-      <div className="teamMapCanvas" ref={holder} aria-label="Map of clocked-in mechanics" />
+      <div className="teamMapCanvas" ref={holder} aria-label={t("Map of clocked-in technicians")} />
       <div className="teamList">
         <p className="muted">
-          Only mechanics who are clocked in are shown. Positions update while a job is in progress and the mechanic has
-          the app open.
+          {t("Only technicians who are clocked in are shown. Positions update while a job is in progress and the technician has the app open.")}
         </p>
         {team && team.length === 0 && (
           <div className="subEmpty">
-            <strong>Nobody is clocked in</strong>
-            <span>Mechanics appear here when they clock in.</span>
+            <strong>{t("Nobody is clocked in")}</strong>
+            <span>{t("Technicians appear here when they clock in.")}</span>
           </div>
         )}
         {team?.map((person) => (
@@ -116,24 +114,24 @@ export default function TeamMap({ onOpenJob }: { onOpenJob?: (id: number) => voi
             <div>
               <strong>{person.name}</strong>
               <span>
-                {person.last ? `Seen ${ago(person.last.recorded_at)} ${SEEN[person.last.kind] || ""}` : "No location yet"}
-                {person.last?.accuracy_m ? ` · ±${person.last.accuracy_m} m` : ""}
+                {person.last ? t(SEEN[person.last.kind] || mark("Seen {ago}"), { ago: ago(person.last.recorded_at) }) : t("No location yet")}
+                {person.last?.accuracy_m ? ` · ±${formatDistance(person.last.accuracy_m)}` : ""}
               </span>
               {person.job ? (
                 <button className="titleLink" onClick={() => onOpenJob?.(person.job.id)}>
-                  Working on {person.job.title}
+                  {t("Working on {title}", { title: person.job.title })}
                 </button>
               ) : (
-                <span>Clocked in, no job in progress</span>
+                <span>{t("Clocked in, no job in progress")}</span>
               )}
             </div>
             {person.last && (
               <div className="teamRowActions">
                 <button className="listAction" onClick={() => focus(person)}>
-                  <MapPin size={12} /> Show
+                  <MapPin size={12} /> {t("Show")}
                 </button>
                 <a className="listAction" href={mapLink(person.last.latitude, person.last.longitude)} target="_blank" rel="noreferrer">
-                  Open map
+                  {t("Open map")}
                 </a>
               </div>
             )}

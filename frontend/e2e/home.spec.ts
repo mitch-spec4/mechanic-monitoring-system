@@ -16,7 +16,7 @@ test("the homepage explains the product and shows the plans", async ({ page }) =
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Run your service team from one place.");
   await expect(page.locator(".preview .sample")).toHaveText("Sample data");
-  await expect(page.locator(".role h3")).toHaveText(["Boss / Manager", "Mechanic", "Customer"]);
+  await expect(page.locator(".role h3")).toHaveText(["Boss / Manager", "Technician", "Customer"]);
   const pricing = page.locator("#subscriptions");
   await expect(pricing.locator(".plan h3")).toHaveText(["Starter", "Professional", "Business"]);
   await expect(pricing.locator(".plan.popular .tag")).toHaveText("Recommended");

@@ -45,6 +45,7 @@ def user_payload(user):
         "language": user.language,
         # Times are shown in the company's time zone, so everyone on the team sees the same times.
         "timezone": company.timezone if company else "Africa/Nairobi",
+        "units": company.units if company else "metric",
     }
 
 

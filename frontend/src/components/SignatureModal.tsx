@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, CheckCircle2, Eraser, PenLine, Undo2, UserX, X } from "lucide-react";
-import { errorMessage } from "../lib/format";
+import { errorMessage, formatDay } from "../lib/format";
+import { mark, t } from "../i18n";
 import "./SignatureModal.css";
 
 export type SignOff = { signature: { name: string; image: string } } | { no_signature_reason: string };
@@ -21,10 +22,11 @@ type Stroke = { color: string; points: Point[] };
 type Pen = { x: number; y: number; t: number; w: number };
 
 const INKS = [
-  { color: "#172033", label: "Black ink" },
-  { color: "#1d4ed8", label: "Blue ink" },
+  { color: "#172033", label: mark("Black ink") },
+  { color: "#1d4ed8", label: mark("Blue ink") },
 ];
-const REASONS = ["Customer had left the site", "Site closed for the day", "Approved by phone", "Handed over to security"];
+// Quick picks; the chosen one is saved in the technician's language, like a typed reason.
+const REASONS = [mark("Customer had left the site"), mark("Site closed for the day"), mark("Approved by phone"), mark("Handed over to security")];
 const CELEBRATE_MS = 2100;
 const CONFETTI = Array.from({ length: 26 }, (_, i) => i);
 
@@ -197,11 +199,11 @@ export default function SignatureModal({ jobTitle, facts = [], onSubmit, onDone,
     setProblem("");
     let signOff: SignOff;
     if (absent) {
-      if (!reason.trim()) return setProblem("Say why the customer couldn't sign.");
+      if (!reason.trim()) return setProblem(t("Say why the customer couldn't sign."));
       signOff = { no_signature_reason: reason.trim() };
     } else {
-      if (!name.trim()) return setProblem("Enter the name of the person signing.");
-      if (!hasInk) return setProblem("Ask the customer to sign in the box.");
+      if (!name.trim()) return setProblem(t("Enter the name of the person signing."));
+      if (!hasInk) return setProblem(t("Ask the customer to sign in the box."));
       signOff = { signature: { name: name.trim(), image: exportSignature(strokes.current) } };
     }
     setBusy(true);
@@ -217,15 +219,15 @@ export default function SignatureModal({ jobTitle, facts = [], onSubmit, onDone,
 
   const steps = absent
     ? [
-        { label: "Reason", done: !!reason.trim() },
-        { label: "Complete", done: !!done },
+        { label: t("Reason"), done: !!reason.trim() },
+        { label: t("Complete"), done: !!done },
       ]
     : [
-        { label: "Name", done: !!name.trim() },
-        { label: "Sign", done: hasInk },
-        { label: "Complete", done: !!done },
+        { label: t("Name"), done: !!name.trim() },
+        { label: t("Sign"), done: hasInk },
+        { label: t("Complete"), done: !!done },
       ];
-  const today = new Date().toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" });
+  const today = formatDay(new Date().toISOString());
 
   return (
     <div className="overlay signOverlay">
@@ -235,13 +237,13 @@ export default function SignatureModal({ jobTitle, facts = [], onSubmit, onDone,
           <div className="signHeroTop">
             <div className="signBadge">
               <PenLine size={14} />
-              <h2 id="sign-title">Customer sign-off</h2>
+              <h2 id="sign-title">{t("Customer sign-off")}</h2>
             </div>
-            <button type="button" className="signClose" aria-label="Close" onClick={onClose} disabled={busy}>
+            <button type="button" className="signClose" aria-label={t("Close")} onClick={onClose} disabled={busy}>
               <X size={18} />
             </button>
           </div>
-          <p className="signLead">Completing</p>
+          <p className="signLead">{t("Completing")}</p>
           <h3 className="signJob">{jobTitle}</h3>
           {facts.length > 0 && (
             <ul className="signFacts">
@@ -250,7 +252,7 @@ export default function SignatureModal({ jobTitle, facts = [], onSubmit, onDone,
               ))}
             </ul>
           )}
-          <ol className="signSteps" aria-label="Progress">
+          <ol className="signSteps" aria-label={t("Progress")}>
             {steps.map((step, index) => (
               <li key={step.label} className={step.done ? "done" : ""}>
                 <span>{step.done ? <Check size={12} strokeWidth={3} /> : index + 1}</span>
@@ -264,24 +266,24 @@ export default function SignatureModal({ jobTitle, facts = [], onSubmit, onDone,
           <div className="signSwitch" style={{ "--pos": absent ? 1 : 0 } as React.CSSProperties}>
             <span className="signThumb" aria-hidden="true" />
             <button type="button" aria-pressed={!absent} onClick={() => setAbsent(false)} disabled={busy}>
-              <PenLine size={15} /> Customer signs
+              <PenLine size={15} /> {t("Customer signs")}
             </button>
             <button type="button" aria-pressed={absent} onClick={() => setAbsent(true)} disabled={busy}>
-              <UserX size={15} /> Customer not present
+              <UserX size={15} /> {t("Customer not present")}
             </button>
           </div>
 
           {!absent ? (
             <>
-              <p className="signHint">Hand the phone to the customer to confirm the work.</p>
+              <p className="signHint">{t("Hand the phone to the customer to confirm the work.")}</p>
               <label className="signField">
-                <span>Name of the person signing</span>
-                <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="e.g. Grace Wanjiru" disabled={busy} />
+                <span>{t("Name of the person signing")}</span>
+                <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder={t("e.g. {example}", { example: "Grace Wanjiru" })} disabled={busy} />
               </label>
               <div className={`signPaper ${hasInk ? "inked" : ""}`}>
                 <canvas
                   ref={canvas}
-                  aria-label="Signature pad: sign with your finger"
+                  aria-label={t("Signature pad: sign with your finger")}
                   onPointerDown={down}
                   onPointerMove={move}
                   onPointerUp={up}
@@ -293,31 +295,31 @@ export default function SignatureModal({ jobTitle, facts = [], onSubmit, onDone,
                     <svg viewBox="0 0 300 90">
                       <path d="M12 62c14-30 26-44 34-38s-8 40-2 42 18-34 28-36 6 30 14 30 16-26 26-26-2 22 8 22 22-30 34-30 4 24 14 24c12 0 26-18 40-20s10 14 22 14 30-10 46-12" />
                     </svg>
-                    <b>Sign here</b>
+                    <b>{t("Sign here")}</b>
                   </div>
                 )}
                 <div className="signLine" aria-hidden="true">
                   <span>✕</span>
                 </div>
                 <p className="signCaption">
-                  {name.trim() || "Customer name"} · {today}
+                  {name.trim() || t("Customer name")} · {today}
                 </p>
                 {done === "signed" && (
                   <div className="signStamp" aria-hidden="true">
-                    <span>Signed</span>
+                    <span>{t("Signed")}</span>
                   </div>
                 )}
               </div>
               <div className="signTools">
                 <div className="signInks">
-                  <span>Ink</span>
+                  <span>{t("Ink")}</span>
                   {INKS.map((option) => (
                     <button
                       key={option.color}
                       type="button"
                       className={`signInk ${ink === option.color ? "active" : ""}`}
                       style={{ "--ink": option.color } as React.CSSProperties}
-                      aria-label={option.label}
+                      aria-label={t(option.label)}
                       aria-pressed={ink === option.color}
                       onClick={() => setInk(option.color)}
                     />
@@ -325,10 +327,10 @@ export default function SignatureModal({ jobTitle, facts = [], onSubmit, onDone,
                 </div>
                 <div className="signEdits">
                   <button type="button" className="signTool" onClick={undo} disabled={!hasInk || busy}>
-                    <Undo2 size={14} /> Undo
+                    <Undo2 size={14} /> {t("Undo")}
                   </button>
                   <button type="button" className="signTool" onClick={clear} disabled={!hasInk || busy}>
-                    <Eraser size={14} /> Clear
+                    <Eraser size={14} /> {t("Clear")}
                   </button>
                 </div>
               </div>
@@ -336,22 +338,22 @@ export default function SignatureModal({ jobTitle, facts = [], onSubmit, onDone,
           ) : (
             <>
               <label className="signField">
-                <span>Why couldn't the customer sign?</span>
+                <span>{t("Why couldn't the customer sign?")}</span>
                 <textarea
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  placeholder="e.g. Site manager had left; machine handed over to security"
+                  placeholder={t("e.g. {example}", { example: t("Site manager had left; equipment handed over to security") })}
                   disabled={busy}
                 />
               </label>
               <div className="signReasons">
                 {REASONS.map((option) => (
-                  <button key={option} type="button" className={reason === option ? "active" : ""} onClick={() => setReason(option)} disabled={busy}>
-                    {option}
+                  <button key={option} type="button" className={reason === t(option) ? "active" : ""} onClick={() => setReason(t(option))} disabled={busy}>
+                    {t(option)}
                   </button>
                 ))}
               </div>
-              <p className="signHint">The reason is saved in the job's history and printed on the customer's report.</p>
+              <p className="signHint">{t("The reason is saved in the job's history and printed on the customer's report.")}</p>
             </>
           )}
 
@@ -362,7 +364,7 @@ export default function SignatureModal({ jobTitle, facts = [], onSubmit, onDone,
           )}
           <button className="primary signSubmit" disabled={busy}>
             <CheckCircle2 size={18} />
-            {busy && !done ? "Completing…" : "Complete job"}
+            {busy && !done ? t("Completing…") : t("Complete job")}
           </button>
         </form>
 
@@ -376,8 +378,8 @@ export default function SignatureModal({ jobTitle, facts = [], onSubmit, onDone,
             <div className="signSeal">
               <CheckCircle2 size={44} />
             </div>
-            <strong>Job completed</strong>
-            <span>{done === "signed" ? `Signed by ${name.trim()}` : "Customer not present: reason saved"}</span>
+            <strong>{t("Job completed")}</strong>
+            <span>{done === "signed" ? t("Signed by {name}", { name: name.trim() }) : t("Customer not present: reason saved")}</span>
           </div>
         )}
       </section>
