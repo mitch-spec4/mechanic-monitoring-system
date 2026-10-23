@@ -46,8 +46,15 @@ def client(app):
     return app.test_client()
 
 
-def make_user(name, email, role, company, customer=None):
-    user = User(name=name, email=email, role=role, company_id=company.id, customer_id=customer.id if customer else None)
+def make_user(name, email, role, company, customer=None, verified=True):
+    user = User(
+        name=name,
+        email=email,
+        role=role,
+        company_id=company.id,
+        customer_id=customer.id if customer else None,
+        email_verified_at=utcnow() if verified else None,
+    )
     user.set_password(PASSWORD)
     db.session.add(user)
     db.session.flush()

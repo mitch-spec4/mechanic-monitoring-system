@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Login from "./pages/Login";
+import VerifyEmail from "./pages/VerifyEmail";
 import BossDashboard from "./pages/BossDashboard";
 import MechanicDashboard from "./pages/MechanicDashboard";
 import CustomerDashboard from "./pages/CustomerDashboard";
@@ -14,6 +15,7 @@ import { go, readRoute, useRoute } from "./lib/route";
 import type { Interval } from "./components/Plans";
 import Profile from "./components/Profile";
 import Sidebar from "./components/Sidebar";
+import DemoBar from "./components/DemoBar";
 import { LocationIndicator, ShiftProvider } from "./components/Shift";
 import { clearSession, logout as endSession, saveSession, SESSION_EXPIRED_EVENT } from "./services/api";
 import "./style.css";
@@ -59,7 +61,24 @@ export default function App() {
 	};
 	const signedIn = (loggedInUser: any) => {
 		setUser(loggedInUser);
+		setOpenJobId(null);
+		setOpenCustomerId(null);
 		setActive("Dashboard");
+	};
+	// The profile kept for reloads changes too, e.g. once the email address is confirmed.
+	const updateUser = (changed: any) => {
+		saveSession(changed);
+		setUser(changed);
+	};
+	const afterLogin = (loggedInUser: any) => {
+		signedIn(loggedInUser);
+		const next = route.query.get("next") || "";
+		// "Already using MechanicPro?" on the homepage leads to Billing, with the chosen plan picked out.
+		if (next === "billing" && loggedInUser.role === "boss") {
+			setBillingFocus({ plan: route.query.get("plan") || "", interval: route.query.get("interval") === "year" ? "year" : "month" });
+			setActive("Billing");
+		}
+		go(next.startsWith("/checkout/") ? next : "/");
 	};
 
 	useEffect(() => {
@@ -87,22 +106,26 @@ export default function App() {
 		);
 	}
 
+	// Links from emails work whether or not someone is signed in on this browser.
+	if (route.path === "/verify") {
+		return <VerifyEmail token={route.query.get("token") || ""} user={user} onVerified={updateUser} />;
+	}
+	if (route.path === "/join" || route.path === "/reset") {
+		return (
+			<Login
+				key={route.path}
+				mode={route.path === "/join" ? "invite" : "link"}
+				code={route.query.get("code") || ""}
+				email={route.query.get("email") || ""}
+				token={route.query.get("token") || ""}
+				done={afterLogin}
+			/>
+		);
+	}
+
 	if (!user) {
 		if (route.path === "/signin") {
-			return (
-				<Login
-					done={(loggedInUser: any) => {
-						signedIn(loggedInUser);
-						const next = route.query.get("next") || "";
-						// "Already using MechanicPro?" on the homepage leads to Billing, with the chosen plan picked out.
-						if (next === "billing" && loggedInUser.role === "boss") {
-							setBillingFocus({ plan: route.query.get("plan") || "", interval: route.query.get("interval") === "year" ? "year" : "month" });
-							setActive("Billing");
-						}
-						go(next.startsWith("/checkout/") ? next : "/");
-					}}
-				/>
-			);
+			return <Login done={afterLogin} />;
 		}
 		if (route.path === "/signup") {
 			return (
@@ -116,7 +139,15 @@ export default function App() {
 				/>
 			);
 		}
-		return <Home />;
+		return (
+			<Home
+				onDemo={(demoUser) => {
+					saveSession(demoUser);
+					signedIn(demoUser);
+					go("/");
+				}}
+			/>
+		);
 	}
 
 	const dashboard = openJobId ? (
@@ -126,9 +157,9 @@ export default function App() {
 	) : active === "Billing" && user.role === "boss" ? (
 		<BillingPage focus={billingFocus} />
 	) : active !== "Dashboard" && active !== "Profile" ? (
-		<WorkspacePage title={active} user={user} onOpenJob={openJob} onOpenCustomer={openCustomer} />
+		<WorkspacePage title={active} user={user} onOpenJob={openJob} onOpenCustomer={openCustomer} onUserChanged={updateUser} />
 	) : user.role === "boss" ? (
-		<BossDashboard u={user} onOpenJob={openJob} onOpenCustomer={openCustomer} onOpenBilling={() => navigate("Billing")} />
+		<BossDashboard u={user} onOpenJob={openJob} onOpenCustomer={openCustomer} onOpenBilling={() => navigate("Billing")} onUserChanged={updateUser} />
 	) : user.role === "mechanic" ? (
 		<MechanicDashboard u={user} onOpenJob={openJob} />
 	) : (
@@ -136,12 +167,26 @@ export default function App() {
 	);
 
 	const shell = (
-		<div className={`appShell role-${user.role}`}>
+		<div className={`appShell role-${user.role}${user.demo_until ? " hasDemoBar" : ""}`}>
 			<Sidebar user={user} active={openJobId || openCustomerId ? "" : active} onNavigate={navigate} />
 			<div className="appMain">
 				<Profile user={user} onLogout={logout} />
 				{user.role === "mechanic" && <LocationIndicator />}
 				{dashboard}
+				{user.demo_until && (
+					<DemoBar
+						user={user}
+						onSwitched={(demoUser) => {
+							saveSession(demoUser);
+							signedIn(demoUser);
+						}}
+						onLeave={() => {
+							endSession();
+							signedOut();
+							go("/signup");
+						}}
+					/>
+				)}
 			</div>
 		</div>
 	);

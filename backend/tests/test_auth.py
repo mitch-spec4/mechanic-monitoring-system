@@ -174,15 +174,41 @@ def test_unset_app_env_is_treated_as_production(monkeypatch):
         create_app()
 
 
-def test_production_starts_with_strong_settings(monkeypatch):
+def production_settings(monkeypatch):
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("SECRET_KEY", "s" * 40)
     monkeypatch.setenv("JWT_SECRET_KEY", "j" * 40)
     monkeypatch.setenv("CORS_ORIGINS", "https://app.example.com")
     monkeypatch.setenv("DATABASE_URL", "postgres://user:pass@db.example.com/app")
+    monkeypatch.setenv("APP_URL", "https://app.example.com/")
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("EMAIL_FROM", "MechanicPro <no-reply@example.com>")
+
+
+def test_production_starts_with_strong_settings(monkeypatch):
+    production_settings(monkeypatch)
     app = create_app()
     assert app.config["SQLALCHEMY_DATABASE_URI"].startswith("postgresql+psycopg://")
     assert app.config["CORS_ORIGINS"] == ["https://app.example.com"]
+    assert app.config["APP_URL"] == "https://app.example.com" and app.config["EMAIL_BACKEND"] == "smtp"
+
+
+@pytest.mark.parametrize(
+    "name, value, problem",
+    [
+        ("APP_URL", "", "APP_URL"),
+        ("APP_URL", "http://app.example.com", "APP_URL"),
+        ("SMTP_HOST", "", "Email must be set up"),
+        ("EMAIL_FROM", "", "Email must be set up"),
+        ("EMAIL_BACKEND", "log", "Email must be set up"),
+        ("TEST_OUTBOX", "1", "TEST_OUTBOX"),
+    ],
+)
+def test_production_needs_working_email_and_its_own_address(monkeypatch, name, value, problem):
+    production_settings(monkeypatch)
+    monkeypatch.setenv(name, value)
+    with pytest.raises(RuntimeError, match=problem):
+        create_app()
 
 
 def test_user_role_change_invalidates_old_token(client, data, auth):

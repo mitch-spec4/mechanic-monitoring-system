@@ -3,6 +3,8 @@
   --accent: var(--role-color, #0969d7);
   --accent-soft: var(--role-soft, #eaf3ff);
   display: grid;
+  /* One column that may shrink below its content, so phones never scroll sideways. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   max-width: 1180px;
   padding: 18px 14px 40px;
@@ -32,6 +34,7 @@
 }
 .jobHeroTop {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
@@ -160,10 +163,12 @@
 /* ---------- Cards ---------- */
 .jobGrid {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
 }
 .jobCard {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: 10px;
   padding: 16px;
@@ -173,8 +178,10 @@
 }
 .jobCardHead {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
 }
 .jobCardHead h2 {
   display: flex;
@@ -507,7 +514,7 @@
 }
 @media (min-width: 1000px) {
   .jobGrid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .jobCard.wide {
     grid-column: 1 / -1;

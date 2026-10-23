@@ -58,6 +58,11 @@ def build_config():
     jwt_secret_key = os.getenv("JWT_SECRET_KEY", "")
     origins = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "").split(",") if origin.strip()]
     database_url = os.getenv("DATABASE_URL", "")
+    app_url = os.getenv("APP_URL", "").strip().rstrip("/")
+    email_backend = os.getenv("EMAIL_BACKEND", "smtp" if is_production else "log").strip().lower()
+    email_from = os.getenv("EMAIL_FROM", "").strip()
+    smtp_host = os.getenv("SMTP_HOST", "").strip()
+    test_outbox = os.getenv("TEST_OUTBOX") == "1"
 
     if is_production:
         problems = []
@@ -68,6 +73,12 @@ def build_config():
             problems.append("CORS_ORIGINS must list your frontend origin(s); '*' is not allowed")
         if not database_url:
             problems.append("DATABASE_URL must be set")
+        if not app_url.startswith("https://"):
+            problems.append("APP_URL must be the https:// address of your site (it goes into links in emails)")
+        if email_backend != "smtp" or not smtp_host or not email_from:
+            problems.append("Email must be set up: EMAIL_BACKEND=smtp with SMTP_HOST and EMAIL_FROM (see SETUP.md, Email)")
+        if test_outbox:
+            problems.append("TEST_OUTBOX is only for the browser tests")
         if problems:
             raise RuntimeError(
                 "Refusing to start in production mode (set APP_ENV=development for local work):\n- "
@@ -78,6 +89,8 @@ def build_config():
         jwt_secret_key = jwt_secret_key or "local-development-jwt-secret-not-for-production"
         origins = origins or DEV_ORIGINS
         database_url = database_url or "sqlite:///mechanic_pro.db"
+        app_url = app_url or origins[0].rstrip("/")
+        email_from = email_from or "MechanicPro <no-reply@mechanicpro.test>"
 
     return {
         "APP_ENV": env,
@@ -90,6 +103,24 @@ def build_config():
         "SQLALCHEMY_TRACK_MODIFICATIONS": False,
         "CORS_ORIGINS": origins,
         "LOGIN_RATE_LIMIT": os.getenv("LOGIN_RATE_LIMIT", "10 per minute;50 per hour"),
+        # Account emails (verification, password reset) one address can be sent.
+        "EMAIL_RATE_LIMIT": os.getenv("EMAIL_RATE_LIMIT", "1 per minute;5 per hour"),
+        # "Try the demo": private demo companies one visitor (IP address) can start.
+        "DEMO_RATE_LIMIT": os.getenv("DEMO_RATE_LIMIT", "10 per hour"),
+        # The public address of the web app, used in links inside emails.
+        "APP_URL": app_url,
+        # Email: "log" writes emails to the server log (development); "smtp" sends them (production).
+        "EMAIL_BACKEND": email_backend,
+        "EMAIL_FROM": email_from,
+        "SMTP_HOST": smtp_host,
+        "SMTP_PORT": int(os.getenv("SMTP_PORT", "587")),
+        "SMTP_USERNAME": os.getenv("SMTP_USERNAME", ""),
+        "SMTP_PASSWORD": os.getenv("SMTP_PASSWORD", ""),
+        "SMTP_SECURITY": os.getenv("SMTP_SECURITY", "starttls").strip().lower(),
+        # Lets the browser tests read the emails the app "sent" in log mode. Refused in production.
+        "TEST_OUTBOX": test_outbox,
+        # Protects /api/cron/daily, the daily clean-up a scheduler calls. Unset: the URL doesn't exist.
+        "CRON_SECRET": os.getenv("CRON_SECRET", ""),
         "TRUSTED_PROXY_COUNT": int(os.getenv("TRUSTED_PROXY_COUNT", "0")),
         # Photos, videos and signatures: "local" disk (development) or "s3" (any S3-compatible
         # bucket: Cloudflare R2, Backblaze B2, AWS S3...). See SETUP.md.
@@ -131,10 +162,12 @@ def create_app(overrides=None):
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=count, x_proto=count, x_host=count)
 
     from app.services.billing import init_billing
+    from app.services.email import init_email
     from app.services.storage import init_storage
 
     init_storage(app)
     init_billing(app)
+    init_email(app)
     CORS(app, origins=app.config["CORS_ORIGINS"], supports_credentials=True)
     db.init_app(app)
     jwt.init_app(app)
@@ -146,7 +179,9 @@ def create_app(overrides=None):
     from app.routes.checklists import bp as checklists
     from app.routes.company import bp as company
     from app.routes.customers import bp as customers
+    from app.routes.demo import bp as demo
     from app.routes.jobs import bp as jobs
+    from app.routes.maintenance import bp as maintenance
     from app.routes.machines import bp as machines
     from app.routes.media import bp as media
     from app.routes.notifications import bp as notifications
@@ -174,6 +209,8 @@ def create_app(overrides=None):
     app.register_blueprint(shifts, url_prefix="/api/shifts")
     app.register_blueprint(location, url_prefix="/api/location")
     app.register_blueprint(billing, url_prefix="/api")
+    app.register_blueprint(demo, url_prefix="/api/demo")
+    app.register_blueprint(maintenance, url_prefix="/api/cron")
 
     @app.cli.command("purge-locations")
     def purge_locations():
@@ -192,6 +229,23 @@ def create_app(overrides=None):
         removed = purge_abandoned_uploads()
         db.session.commit()
         print(f"Removed {removed} abandoned upload(s).")
+
+    @app.cli.command("purge-demos")
+    def purge_demos():
+        """Delete "Try the demo" companies whose 24 hours are up (run daily)."""
+        from app.services.demo import purge_expired
+
+        print(f"Removed {purge_expired()} expired demo company(ies).")
+
+    if app.config["TEST_OUTBOX"]:
+
+        @app.get("/api/test/outbox")
+        def test_outbox():
+            """The emails written to the log, newest first, so the browser tests can open their links."""
+            from app.services.email import mailer
+
+            messages = reversed(getattr(mailer(), "outbox", []))
+            return {"emails": [{"to": m["To"], "subject": m["Subject"], "text": m.get_body(("plain",)).get_content()} for m in messages]}
 
     register_error_handlers(app)
     if not app.config.get("TESTING") and not app.config["IS_PRODUCTION"]:

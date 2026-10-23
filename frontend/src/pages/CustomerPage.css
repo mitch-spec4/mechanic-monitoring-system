@@ -12,7 +12,7 @@
 }
 .machineCards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
   gap: 12px;
   margin: 0;
   padding: 0;
@@ -167,6 +167,7 @@
 /* Machines page grouped by customer. */
 .machineGroups {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   padding: 14px 18px 18px;
 }

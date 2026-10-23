@@ -16,12 +16,15 @@ import Modal from "../components/Modal";
 import MechanicProfile from "../components/MechanicProfile";
 import { CreateJobModal, JobTypeSelect } from "../components/JobForms";
 import InviteForm from "../components/InviteForm";
+import SetupGuide, { type SetupStep } from "../components/SetupGuide";
+import VerifyBanner from "../components/VerifyBanner";
+import { AddMachine } from "../components/MachineForms";
 import { errorMessage, formatDate, greeting } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
 import { PlanBanner } from "./BillingPage";
-type Props = { u: any; onOpenJob: (id: number) => void; onOpenCustomer: (id: number) => void; onOpenBilling?: () => void };
+type Props = { u: any; onOpenJob: (id: number) => void; onOpenCustomer: (id: number) => void; onOpenBilling?: () => void; onUserChanged?: (user: any) => void };
 
-export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBilling = () => {} }: Props) {
+export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBilling = () => {}, onUserChanged = () => {} }: Props) {
   const [data, setData] = useState<any[]>([]),
     [cs, setCs] = useState<any[]>([]),
     [ms, setMs] = useState<any[]>([]),
@@ -65,7 +68,9 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBill
     <>
       <Header u={u} />
       <main className="page">
+        {u.email_verified === false && <VerifyBanner user={u} onVerified={onUserChanged} />}
         <PlanBanner onOpenBilling={onOpenBilling} />
+        <SetupGuide onAction={(step: SetupStep) => setModal(SETUP_MODALS[step])} />
         <div className="welcome">
           <div>
             <h1>{greeting()}, {u.name.split(" ")[0]}.</h1>
@@ -230,6 +235,15 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBill
         </Modal>
       )}
       {modal === "invite" && <InviteForm role="customer" onClose={() => setModal("")} />}
+      {modal === "machine" && (
+        <AddMachine
+          onClose={() => setModal("")}
+          onAdded={() => {
+            setModal("");
+            load();
+          }}
+        />
+      )}
       {modal === "addmech" && <InviteForm role="mechanic" onClose={() => setModal("")} />}
       {selectedMechanic && (
         <MechanicProfile mechanic={selectedMechanic} onClose={() => setSelectedMechanic(null)} />
@@ -237,6 +251,8 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBill
     </>
   );
 }
+// Which dialog each "Get set up" step opens.
+const SETUP_MODALS: Record<SetupStep, string> = { verify: "", customer: "invite", machine: "machine", mechanic: "addmech", job: "job" };
 function Header({ u }: { u: any }) {
   return (
     <header>

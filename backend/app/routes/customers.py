@@ -17,6 +17,7 @@ from app.models.service_record import ServiceRecord
 from app.models.user import User
 from app.routes.machines import out as machine_out
 from app.routes.services import out as record_out
+from app.services.accounts import send_invitation
 from app.services.billing import check_mechanic_limit, require_active
 from app.services.machine_work import with_work
 from app.services.notifications import notify, notify_bosses
@@ -124,6 +125,13 @@ def invite():
         raise ValidationError("Only customers and mechanics can be invited")
     if User.query.filter_by(email=email).first():
         raise ValidationError("This email address already has an account", 409)
+    if not user.email_verified_at:
+        # Invitations are emailed, so an unconfirmed account can't make the app email strangers.
+        raise ValidationError(
+            f"Confirm your email address first: open the link we sent to {user.email}. "
+            "You can send a new link from the banner at the top of the page.",
+            403,
+        )
     require_active(user.company_id, "invite people")
     if role == "mechanic":
         check_mechanic_limit(user.company_id)
@@ -139,7 +147,8 @@ def invite():
     )
     db.session.add(invitation)
     db.session.commit()
-    return jsonify(code=code, expires_at=invitation.expires_at.isoformat()), 201
+    emailed = send_invitation(invitation, user)
+    return jsonify(code=code, expires_at=invitation.expires_at.isoformat(), emailed=emailed), 201
 
 
 @bp.patch("/<int:cid>")

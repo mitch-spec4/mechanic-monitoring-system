@@ -28,7 +28,7 @@ export default function InviteForm({ role, onClose, onDone }: Props) {
   const text = COPY[role];
   const [formError, setFormError] = useState("");
   const [sending, setSending] = useState(false);
-  const [result, setResult] = useState<{ code: string; name: string; email: string; expires_at: string } | null>(null);
+  const [result, setResult] = useState<{ code: string; name: string; email: string; expires_at: string; emailed: boolean } | null>(null);
 
   const submit = async (event: any) => {
     event.preventDefault();
@@ -55,10 +55,17 @@ export default function InviteForm({ role, onClose, onDone }: Props) {
           email={result.email}
           onDone={finish}
           summary={
-            <>
-              Invitation created for <b>{result.name}</b>. Share this code with them. It works once, only for{" "}
-              <b>{result.email}</b>, and expires in 7 days.
-            </>
+            result.emailed ? (
+              <>
+                We emailed an invitation to <b>{result.email}</b>. You can also send <b>{result.name}</b> the code yourself, for example on
+                WhatsApp. It works once, only for that address, and expires in 7 days.
+              </>
+            ) : (
+              <>
+                Invitation created for <b>{result.name}</b>. Share this code with them. It works once, only for <b>{result.email}</b>, and
+                expires in 7 days.
+              </>
+            )
           }
           subject="Your MechanicPro invitation"
           lines={[
@@ -66,11 +73,9 @@ export default function InviteForm({ role, onClose, onDone }: Props) {
             "",
             "You've been invited to join our team on MechanicPro.",
             "",
-            `Your invitation code: ${result.code}`,
+            `Accept the invitation: ${window.location.origin}/#/join?${new URLSearchParams({ code: result.code, email: result.email })}`,
             "",
-            `1. Open ${window.location.origin}`,
-            '2. Choose "Have an invitation code?"',
-            `3. Enter the code, your name, this email address (${result.email}) and a password.`,
+            `Or open ${window.location.origin}, choose "Have an invitation code?" and enter ${result.code} with this email address (${result.email}).`,
             "",
             `The code works once and expires on ${formatExpiry(result.expires_at)}.`,
           ]}

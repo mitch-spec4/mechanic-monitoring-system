@@ -232,6 +232,7 @@ test("manager reset code lets a customer choose a new password", async ({ page }
   await page.getByRole("button", { name: "Open profile menu" }).click();
   await page.getByRole("button", { name: "Log out" }).click();
   await page.getByRole("button", { name: "Forgot password?" }).click();
+  await page.getByRole("button", { name: "Have a reset code from your manager?" }).click();
   await page.getByLabel("Reset code").fill(code);
   await page.getByLabel("Email").fill("kenya@example.com");
   await page.getByLabel("New password").fill("kenya-new-password");

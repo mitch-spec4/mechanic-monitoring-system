@@ -15,6 +15,8 @@ class User(db.Model):
     token_version = db.Column(db.Integer, nullable=False, default=0, server_default="0")
     # When a mechanic agreed to location sharing while clocked in (None: not agreed or withdrawn).
     location_consent_at = db.Column(db.DateTime)
+    # When the owner of the email address proved it (a verification or password-reset link).
+    email_verified_at = db.Column(db.DateTime)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
