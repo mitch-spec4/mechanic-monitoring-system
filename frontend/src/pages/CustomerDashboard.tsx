@@ -1,11 +1,11 @@
 import { useState, type FormEvent } from "react";
-import { ClipboardList, Plus, Star, Wrench } from "lucide-react";
+import { CheckCircle2, ClipboardList, Plus, Star, Wrench } from "lucide-react";
 import { createRequest, createReview, jobs, machines, requests, reviews, services, type User } from "../services/api";
 import Notifications from "../components/Notifications";
 import Modal from "../components/Modal";
 import { toast } from "../components/Feedback";
 import { errorMessage } from "../lib/format";
-import { PRIORITIES } from "../lib/labels";
+import { PRIORITIES, statusClass } from "../lib/labels";
 import { usePolling } from "../lib/usePolling";
 import { mark, t } from "../i18n";
 
@@ -88,12 +88,14 @@ export default function CustomerDashboard({ u, onOpenJob }: { u: User; onOpenJob
             </div>
           </div>
           <div className="stat">
+            <CheckCircle2 />
             <div>
               <b>{records.length}</b>
               <span>{t("Service visits")}</span>
             </div>
           </div>
           <div className="stat">
+            <Wrench />
             <div>
               <b>{openJobs.length}</b>
               <span>{t("Open jobs")}</span>
@@ -117,7 +119,7 @@ export default function CustomerDashboard({ u, onOpenJob }: { u: User; onOpenJob
                 <b>{x.name}</b>
                 <span>{t("{model} · Serial {serial}", { model: x.model || t("Model not recorded"), serial: x.serial_no })}</span>
               </div>
-              <strong>{t(x.status)}</strong>
+              <span className={`machineStatus ${statusClass(x.status)}`}>{t(x.status)}</span>
             </div>
           ))}
         </section>
@@ -138,7 +140,7 @@ export default function CustomerDashboard({ u, onOpenJob }: { u: User; onOpenJob
                       {t(request.status)} · {request.description}
                     </span>
                   </div>
-                  <span className="priority">{t(request.priority)}</span>
+                  <span className="priority" data-level={statusClass(request.priority)}>{t(request.priority)}</span>
                 </div>
               ))
             )}
@@ -155,7 +157,7 @@ export default function CustomerDashboard({ u, onOpenJob }: { u: User; onOpenJob
                   </button>
                   <span>{job.location || t("Site not set")}</span>
                 </div>
-                <span className="status">{t(job.status)}</span>
+                <span className={`status ${statusClass(job.status)}`}>{t(job.status)}</span>
               </div>
             ))}
             {openJobs.length === 0 && <p className="muted">{t("No upcoming services.")}</p>}

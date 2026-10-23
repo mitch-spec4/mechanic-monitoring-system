@@ -6,6 +6,7 @@ import { asDate, errorMessage, formatDay as day, formatTime as time, fromZoneInp
 import { mapLink } from "../lib/location";
 import { t } from "../i18n";
 import "./Team.css";
+import { EmptyState } from "./States";
 
 /** Shift times and hours. Managers see everyone and can fix a clock-out; technicians see their own. */
 export default function ShiftsView({ user }: { user: any }) {
@@ -61,10 +62,7 @@ export default function ShiftsView({ user }: { user: any }) {
         </span>
       </div>
       {shifts && shifts.length === 0 ? (
-        <div className="subEmpty">
-          <strong>{t("No shifts in this period")}</strong>
-          <span>{t("Shifts appear here when technicians clock in.")}</span>
-        </div>
+        <EmptyState icon={<Clock size={26} />} title={t("No shifts in this period")} text={t("Shifts appear here when technicians clock in.")} />
       ) : (
         <div className={`shiftTable ${isBoss ? "" : "own"}`} role="table" aria-label={t("Shifts")}>
           <div className="shiftRow shiftHead" role="row">

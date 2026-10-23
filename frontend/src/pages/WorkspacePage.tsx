@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import {
+  AlertTriangle,
   BarChart3,
   Bell,
   CheckCircle2,
@@ -34,6 +35,7 @@ import SettingsPanel from "../components/SettingsPanel";
 import { ROLE_NAMES } from "../components/Sidebar";
 import { errorMessage, formatBytes, formatDate } from "../lib/format";
 import { mark, t } from "../i18n";
+import { EmptyState, Loading } from "../components/States";
 
 type Props = { title: string; user: User; onOpenJob?: (id: number) => void; onOpenCustomer?: (id: number) => void; onUserChanged?: (user: User) => void };
 type Icon = LucideIcon;
@@ -178,13 +180,14 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
   };
 
   const body = () => {
-    if (error) return <Empty title={t("Unable to load data")} text={error} />;
+    if (error) return <EmptyState icon={<AlertTriangle size={26} />} title={t("Unable to load data")} text={error} />;
     switch (title) {
       case "My Company":
-        return companyInfo ? <CompanyView company={companyInfo} /> : <Empty title={t("Loading")} text={t("Fetching your company details.")} />;
+        return companyInfo ? <CompanyView company={companyInfo} /> : <Loading label={t("Fetching your company details.")} />;
       case "Help & Support":
         return (
-          <Empty
+          <EmptyState
+            icon={<HelpCircle size={26} />}
             title={t("Need help?")}
             text={t("Contact your company manager for access, invitations, or questions about a job. Use the sidebar to move between your jobs, records, and notifications.")}
           />
@@ -197,7 +200,7 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
       case "My Shifts":
         return <ShiftsView user={user} />;
       case "Messages":
-        return <Empty title={t("Messaging is not connected")} text={t("Conversation storage and permissions will appear here when the messaging service is enabled.")} />;
+        return <EmptyState icon={<MessageSquare size={26} />} title={t("Messaging is not connected")} text={t("Conversation storage and permissions will appear here when the messaging service is enabled.")} />;
       case "Settings":
       case "Profile":
         return <SettingsPanel user={user} onUserChanged={onUserChanged} />;
@@ -206,7 +209,7 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
       return <MachinesByCustomer machines={items} customers={customerList} query={query} onOpenJob={onOpenJob} onOpenCustomer={onOpenCustomer} onChanged={added} />;
     }
     if (!filtered.length) {
-      return <Empty title={t("Nothing here yet")} text={t("New records will appear here as your team uses the workspace.")} />;
+      return <EmptyState icon={<Icon size={26} />} title={t("Nothing here yet")} text={t("New records will appear here as your team uses the workspace.")} />;
     }
     return (
       <div className="subPageList">
@@ -477,15 +480,6 @@ function ReportSummary({ summary }: { summary: Row }) {
           </div>
         </section>
       </div>
-    </div>
-  );
-}
-
-function Empty({ title, text }: { title: string; text: string }) {
-  return (
-    <div className="subEmpty">
-      <strong>{title}</strong>
-      <span>{text}</span>
     </div>
   );
 }

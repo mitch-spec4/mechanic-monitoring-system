@@ -24,6 +24,8 @@ import { LANGUAGE_CHANGED_EVENT, setLanguage, t } from "./i18n";
 import "./style.css";
 import "./components/DashboardShell.css";
 import "./components/Buttons.css";
+// Last, so the look of the app sits on top of each page's layout.
+import "./styles/bold.css";
 
 export default function App() {
 	return (

@@ -126,19 +126,19 @@
   transform: translateY(-2px);
   box-shadow: 0 8px 16px -10px color-mix(in srgb, var(--tone) 70%, transparent);
 }
-.appShell .iconButton[title="Edit job"]:hover svg {
+.appShell .iconButton.edit:hover svg {
   transform: rotate(-14deg) scale(1.08);
 }
-.appShell .iconButton[title="Cancel job"]:hover {
+.appShell .iconButton.cancel:hover {
   --tone: #c27803;
 }
-.appShell .iconButton[title="Cancel job"]:hover svg {
+.appShell .iconButton.cancel:hover svg {
   transform: rotate(90deg);
 }
-.appShell .iconButton[title="Delete job"]:hover {
+.appShell .iconButton.delete:hover {
   --tone: #d03535;
 }
-.appShell .iconButton[title="Delete job"]:hover svg {
+.appShell .iconButton.delete:hover svg {
   animation: btn-shake 0.4s var(--btn-ease);
 }
 .appShell .iconButton:active {

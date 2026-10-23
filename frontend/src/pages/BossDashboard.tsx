@@ -22,7 +22,7 @@ import { AddMachine } from "../components/MachineForms";
 import { confirmAction, toast } from "../components/Feedback";
 import { errorMessage, formatDate, greeting } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
-import { PRIORITIES, REQUEST_STATUSES } from "../lib/labels";
+import { PRIORITIES, REQUEST_STATUSES, statusClass } from "../lib/labels";
 import type { User } from "../services/api";
 import { t } from "../i18n";
 import { PlanBanner } from "./BillingPage";
@@ -150,7 +150,7 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBill
                   <span>{r.description}</span>
                 </div>
                 <div className="requestActions">
-                  <span className="priority">{t(r.priority)}</span>
+                  <span className="priority" data-level={statusClass(r.priority)}>{t(r.priority)}</span>
                   <select aria-label={t("Status for {subject}", { subject: r.subject })} value={r.status} onChange={(e) => changeRequestStatus(r.id, e.target.value)}>
                     {REQUEST_STATUSES.map((status) => (
                       <option key={status} value={status}>
@@ -196,7 +196,7 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBill
                     {job.location || t("Site not set")} · {formatDate(job.due_date) || t("Date not set")}
                   </span>
                 </div>
-                <span className="status">{t(job.status)}</span>
+                <span className={`status ${statusClass(job.status)}`}>{t(job.status)}</span>
               </div>
             ))}
           </Panel>
@@ -365,7 +365,7 @@ function JobRow({ j, mechanics, onAssign, onDelete, onCancel, onEdit, onOpen }: 
           <button className="titleLink" onClick={() => onOpen(j.id)}>
             <b>{j.title}</b>
           </button>
-          <span className={`status ${j.status.replace(/ /g, "").toLowerCase()}`}>{t(j.status)}</span>
+          <span className={`status ${statusClass(j.status)}`}>{t(j.status)}</span>
         </div>
         <p>{j.description}</p>
         <small>
@@ -381,13 +381,13 @@ function JobRow({ j, mechanics, onAssign, onDelete, onCancel, onEdit, onOpen }: 
         ))}
       </select>
       {CANCELLABLE.includes(j.status) && (
-        <button className="iconButton" title={t("Edit job")} aria-label={t("Edit {title}", { title: j.title })} onClick={() => onEdit(j)}>
+        <button className="iconButton edit" title={t("Edit job")} aria-label={t("Edit {title}", { title: j.title })} onClick={() => onEdit(j)}>
           <Pencil size={15} />
         </button>
       )}
       {CANCELLABLE.includes(j.status) && (
         <button
-          className="iconButton"
+          className="iconButton cancel"
           title={t("Cancel job")}
           aria-label={t("Cancel {title}", { title: j.title })}
           onClick={async () => {
@@ -405,7 +405,7 @@ function JobRow({ j, mechanics, onAssign, onDelete, onCancel, onEdit, onOpen }: 
       )}
       {DELETABLE.includes(j.status) && (
         <button
-          className="iconButton"
+          className="iconButton delete"
           title={t("Delete job")}
           aria-label={t("Delete {title}", { title: j.title })}
           onClick={async () => {

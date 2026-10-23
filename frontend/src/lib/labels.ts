@@ -15,3 +15,6 @@ export const REQUEST_STATUSES = [
   mark("Cancelled"),
 ];
 export const EQUIPMENT_STATUSES = [mark("Operational"), mark("Under Maintenance"), mark("Under Repair"), mark("Retired")];
+
+/** The class a status gets for its colour: "In Progress" -> "inprogress". */
+export const statusClass = (status?: string | null) => String(status || "").replace(/ /g, "").toLowerCase();

@@ -392,7 +392,6 @@ export const SW: Record<string, string> = {
   "Leave reviews": "Toa tathmini",
   "Light": "Mwanga",
   "Live workspace data": "Data hai ya eneo la kazi",
-  "Loading": "Inapakia",
   "Loading billing…": "Inapakia malipo…",
   "Loading checkout…": "Inapakia malipo…",
   "Loading customer…": "Inapakia mteja…",

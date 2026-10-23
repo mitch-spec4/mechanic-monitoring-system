@@ -6,6 +6,7 @@ import SignatureModal, { type SignOff } from "../components/SignatureModal";
 import { errorMessage, formatDate, formatDay, greeting } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
 import { t } from "../i18n";
+import { EmptyState } from "../components/States";
 
 type Props = { u: User; onOpenJob: (id: number) => void };
 // Lists from the API, read loosely: each panel uses a few fields.
@@ -186,11 +187,7 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
           <Advice service={latestService} />
         </Panel>
         <Panel title={t("Documents")} icon={<FileText />} className="documentsPanel">
-          <div className="documentEmpty">
-            <FileText size={20} />
-            <strong>{t("No documents yet")}</strong>
-            <span>{t("Service reports and inspection files will appear here.")}</span>
-          </div>
+          <EmptyState icon={<FileText size={26} />} title={t("No documents yet")} text={t("Service reports and inspection files will appear here.")} />
         </Panel>
       </section>
     </div>

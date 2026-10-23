@@ -8,6 +8,7 @@ import { toast } from "./Feedback";
 import { ROLE_NAMES } from "./Sidebar";
 import { setTheme, theme, THEMES, type Theme } from "../lib/theme";
 import { t } from "../i18n";
+import { Loading } from "./States";
 
 type Props = { user: User; onUserChanged: (user: User) => void };
 
@@ -135,7 +136,7 @@ function CompanySettingsForm({ user, onUserChanged }: Props) {
       <p className="muted">{t("These apply to everyone in your company.")}</p>
       {error && <div className="error">{error}</div>}
       {!settings ? (
-        !error && <p className="muted">{t("Loading…")}</p>
+        !error && <Loading />
       ) : (
         <>
           <div className="formGroup">

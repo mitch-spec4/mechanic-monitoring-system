@@ -42,6 +42,7 @@ import type { User } from "../services/api";
 import { mark, t } from "../i18n";
 import { Trans } from "../i18n/Trans";
 import "./JobPage.css";
+import { Loading } from "../components/States";
 
 type Props = { jobId: number; user: User; onBack: () => void };
 // The worksheet as the API sends it, read loosely: it has many nested parts.
@@ -170,7 +171,7 @@ export default function JobPage({ jobId, user, onBack }: Props) {
     return (
       <main className="jobPage">
         <BackButton onBack={onBack} />
-        {error ? <div className="error">{error}</div> : <p className="muted">{t("Loading job…")}</p>}
+        {error ? <div className="error">{error}</div> : <Loading label={t("Loading job…")} />}
       </main>
     );
   }
