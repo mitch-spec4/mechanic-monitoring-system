@@ -117,6 +117,14 @@ def confirm_upload(fid):
         db.session.delete(record)
         db.session.commit()
         raise ValidationError("The file is larger than the limit", 413)
+    try:
+        # Checked again here: uploads started together all passed the check when they were reserved.
+        check_storage(record.company_id, size, lock=True)
+    except ValidationError:
+        storage().delete(record.storage_key)
+        db.session.delete(record)
+        db.session.commit()
+        raise
     record.size_bytes = size
     record.status = "ready"
     record_event(job, user, "file_added", note=f"Added a {KIND_LABEL[record.kind]}")

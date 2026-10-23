@@ -2,6 +2,7 @@
 import math
 
 from flask import Blueprint, abort, jsonify
+from sqlalchemy.exc import IntegrityError
 
 from app import db
 from app.models.billing import Payment
@@ -75,6 +76,13 @@ def pricing():
     }
 
 
+EMAIL_TAKEN = "An account with this email already exists. Sign in instead."
+
+
+def email_in_use(email):
+    return User.query.filter_by(email=email).first() is not None
+
+
 def read_plan(data, required=False):
     plan = choice(data, "plan", tuple(PLANS), "Plan")
     if not plan and required:
@@ -101,8 +109,8 @@ def signup():
     password = new_password(data)
     plan, interval = read_plan(data)
     pay_now = data.get("pay_now") is True
-    if User.query.filter_by(email=email).first():
-        raise ValidationError("An account with this email already exists. Sign in instead.", 409)
+    if email_in_use(email):
+        raise ValidationError(EMAIL_TAKEN, 409)
     if pay_now and not provider():
         raise ValidationError("Online payments aren't set up yet. Start with the free trial.", 409)
 
@@ -112,7 +120,12 @@ def signup():
     boss = User(name=name, email=email, role="boss", company_id=company.id)
     boss.set_password(password)
     db.session.add(boss)
-    db.session.flush()
+    try:
+        db.session.flush()
+    except IntegrityError:
+        # Another signup with this email got in first, after the check above.
+        db.session.rollback()
+        raise ValidationError(EMAIL_TAKEN, 409)
     start_trial(company.id, plan)
     extra = {}
     if pay_now:

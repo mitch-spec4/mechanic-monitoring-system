@@ -150,8 +150,11 @@ def storage_used(company_id):
     )
 
 
-def check_storage(company_id, adding_bytes):
-    subscription = subscription_for(company_id)
+def check_storage(company_id, adding_bytes, lock=False):
+    """Refuse a file that would take the company past its plan's storage. With `lock`, checks made
+    at the same moment wait for each other, so two uploads can't both squeeze into the last space."""
+    query = Subscription.query.filter_by(company_id=company_id)
+    subscription = (query.with_for_update() if lock else query).first()
     if not subscription:
         return
     plan = PLANS[subscription.plan]

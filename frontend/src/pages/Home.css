@@ -151,6 +151,9 @@ body:has(.site) {
   display: flex;
   gap: 9px;
 }
+.site .navActions .btn {
+  white-space: nowrap;
+}
 
 /* ---------- Hero ---------- */
 .site .hero {
@@ -214,12 +217,24 @@ body:has(.site) {
   overflow: hidden;
 }
 .site .dots {
+  display: flex;
+  align-items: center;
   height: 40px;
   padding: 13px 16px;
   border-bottom: 1px solid #192f46;
   color: #627b94;
   font-size: 12px;
   line-height: 1.2;
+}
+.site .dots .sample {
+  margin-left: auto;
+  padding: 3px 9px;
+  border: 1px solid #203853;
+  border-radius: 99px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .site .dash {
   display: grid;
@@ -933,6 +948,26 @@ body:has(.site) {
   .site .navActions .btn {
     padding: 8px 11px;
     font-size: 13px;
+  }
+}
+@media (max-width: 360px) {
+  .site .siteLogo {
+    gap: 7px;
+    font-size: 15px;
+  }
+  .site .logoIcon {
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
+  }
+  .site .navActions .btn {
+    padding: 8px 9px;
+    font-size: 12px;
+  }
+}
+@media (max-width: 340px) {
+  .site .logoText {
+    display: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {

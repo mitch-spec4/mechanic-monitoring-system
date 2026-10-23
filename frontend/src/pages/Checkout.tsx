@@ -45,7 +45,7 @@ export default function Checkout({ reference, user, onDone }: Props) {
           <section className="formCard checkoutCard">
             <h1>Log in to finish paying</h1>
             <p className="lead">This checkout belongs to a company account.</p>
-            <button className="btn primary wide" onClick={() => go("/signin")}>
+            <button className="btn primary wide" onClick={() => go(`/signin?next=${encodeURIComponent(`/checkout/${reference}`)}`)}>
               Log in
             </button>
           </section>

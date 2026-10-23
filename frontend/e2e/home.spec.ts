@@ -15,6 +15,7 @@ test("the homepage explains the product and shows the plans", async ({ page }) =
   const noErrors = failOnPageErrors(page);
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Run your service team from one place.");
+  await expect(page.locator(".preview .sample")).toHaveText("Sample data");
   await expect(page.locator(".role h3")).toHaveText(["Boss / Manager", "Mechanic", "Customer"]);
   const pricing = page.locator("#subscriptions");
   await expect(pricing.locator(".plan h3")).toHaveText(["Starter", "Professional", "Business"]);
@@ -97,5 +98,26 @@ test("a manager changes plan from the homepage", async ({ page }) => {
   await expect(page.locator(".billingPage")).toBeVisible();
   await expect(page.locator(".planCard.focused h3")).toHaveText("Business");
   await expect(page.locator(".planCard.focused")).toContainText("KSh 12,000");
+  noErrors();
+});
+
+test("signing in from a checkout comes back to it", async ({ page }) => {
+  const noErrors = failOnPageErrors(page);
+  await page.goto("/#/signup?plan=starter");
+  await fillSignup(page, "finance@riftpower.test");
+  await page.getByRole("button", { name: "Pay now and skip the trial" }).click();
+  await expect(page.locator(".orderSummary")).toContainText("Starter · Monthly");
+  // The session ends, then the same checkout link is opened.
+  await page.context().clearCookies();
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Log in to finish paying" })).toBeVisible();
+  await page.getByRole("button", { name: "Log in" }).click();
+  await page.getByLabel("Email").fill("finance@riftpower.test");
+  await page.getByLabel("Password").fill("rift-valley-1");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.locator(".orderTotal")).toContainText("KSh 1,500");
+  await page.getByRole("button", { name: "Pay KSh 1,500" }).click();
+  await expect(page.getByRole("heading", { name: "Payment received" })).toBeVisible();
   noErrors();
 });

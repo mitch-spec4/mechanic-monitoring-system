@@ -10,7 +10,7 @@ import Home from "./pages/Home";
 import Signup from "./pages/Signup";
 import Checkout from "./pages/Checkout";
 import BillingPage from "./pages/BillingPage";
-import { go, useRoute } from "./lib/route";
+import { go, readRoute, useRoute } from "./lib/route";
 import type { Interval } from "./components/Plans";
 import Profile from "./components/Profile";
 import Sidebar from "./components/Sidebar";
@@ -63,10 +63,11 @@ export default function App() {
 	};
 
 	useEffect(() => {
-		// An ended session goes back to the sign-in page, not the homepage.
+		// An ended session goes back to the sign-in page, not the homepage; a checkout is kept.
 		const expired = () => {
 			signedOut();
-			go("/signin");
+			const { path } = readRoute();
+			go(path.startsWith("/checkout/") ? `/signin?next=${encodeURIComponent(path)}` : "/signin");
 		};
 		window.addEventListener(SESSION_EXPIRED_EVENT, expired);
 		return () => window.removeEventListener(SESSION_EXPIRED_EVENT, expired);
@@ -92,12 +93,13 @@ export default function App() {
 				<Login
 					done={(loggedInUser: any) => {
 						signedIn(loggedInUser);
+						const next = route.query.get("next") || "";
 						// "Already using MechanicPro?" on the homepage leads to Billing, with the chosen plan picked out.
-						if (route.query.get("next") === "billing" && loggedInUser.role === "boss") {
+						if (next === "billing" && loggedInUser.role === "boss") {
 							setBillingFocus({ plan: route.query.get("plan") || "", interval: route.query.get("interval") === "year" ? "year" : "month" });
 							setActive("Billing");
 						}
-						go("/");
+						go(next.startsWith("/checkout/") ? next : "/");
 					}}
 				/>
 			);
