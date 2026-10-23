@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { ArrowRight, Check, CreditCard, ShieldCheck } from "lucide-react";
 import { saveSession, signup } from "../services/api";
 import { go, money } from "../lib/route";
-import { IntervalSwitch, SiteHeader, usePricing } from "./Home";
+import { usePricing, type Interval } from "../components/Plans";
+import { PeriodToggle, SiteNav } from "./Home";
 import { errorMessage } from "../lib/format";
 import "./Home.css";
 
@@ -10,23 +10,26 @@ type Props = { query: URLSearchParams; onSignedIn: (user: any, checkoutUrl?: str
 
 /** A new company and its owner. Every plan starts as a free trial; paying now skips it. */
 export default function Signup({ query, onSignedIn }: Props) {
-  const pricing = usePricing();
-  const [plan, setPlan] = useState(query.get("plan") || "team");
-  const [interval, setPeriod] = useState<"month" | "year">(query.get("interval") === "year" ? "year" : "month");
+  const [pricing, failed] = usePricing();
+  const [plan, setPlan] = useState(query.get("plan") || "professional");
+  const [interval, setPeriod] = useState<Interval>(query.get("interval") === "year" ? "year" : "month");
   const [form, setForm] = useState({ company_name: "", name: "", email: "", password: "" });
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  const chosen = pricing?.plans.find((item) => item.key === plan) || pricing?.plans[1];
+  // A link to a plan that doesn't exist (or no longer does) falls back to Professional.
+  const chosen = pricing?.plans.find((item) => item.key === plan) || pricing?.plans.find((item) => item.key === "professional") || pricing?.plans[0];
+  const trialDays = pricing?.trial_days ?? 14;
   const field = (key: keyof typeof form) => ({
     value: form[key],
     onChange: (event: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [key]: event.target.value }),
   });
 
   const submit = async (payNow: boolean) => {
+    if (!chosen) return;
     setError("");
     setBusy(payNow ? "Preparing checkout…" : "Creating your account…");
     try {
-      const data = await signup({ ...form, plan, interval, pay_now: payNow });
+      const data = await signup({ ...form, plan: chosen.key, interval, pay_now: payNow });
       saveSession(data.user);
       onSignedIn(data.user, data.checkout_url);
     } catch (problem) {
@@ -37,22 +40,30 @@ export default function Signup({ query, onSignedIn }: Props) {
 
   return (
     <div className="site signupPage">
-      <SiteHeader />
-      <main className="signupLayout">
+      <SiteNav>
+        <div className="navActions">
+          <button className="btn outline" onClick={() => go("/signin")}>
+            Log in
+          </button>
+        </div>
+      </SiteNav>
+      <main className="container signupLayout">
         <form
-          className="signupCard"
+          className="formCard"
           onSubmit={(event) => {
             event.preventDefault();
             submit(false);
           }}
         >
-          <h1>Start your free trial</h1>
-          <p className="muted">Set up your company in a minute. You'll be its manager, and you can invite your team afterwards.</p>
+          <div className="badge">● {trialDays}-day free trial · no card needed</div>
+          <h1>Create your account</h1>
+          <p className="lead">Set up your company in a minute. You'll be its manager, and you can invite your team afterwards.</p>
           {error && (
             <div className="error" role="alert">
               {error}
             </div>
           )}
+          {failed && <div className="error">Plans couldn't be loaded. Refresh the page to try again.</div>}
           <label>
             Company name
             <input {...field("company_name")} required maxLength={150} placeholder="e.g. Rift Valley Power Services" />
@@ -69,30 +80,36 @@ export default function Signup({ query, onSignedIn }: Props) {
             Password
             <input {...field("password")} type="password" required minLength={8} autoComplete="new-password" placeholder="At least 8 characters" />
           </label>
-          <fieldset className="planPicker">
-            <legend>Plan</legend>
-            {pricing?.plans.map((item) => (
-              <label key={item.key} className={plan === item.key ? "chosen" : ""}>
-                <input type="radio" name="plan" value={item.key} checked={plan === item.key} onChange={() => setPlan(item.key)} />
-                <strong>{item.name}</strong>
-                <span>Up to {item.mechanics} mechanics</span>
-                <em>{money(item.prices.month, pricing.currency)}/mo</em>
-              </label>
-            ))}
-          </fieldset>
-          {pricing && <IntervalSwitch value={interval} onChange={setPeriod} freeMonths={12 - pricing.yearly_months} />}
-          <button className="primary" disabled={!!busy}>
-            {busy && busy.startsWith("Creating") ? busy : `Start ${pricing?.trial_days ?? 14}-day free trial`} <ArrowRight size={16} />
+          {pricing && (
+            <>
+              <fieldset className="planPicker">
+                <legend>Plan</legend>
+                {pricing.plans.map((item) => (
+                  <label key={item.key} className={chosen?.key === item.key ? "chosen" : ""}>
+                    <input type="radio" name="plan" value={item.key} checked={chosen?.key === item.key} onChange={() => setPlan(item.key)} />
+                    <strong>{item.name}</strong>
+                    <span>Up to {item.mechanics} mechanics</span>
+                    <em>
+                      {money(item.prices[interval], pricing.currency)} / {interval}
+                    </em>
+                  </label>
+                ))}
+              </fieldset>
+              <PeriodToggle value={interval} onChange={setPeriod} freeMonths={12 - pricing.yearly_months} />
+            </>
+          )}
+          <button className="btn primary wide" disabled={!!busy || !chosen}>
+            {busy && busy.startsWith("Creating") ? busy : `Start ${trialDays}-day free trial →`}
           </button>
           {pricing?.payment_provider && (
-            <button type="button" className="secondary" disabled={!!busy} onClick={(event) => event.currentTarget.form?.reportValidity() && submit(true)}>
-              <CreditCard size={16} /> {busy && busy.startsWith("Preparing") ? busy : "Pay now and skip the trial"}
+            <button type="button" className="btn outline wide" disabled={!!busy} onClick={(event) => event.currentTarget.form?.reportValidity() && submit(true)}>
+              {busy && busy.startsWith("Preparing") ? busy : "Pay now and skip the trial"}
             </button>
           )}
-          <p className="signupSmall">
+          <p className="formSmall">
             Already have an account?{" "}
-            <button type="button" className="siteLink" onClick={() => go("/signin")}>
-              Sign in
+            <button type="button" className="textLink" onClick={() => go("/signin")}>
+              Log in
             </button>
           </p>
         </form>
@@ -102,30 +119,20 @@ export default function Signup({ query, onSignedIn }: Props) {
             <span className="summaryLabel">Your plan</span>
             <h2>{chosen.name}</h2>
             <p className="summaryPrice">
-              {money(chosen.prices[interval], pricing.currency)} <span>/ {interval === "year" ? "year" : "month"}</span>
+              {money(chosen.prices[interval], pricing.currency)} <small>/ {interval}</small>
             </p>
-            <p className="muted">
+            <p className="summaryNote">
               {interval === "year"
                 ? `${12 - pricing.yearly_months} months free compared with paying monthly.`
-                : "Switch to yearly billing for two months free."}
+                : `Switch to yearly billing for ${12 - pricing.yearly_months} months free.`}
             </p>
             <ul>
-              <li>
-                <Check size={15} /> {pricing.trial_days}-day free trial, no card needed
-              </li>
-              <li>
-                <Check size={15} /> Up to {chosen.mechanics} mechanics
-              </li>
-              <li>
-                <Check size={15} /> {chosen.storage_gb} GB for photos and videos
-              </li>
-              <li>
-                <Check size={15} /> Unlimited customers, machines and jobs
-              </li>
+              <li>{pricing.trial_days}-day free trial, no card needed</li>
+              <li>Up to {chosen.mechanics} mechanics</li>
+              <li>{chosen.storage_gb} GB for photos, videos and signatures</li>
+              <li>Unlimited customers, machines and jobs</li>
             </ul>
-            <p className="summaryNote">
-              <ShieldCheck size={15} /> Your company's data is only visible to the people you invite.
-            </p>
+            <p className="summaryPrivacy">Your company's data is only visible to the people you invite.</p>
           </aside>
         )}
       </main>

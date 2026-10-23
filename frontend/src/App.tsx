@@ -11,6 +11,7 @@ import Signup from "./pages/Signup";
 import Checkout from "./pages/Checkout";
 import BillingPage from "./pages/BillingPage";
 import { go, useRoute } from "./lib/route";
+import type { Interval } from "./components/Plans";
 import Profile from "./components/Profile";
 import Sidebar from "./components/Sidebar";
 import { LocationIndicator, ShiftProvider } from "./components/Shift";
@@ -27,10 +28,12 @@ export default function App() {
 	const [active, setActive] = useState("Dashboard");
 	const [openJobId, setOpenJobId] = useState<number | null>(null);
 	const [openCustomerId, setOpenCustomerId] = useState<number | null>(null);
+	const [billingFocus, setBillingFocus] = useState<{ plan: string; interval: Interval }>();
 	const route = useRoute();
 	const navigate = (label: string) => {
 		setOpenJobId(null);
 		setOpenCustomerId(null);
+		setBillingFocus(undefined);
 		setActive(label);
 	};
 	const openCustomer = (id: number) => {
@@ -89,6 +92,11 @@ export default function App() {
 				<Login
 					done={(loggedInUser: any) => {
 						signedIn(loggedInUser);
+						// "Already using MechanicPro?" on the homepage leads to Billing, with the chosen plan picked out.
+						if (route.query.get("next") === "billing" && loggedInUser.role === "boss") {
+							setBillingFocus({ plan: route.query.get("plan") || "", interval: route.query.get("interval") === "year" ? "year" : "month" });
+							setActive("Billing");
+						}
 						go("/");
 					}}
 				/>
@@ -114,7 +122,7 @@ export default function App() {
 	) : openCustomerId ? (
 		<CustomerPage key={openCustomerId} customerId={openCustomerId} onBack={() => setOpenCustomerId(null)} onOpenJob={openJob} />
 	) : active === "Billing" && user.role === "boss" ? (
-		<BillingPage />
+		<BillingPage focus={billingFocus} />
 	) : active !== "Dashboard" && active !== "Profile" ? (
 		<WorkspacePage title={active} user={user} onOpenJob={openJob} onOpenCustomer={openCustomer} />
 	) : user.role === "boss" ? (

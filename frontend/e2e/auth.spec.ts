@@ -3,7 +3,7 @@ import { openPage, signIn } from "./helpers";
 
 test("sign-in page shows no demo credentials", async ({ page }) => {
   await page.goto("/#/signin");
-  await expect(page).toHaveTitle("MechanicPro");
+  await expect(page).toHaveTitle("MechanicPro | Field Service Management");
   await expect(page.getByLabel("Email")).toHaveValue("");
   await expect(page.getByLabel("Password")).toHaveValue("");
   await expect(page.getByText(/demo accounts/i)).toHaveCount(0);

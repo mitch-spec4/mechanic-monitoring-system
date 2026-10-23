@@ -79,7 +79,7 @@ def read_plan(data, required=False):
     plan = choice(data, "plan", tuple(PLANS), "Plan")
     if not plan and required:
         raise ValidationError("Plan is required")
-    return plan or "team", choice(data, "interval", INTERVALS, "Billing period", default="month")
+    return plan or "professional", choice(data, "interval", INTERVALS, "Billing period", default="month")
 
 
 @bp.get("/plans")

@@ -6,7 +6,7 @@ Built with React + TypeScript (Vite) on the frontend and Flask, SQLAlchemy, Alem
 
 ## Features
 
-- **A public homepage with plans.** Companies sign up themselves and start a 14-day free trial; plans (Starter, Team, Business) set how many mechanics and how much storage they get. Payment runs in test mode until a real payment provider is connected.
+- **A public homepage with plans.** Companies sign up themselves and start a 14-day free trial; plans (Starter, Professional and Business, priced in Kenyan shillings) set how many mechanics and how much storage they get. Payment runs in test mode until a real payment provider is connected.
 - **Role-based dashboards** for managers (boss), mechanics and customers, with every query scoped to the user's company.
 - **Invite-only team accounts.** Managers issue single-use invitation codes for their mechanics and customers that expire after 7 days.
 - **A job workflow with enforced statuses:** Pending → Assigned → Accepted → In Progress ⇄ Paused → Completed. Mechanics can't decline or cancel jobs.
