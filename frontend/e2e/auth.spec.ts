@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { openPage, signIn } from "./helpers";
 
 test("sign-in page shows no demo credentials", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/#/signin");
   await expect(page).toHaveTitle("MechanicPro");
   await expect(page.getByLabel("Email")).toHaveValue("");
   await expect(page.getByLabel("Password")).toHaveValue("");
@@ -11,7 +11,7 @@ test("sign-in page shows no demo credentials", async ({ page }) => {
 });
 
 test("wrong password shows an error", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/#/signin");
   await page.getByLabel("Email").fill("james@mechanicpro.test");
   await page.getByLabel("Password").fill("not-the-password");
   await page.getByRole("button", { name: "Sign in" }).click();

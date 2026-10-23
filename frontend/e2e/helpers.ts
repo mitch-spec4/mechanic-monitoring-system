@@ -3,7 +3,7 @@ import { expect, type Page } from "@playwright/test";
 export const DEMO_PASSWORD = "password";
 
 export async function signIn(page: Page, email: string, password = DEMO_PASSWORD) {
-  await page.goto("/");
+  await page.goto("/#/signin");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();

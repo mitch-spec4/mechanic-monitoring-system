@@ -103,6 +103,9 @@ def build_config():
         "MAX_PHOTO_MB": int(os.getenv("MAX_PHOTO_MB", "10")),
         "MAX_VIDEO_MB": int(os.getenv("MAX_VIDEO_MB", "50")),
         "MAX_VIDEO_SECONDS": int(os.getenv("MAX_VIDEO_SECONDS", "60")),
+        # Taking payment for plans: "test" (a pretend card page, development only) or "none"
+        # (free trials only) until a real provider is connected. See SETUP.md.
+        "BILLING_PROVIDER": os.getenv("BILLING_PROVIDER", "none" if is_production else "test").strip().lower(),
         # Sessions live in httpOnly cookies (unreadable by page scripts), with CSRF protection
         # on every state-changing request. Headers are also accepted for API clients and tests.
         "JWT_TOKEN_LOCATION": ["headers", "cookies"],
@@ -127,9 +130,11 @@ def create_app(overrides=None):
         count = app.config["TRUSTED_PROXY_COUNT"]
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=count, x_proto=count, x_host=count)
 
+    from app.services.billing import init_billing
     from app.services.storage import init_storage
 
     init_storage(app)
+    init_billing(app)
     CORS(app, origins=app.config["CORS_ORIGINS"], supports_credentials=True)
     db.init_app(app)
     jwt.init_app(app)
@@ -137,6 +142,7 @@ def create_app(overrides=None):
 
     from app import models  # noqa: F401  (register models for migrations)
     from app.routes.auth import bp as auth
+    from app.routes.billing import bp as billing
     from app.routes.checklists import bp as checklists
     from app.routes.company import bp as company
     from app.routes.customers import bp as customers
@@ -167,6 +173,7 @@ def create_app(overrides=None):
     app.register_blueprint(media, url_prefix="/api")
     app.register_blueprint(shifts, url_prefix="/api/shifts")
     app.register_blueprint(location, url_prefix="/api/location")
+    app.register_blueprint(billing, url_prefix="/api")
 
     @app.cli.command("purge-locations")
     def purge_locations():

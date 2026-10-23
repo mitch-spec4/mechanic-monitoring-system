@@ -51,9 +51,9 @@ def access_token_for(user):
     return create_access_token(identity=str(user.id), additional_claims=claims_for(user))
 
 
-def signed_in_response(user, status=200):
+def signed_in_response(user, status=200, **extra):
     """Put the session in httpOnly cookies; the body only carries public profile data."""
-    response = jsonify(user=user_payload(user))
+    response = jsonify(user=user_payload(user), **extra)
     set_access_cookies(response, access_token_for(user))
     set_refresh_cookies(response, create_refresh_token(identity=str(user.id), additional_claims={"tv": user.token_version}))
     return response, status

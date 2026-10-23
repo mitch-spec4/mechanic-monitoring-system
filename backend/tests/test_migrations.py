@@ -56,6 +56,8 @@ def test_upgrading_a_database_that_already_has_data(tmp_path):
     assert db.execute("select count(*) from review").fetchone() == (1,)
     assert db.execute("select job_id from service_record").fetchone() == (None,)
     assert db.execute("pragma foreign_key_check").fetchall() == []
+    # Companies from before plans existed get the largest plan with no end date.
+    assert db.execute("select company_id, plan, status, current_period_end from subscription").fetchall() == [(1, "business", "active", None)]
 
 
 def test_migrations_roll_back_and_forward(tmp_path):
@@ -71,4 +73,4 @@ def test_migrations_roll_back_and_forward(tmp_path):
         upgrade(directory=migrations)
         downgrade(directory=migrations, revision="base")
         upgrade(directory=migrations)
-    assert sqlite3.connect(path).execute("select version_num from alembic_version").fetchone() == ("0004_media",)
+    assert sqlite3.connect(path).execute("select version_num from alembic_version").fetchone() == ("0005_billing",)

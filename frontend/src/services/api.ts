@@ -88,6 +88,15 @@ export const resetPassword = (data: any) => post("/auth/reset-password", data);
 export const changePassword = (data: any) => post("/auth/change-password", data);
 export const issueResetCode = (userId: number) => post(`/users/${userId}/reset-code`, {});
 
+// Plans, company signup and billing
+export const plans = () => api("/plans");
+export const signup = (data: any) => post("/signup", data);
+export const billing = () => api("/billing");
+export const startCheckout = (plan: string, interval: string) => post("/billing/checkout", { plan, interval });
+export const checkoutDetail = (reference: string) => api(`/billing/payments/${encodeURIComponent(reference)}`);
+export const payTestCheckout = (reference: string, outcome: "success" | "declined") =>
+  post(`/billing/test/${encodeURIComponent(reference)}/pay`, { outcome });
+
 export const jobs = () => api("/jobs");
 export const notifications = () => api("/notifications");
 export const machines = () => api("/machines");
