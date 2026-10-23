@@ -1,0 +1,981 @@
+/* Public pages: homepage, signup and checkout, in the dark MechanicPro site style.
+   Everything is scoped to .site so none of it reaches the app. */
+.site {
+  --bg: #07111f;
+  --panel: #0d1b2d;
+  --text: #f5f8fc;
+  --muted: #9db0c5;
+  --blue: #3b82f6;
+  --line: #1d334d;
+  color-scheme: dark;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+body:has(.site) {
+  background: #07111f;
+}
+.site :is(h1, h2, h3, h4, p, ul, dl, dd, fieldset) {
+  margin: 0;
+}
+.site :is(ul, fieldset, legend) {
+  padding: 0;
+}
+.site .container {
+  width: min(1160px, 92%);
+  margin: auto;
+}
+.site :is(button, a, select, input):focus-visible {
+  outline: 2px solid #8bc1ff;
+  outline-offset: 2px;
+}
+
+/* ---------- Buttons (the app's own .primary rules are overridden here) ---------- */
+.site .btn {
+  width: auto;
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 9px;
+  padding: 11px 17px;
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.3;
+  color: #fff;
+  cursor: pointer;
+  transition:
+    transform 0.2s,
+    background 0.2s,
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+.site .btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+.site .btn.primary {
+  background: var(--blue);
+}
+.site .btn.primary:hover:not(:disabled) {
+  background: #4b8ef8;
+  box-shadow: 0 12px 26px -14px var(--blue);
+}
+.site .btn.outline {
+  background: transparent;
+  border: 1px solid #2a425d;
+}
+.site .btn.outline:hover:not(:disabled) {
+  background: #0d1b2d;
+  border-color: #3a5878;
+}
+.site .btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.site .btn.wide {
+  width: 100%;
+  padding: 13px 18px;
+}
+.site .textLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #65adff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.site .textLink:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+/* ---------- Top bar ---------- */
+.site .siteNav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #07111fef;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid #182a3e;
+}
+.site .navRow {
+  height: 74px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.site .siteLogo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 21px;
+  font-weight: 850;
+  cursor: pointer;
+}
+.site .logoIcon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #3b82f6, #60a5fa);
+  font-size: 18px;
+}
+.site .navLinks {
+  display: flex;
+  gap: 23px;
+}
+.site .navLinks button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #b8c7d8;
+  font-size: 14px;
+  cursor: pointer;
+}
+.site .navLinks button:hover {
+  color: #fff;
+}
+.site .navActions {
+  display: flex;
+  gap: 9px;
+}
+.site .navActions .btn {
+  white-space: nowrap;
+}
+
+/* ---------- Hero ---------- */
+.site .hero {
+  text-align: center;
+  padding: 85px 0 70px;
+  background: radial-gradient(ellipse at top, #12315a 0%, #07111f 57%);
+}
+.site .badge {
+  display: inline-block;
+  padding: 7px 13px;
+  border: 1px solid #1c4779;
+  border-radius: 99px;
+  color: #8bc1ff;
+  background: #0d2340;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.4;
+  margin-bottom: 20px;
+}
+.site .hero h1 {
+  max-width: 900px;
+  margin: auto;
+  font-size: clamp(42px, 7vw, 70px);
+  line-height: 1.04;
+  letter-spacing: -2px;
+}
+.site .gradient {
+  color: #83bcff;
+}
+.site .hero p {
+  max-width: 680px;
+  margin: 22px auto;
+  color: var(--muted);
+  font-size: 18px;
+}
+.site .heroButtons {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 27px 0 45px;
+}
+.site .heroButtons .btn {
+  padding: 14px 22px;
+}
+
+/* The dashboard illustration under the hero. */
+.site .preview {
+  max-width: 940px;
+  margin: auto;
+  text-align: left;
+  background: #0a1727;
+  border: 1px solid #203853;
+  border-radius: 16px;
+  padding: 13px;
+  box-shadow: 0 25px 75px #0005;
+}
+.site .previewInner {
+  border: 1px solid #192f46;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.site .dots {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 13px 16px;
+  border-bottom: 1px solid #192f46;
+  color: #627b94;
+  font-size: 12px;
+  line-height: 1.2;
+}
+.site .dots .sample {
+  margin-left: auto;
+  padding: 3px 9px;
+  border: 1px solid #203853;
+  border-radius: 99px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.site .dash {
+  display: grid;
+  grid-template-columns: 165px 1fr;
+  min-height: 250px;
+}
+.site .side {
+  padding: 17px;
+  border-right: 1px solid #192f46;
+  color: #91a7bc;
+  font-size: 12px;
+}
+.site .side div {
+  padding: 8px;
+  border-radius: 6px;
+}
+.site .side .current {
+  background: #12345a;
+  color: #8bc1ff;
+}
+.site .dashMain {
+  padding: 20px;
+}
+.site .dashMain h3 {
+  margin-bottom: 14px;
+  font-size: 19px;
+}
+.site .pvStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.site .pvStats > div {
+  padding: 14px;
+  background: #0d1d30;
+  border: 1px solid #1b344d;
+  border-radius: 9px;
+}
+.site .pvStats small {
+  font-size: 10px;
+  color: #7890a7;
+}
+.site .pvStats b {
+  display: block;
+  font-size: 25px;
+}
+.site .pvJobs {
+  margin-top: 10px;
+  padding: 0 13px;
+  background: #0d1d30;
+  border: 1px solid #1b344d;
+  border-radius: 9px;
+}
+.site .pvJob {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #1b3045;
+  font-size: 12px;
+  color: #c4d2df;
+}
+.site .pvJob:last-child {
+  border-bottom: 0;
+}
+.site .pvStatus {
+  flex: none;
+  color: #5be08b;
+}
+.site .pvStatus[data-tone="progress"] {
+  color: #8bc1ff;
+}
+.site .pvStatus[data-tone="assigned"] {
+  color: #fbbf24;
+}
+
+/* ---------- Sections ---------- */
+.site .siteSection {
+  padding: 76px 0;
+}
+.site .head {
+  max-width: 720px;
+  margin: 0 auto 38px;
+  text-align: center;
+}
+.site .head h2 {
+  font-size: clamp(29px, 4vw, 40px);
+  line-height: 1.2;
+  letter-spacing: -1px;
+}
+.site .head p {
+  margin-top: 10px;
+  color: var(--muted);
+}
+.site .featureGrid,
+.site .roleGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 17px;
+}
+.site .feature,
+.site .role {
+  padding: 24px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.site .ico {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 15px;
+  border-radius: 11px;
+  background: #12345a;
+  font-size: 21px;
+}
+.site .feature h3,
+.site .role h3 {
+  margin-bottom: 7px;
+  font-size: 18px;
+}
+.site .feature p,
+.site .role p {
+  font-size: 14px;
+  color: var(--muted);
+}
+.site .role ul {
+  margin-top: 15px;
+  list-style: none;
+  font-size: 13px;
+  color: #c1d0df;
+}
+.site .role li {
+  padding: 5px 0;
+}
+.site .role li::before {
+  content: "✓ ";
+  color: #4ade80;
+  font-weight: 700;
+}
+
+/* ---------- Subscriptions ---------- */
+.site .periodToggle {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin: -12px 0 30px;
+}
+.site .periodToggle button {
+  padding: 8px 13px;
+  border: 1px solid #29445e;
+  border-radius: 8px;
+  background: #0d1b2d;
+  color: #dce9f7;
+  font-size: 13px;
+  cursor: pointer;
+}
+.site .periodToggle button[aria-pressed="true"] {
+  background: #12345a;
+  border-color: var(--blue);
+}
+.site .save {
+  color: #4ade80;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.site .pricingGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+.site .plan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 21px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 15px;
+}
+.site .plan.popular {
+  border-color: var(--blue);
+  background: linear-gradient(180deg, #102744, #0d1b2d);
+  box-shadow: 0 0 0 1px #3b82f622;
+}
+.site .tag {
+  position: absolute;
+  top: -12px;
+  left: 18px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: var(--blue);
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+.site .plan h3 {
+  font-size: 20px;
+}
+.site .desc {
+  min-height: 42px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.site .price {
+  margin-top: 16px;
+  font-size: 29px;
+  font-weight: 850;
+  letter-spacing: -1px;
+  white-space: nowrap;
+}
+.site .price small {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+.site .yearNote {
+  min-height: 34px;
+  font-size: 10px;
+  color: #8197ac;
+}
+.site .plan .btn {
+  width: 100%;
+  margin: 13px 0 16px;
+}
+.site .plan ul {
+  flex: 1;
+  list-style: none;
+  font-size: 12px;
+  color: #c0cedd;
+}
+.site .plan li {
+  padding: 7px 0;
+  border-bottom: 1px solid #1b3045;
+}
+.site .plan li::before {
+  content: "✓ ";
+  color: #4ade80;
+  font-weight: 900;
+}
+.site .plan li.planned {
+  color: #91a5ba;
+}
+.site .plan li.planned::before {
+  content: "○ ";
+  color: #4d6a88;
+}
+.site .plan li em,
+.site .pill {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 7px;
+  border: 1px solid #1c4779;
+  border-radius: 99px;
+  background: #0d2340;
+  color: #8bc1ff;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1.7;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+.site .plan h4 {
+  margin: 15px 0 3px;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #78b5ff;
+  text-transform: uppercase;
+}
+.site .detail {
+  font-size: 11px;
+  color: var(--muted);
+}
+.site .compareWrap {
+  overflow-x: auto;
+  margin-top: 25px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.site .compare {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.site .compare :is(th, td) {
+  padding: 12px 14px;
+  border-bottom: 1px solid #1b3045;
+  text-align: left;
+}
+.site .compare th {
+  background: #10243a;
+}
+.site .compare th:first-child {
+  width: 34%;
+}
+.site .compare td {
+  color: #aebfd0;
+}
+.site .compare td:first-child {
+  color: #e4edf7;
+  font-weight: 700;
+}
+.site .compare tr:last-child td {
+  border: 0;
+}
+.site .compare .yes {
+  color: #4ade80;
+  font-weight: 700;
+}
+.site .compare .pill {
+  margin-left: 0;
+}
+.site .switcher {
+  margin-top: 22px;
+  padding: 20px;
+  background: #0a1726;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+}
+.site .switcher h3 {
+  font-size: 19px;
+}
+.site .switcher p {
+  margin: 4px 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.site .switchRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.site :is(select, input) {
+  width: 100%;
+  padding: 11px;
+  border: 1px solid #29445e;
+  border-radius: 8px;
+  background: #091625;
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+}
+.site :is(select, input):focus {
+  border-color: var(--blue);
+}
+.site .switchRow select {
+  max-width: 300px;
+}
+.site .pricingNote {
+  max-width: 820px;
+  margin: 15px auto 0;
+  font-size: 12px;
+  color: #71879d;
+  text-align: center;
+}
+
+/* ---------- Call to action and footer ---------- */
+.site .cta {
+  padding: 52px 25px;
+  text-align: center;
+  background: linear-gradient(135deg, #0d2947, #0c1e32);
+  border: 1px solid #20507e;
+  border-radius: 18px;
+}
+.site .cta h2 {
+  font-size: clamp(30px, 4vw, 40px);
+  line-height: 1.15;
+}
+.site .cta p {
+  max-width: 600px;
+  margin: 12px auto 22px;
+  color: var(--muted);
+}
+.site .siteFooter {
+  padding: 25px 0;
+  border-top: 1px solid #172b40;
+  color: #70859b;
+  font-size: 12px;
+}
+.site .foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+/* ---------- Signup and checkout ---------- */
+.site .signupLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+  gap: 22px;
+  align-items: start;
+  padding: 48px 0 76px;
+}
+.site .checkoutLayout {
+  display: grid;
+  justify-items: center;
+  padding: 48px 0 76px;
+}
+.site .formCard,
+.site .signupSummary {
+  padding: 28px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 15px;
+}
+.site .formCard {
+  display: grid;
+  gap: 14px;
+}
+.site .formCard .badge {
+  justify-self: start;
+  margin-bottom: 0;
+}
+.site .formCard h1 {
+  font-size: clamp(28px, 4vw, 36px);
+  line-height: 1.15;
+  letter-spacing: -1px;
+}
+.site .lead {
+  color: var(--muted);
+  font-size: 15px;
+}
+.site .formCard > label,
+.site .cardForm label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #dce9f7;
+}
+.site input::placeholder {
+  color: #5f7790;
+}
+.site .error {
+  padding: 10px 12px;
+  border: 1px solid #7f1d1d;
+  border-radius: 8px;
+  background: #3a1219;
+  color: #fecaca;
+  font-size: 13px;
+}
+.site .planPicker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  border: 0;
+}
+.site .planPicker legend {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #dce9f7;
+}
+.site .planPicker label {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  padding: 12px;
+  border: 1px solid #29445e;
+  border-radius: 10px;
+  background: #091625;
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+.site .planPicker label:hover {
+  border-color: #3a5878;
+}
+.site .planPicker label.chosen {
+  border-color: var(--blue);
+  background: #12345a;
+}
+.site .planPicker label:has(input:focus-visible) {
+  outline: 2px solid #8bc1ff;
+  outline-offset: 2px;
+}
+.site .planPicker input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.site .planPicker strong {
+  font-size: 15px;
+}
+.site .planPicker span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.site .planPicker em {
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+  color: #8bc1ff;
+}
+.site .formCard .periodToggle {
+  justify-content: flex-start;
+  margin: 0;
+}
+.site .formSmall {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+.site .signupSummary {
+  position: sticky;
+  top: 98px;
+  display: grid;
+  gap: 10px;
+  background: linear-gradient(180deg, #102744, #0d1b2d);
+  border-color: var(--blue);
+}
+.site .summaryLabel {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #78b5ff;
+}
+.site .signupSummary h2 {
+  font-size: 26px;
+}
+.site .summaryPrice {
+  font-size: 29px;
+  font-weight: 850;
+  letter-spacing: -1px;
+}
+.site .summaryPrice small {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+.site .summaryNote {
+  font-size: 13px;
+  color: var(--muted);
+}
+.site .signupSummary ul {
+  list-style: none;
+  font-size: 13px;
+  color: #c0cedd;
+}
+.site .signupSummary li {
+  padding: 7px 0;
+  border-bottom: 1px solid #1b3045;
+}
+.site .signupSummary li::before {
+  content: "✓ ";
+  color: #4ade80;
+  font-weight: 900;
+}
+.site .summaryPrivacy {
+  font-size: 12px;
+  color: var(--muted);
+}
+.site .checkoutCard {
+  width: min(480px, 100%);
+}
+.site .checkoutCard.done {
+  justify-items: center;
+  text-align: center;
+}
+.site .doneMark {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #12391f;
+  border: 1px solid #1f7a3d;
+  color: #4ade80;
+  font-size: 30px;
+  font-weight: 900;
+}
+.site .testBanner {
+  padding: 9px 12px;
+  border: 1px solid #6b4e12;
+  border-radius: 8px;
+  background: #2b2108;
+  color: #fcd34d;
+  font-size: 13px;
+  font-weight: 700;
+}
+.site .orderSummary {
+  display: grid;
+  padding: 4px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #091625;
+}
+.site .orderSummary div {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid #1b3045;
+  font-size: 14px;
+}
+.site .orderSummary div:last-child {
+  border-bottom: 0;
+}
+.site .orderSummary dt {
+  color: var(--muted);
+}
+.site .orderSummary dd {
+  font-weight: 700;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.site .orderTotal dd {
+  font-size: 18px;
+  color: #8bc1ff;
+}
+.site .cardForm {
+  display: grid;
+  gap: 12px;
+}
+.site .cardRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.site .declineLink {
+  justify-self: center;
+  font-size: 13px;
+}
+
+/* ---------- Smaller screens ---------- */
+@media (max-width: 980px) {
+  .site .pricingGrid {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .site .desc,
+  .site .yearNote {
+    min-height: 0;
+  }
+  .site .signupLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .site .signupSummary {
+    position: static;
+  }
+}
+@media (max-width: 760px) {
+  .site .navLinks {
+    display: none;
+  }
+  .site .featureGrid,
+  .site .roleGrid {
+    grid-template-columns: 1fr;
+  }
+  .site .dash {
+    grid-template-columns: 1fr;
+  }
+  .site .side {
+    display: none;
+  }
+  .site .hero {
+    padding-top: 60px;
+  }
+  .site .pvStats {
+    grid-template-columns: 1fr;
+  }
+  .site .foot {
+    flex-direction: column;
+  }
+  .site .price {
+    font-size: 30px;
+  }
+  .site .planPicker {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .site .formCard,
+  .site .signupSummary {
+    padding: 22px 18px;
+  }
+  .site .signupLayout,
+  .site .checkoutLayout {
+    padding: 24px 0 48px;
+  }
+}
+@media (max-width: 420px) {
+  .site .navRow {
+    gap: 10px;
+  }
+  .site .siteLogo {
+    gap: 8px;
+    font-size: 17px;
+  }
+  .site .logoIcon {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    font-size: 15px;
+  }
+  .site .navActions {
+    gap: 6px;
+  }
+  .site .navActions .btn {
+    padding: 8px 11px;
+    font-size: 13px;
+  }
+}
+@media (max-width: 360px) {
+  .site .siteLogo {
+    gap: 7px;
+    font-size: 15px;
+  }
+  .site .logoIcon {
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
+  }
+  .site .navActions .btn {
+    padding: 8px 9px;
+    font-size: 12px;
+  }
+}
+@media (max-width: 340px) {
+  .site .logoText {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .site .btn,
+  .site .planPicker label {
+    transition: none;
+  }
+  .site .btn:hover:not(:disabled) {
+    transform: none;
+  }
+}

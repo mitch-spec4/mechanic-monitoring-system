@@ -1,5 +1,6 @@
 import {useState} from "react";
 import {acceptInvitation, login, resetPassword, saveSession} from "../services/api";
+import {go} from "../lib/route";
 
 type Props = {done: (user: any) => void};
 type Mode = "signin" | "invite" | "reset";
@@ -39,5 +40,7 @@ export default function Login({done}: Props) {
       <button type="button" className="loginSwitch" onClick={() => switchTo("invite")}>Have an invitation code?</button>
       <button type="button" className="loginSwitch" onClick={() => switchTo("reset")}>Forgot password?</button>
     </> : <button type="button" className="loginSwitch" onClick={() => switchTo("signin")}>Back to sign in</button>}
+    <p className="loginNew">New to MechanicPro? <button type="button" className="loginSwitch" onClick={() => go("/signup")}>Start a free trial</button></p>
+    <button type="button" className="loginSwitch loginHome" onClick={() => go("/")}>← Back to the homepage</button>
   </form></main>;
 }

@@ -6,6 +6,7 @@ from flask import Blueprint, Response, current_app, jsonify, redirect, request, 
 from app import db
 from app.models.media import JobFile
 from app.routes.worksheet import job_detail, load_job
+from app.services.billing import check_storage
 from app.services.report_pdf import build_report
 from app.services.storage import StorageError, read_upload_token, storage
 from app.services.worksheet import record_event
@@ -62,6 +63,7 @@ def request_upload(jid):
     limit = max_bytes(kind)
     if size > limit:
         raise ValidationError(f"This {KIND_LABEL[kind]} is too large; the limit is {limit // (1024 * 1024)} MB.", 413)
+    check_storage(job.company_id, size)
     record = JobFile(
         company_id=job.company_id,
         job_id=job.id,
@@ -115,6 +117,14 @@ def confirm_upload(fid):
         db.session.delete(record)
         db.session.commit()
         raise ValidationError("The file is larger than the limit", 413)
+    try:
+        # Checked again here: uploads started together all passed the check when they were reserved.
+        check_storage(record.company_id, size, lock=True)
+    except ValidationError:
+        storage().delete(record.storage_key)
+        db.session.delete(record)
+        db.session.commit()
+        raise
     record.size_bytes = size
     record.status = "ready"
     record_event(job, user, "file_added", note=f"Added a {KIND_LABEL[record.kind]}")

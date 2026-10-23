@@ -143,8 +143,10 @@ test("invited customer joins with the code and signs in", async ({ page, context
   if (browserName === "chromium") expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(code);
   await page.getByRole("button", { name: "Done" }).click();
 
+  // A fresh visit as someone else: forget the signed-in user and reload on the sign-in page.
   await page.evaluate(() => localStorage.clear());
-  await page.goto("/");
+  await page.goto("/#/signin");
+  await page.reload();
   await page.getByRole("button", { name: "Have an invitation code?" }).click();
   await page.getByLabel("Invitation code").fill(code);
   await page.getByLabel("Full name").fill("Delta Industries");

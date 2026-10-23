@@ -56,6 +56,8 @@ def test_upgrading_a_database_that_already_has_data(tmp_path):
     assert db.execute("select count(*) from review").fetchone() == (1,)
     assert db.execute("select job_id from service_record").fetchone() == (None,)
     assert db.execute("pragma foreign_key_check").fetchall() == []
+    # Companies from before plans existed get the largest plan with no end date.
+    assert db.execute("select company_id, plan, status, current_period_end from subscription").fetchall() == [(1, "business", "active", None)]
 
 
 def test_migrations_roll_back_and_forward(tmp_path):
@@ -71,4 +73,36 @@ def test_migrations_roll_back_and_forward(tmp_path):
         upgrade(directory=migrations)
         downgrade(directory=migrations, revision="base")
         upgrade(directory=migrations)
-    assert sqlite3.connect(path).execute("select version_num from alembic_version").fetchone() == ("0004_media",)
+    assert sqlite3.connect(path).execute("select version_num from alembic_version").fetchone() == ("0006_professional_plan",)
+
+
+def test_the_old_team_plan_becomes_professional(tmp_path):
+    """Databases that ran the first version of plans name the middle plan "team"."""
+    from pathlib import Path
+
+    path = tmp_path / "team.db"
+    migrations = str(Path(__file__).resolve().parents[1] / "migrations")
+    app = create_app({"SQLALCHEMY_DATABASE_URI": f"sqlite:///{path}"})
+    with app.app_context():
+        upgrade(directory=migrations, revision="0005_billing")
+    db = sqlite3.connect(path)
+    db.executescript(
+        """
+        insert into company (id, name) values (1, 'Acme'), (2, 'Bolt');
+        insert into user (id, name, email, password_hash, role, company_id, token_version)
+            values (1, 'Boss', 'b@x.test', 'x', 'boss', 1, 0);
+        insert into subscription (company_id, plan, interval, status, created_at, updated_at)
+            values (1, 'team', 'month', 'trialing', '2026-10-01', '2026-10-01'),
+                   (2, 'starter', 'year', 'active', '2026-10-01', '2026-10-01');
+        insert into payment (company_id, user_id, plan, interval, amount_cents, currency, provider, reference, status, created_at)
+            values (1, 1, 'team', 'month', 4900, 'USD', 'test', 'pay_old', 'paid', '2026-10-02');
+        """
+    )
+    db.commit()
+    db.close()
+    with app.app_context():
+        upgrade(directory=migrations)
+    db = sqlite3.connect(path)
+    assert db.execute("select company_id, plan from subscription order by company_id").fetchall() == [(1, "professional"), (2, "starter")]
+    # Past payments keep what was charged; only the plan's name changes.
+    assert db.execute("select plan, amount_cents, currency from payment").fetchall() == [("professional", 4900, "USD")]

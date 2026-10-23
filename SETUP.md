@@ -140,6 +140,7 @@ All backend settings live in `backend/.env` (see `backend/.env.example`).
 | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | | **Required** with `s3`. A key that can only read, write and delete objects in this bucket |
 | `MAX_PHOTO_MB` / `MAX_VIDEO_MB` | `10` / `50` | Largest photo and video accepted |
 | `MAX_VIDEO_SECONDS` | `60` | Longest video the phone will upload |
+| `BILLING_PROVIDER` | `test` | Leave unset: `none` (free trials only). `test` is refused in production. See [Plans and payments](#plans-and-payments) |
 
 Live positions taken during jobs are deleted after 30 days. The app removes old ones whenever new positions arrive; in production, also run `flask --app run.py purge-locations` once a day (for example from cron).
 
@@ -189,6 +190,27 @@ Setting up a bucket:
 Uploads that are started but never finished (the app was closed, the signal dropped) are removed by `flask --app run.py purge-uploads`, after a day. Run it daily in production.
 
 Photos in a format the phone's browser can't open (for example HEIC in most browsers other than Safari) are refused on the phone with a message to choose a JPEG.
+
+## Plans and payments
+
+The homepage (`/`) shows the plans; **Get started** (or **Choose** on a plan) creates a new company with its owner as the manager. Plans and prices are set in `backend/app/services/plans.py`, in Kenyan shillings; the homepage, signup and checkout all read them from there:
+
+| Plan | Monthly | Yearly | Mechanics | Storage |
+| --- | --- | --- | --- | --- |
+| Starter | KSh 1,500 | KSh 15,000 | 3 | 2 GB |
+| Professional | KSh 4,500 | KSh 45,000 | 10 | 20 GB |
+| Business | KSh 12,000 | KSh 120,000 | 30 | 100 GB |
+
+Yearly billing charges ten months (two months free). Today every plan includes every feature that's built; plans differ in team size and storage. The extra features the homepage lists for Professional and Business are marked **Planned** until they exist (their wording is in `frontend/src/pages/Home.tsx`). Every new company starts with a 14-day free trial; no card is needed. During the trial and once paid, the plan's limits apply: inviting a mechanic is refused once the team (plus open invitations) reaches the limit, and uploads are refused once storage is full. When a trial or paid period runs out, nothing is deleted and work in progress carries on, but creating jobs and inviting people waits until the manager pays under **Billing**. Companies created before plans existed get the Business plan with no end date.
+
+Payment goes through a provider set by `BILLING_PROVIDER`:
+
+- **`test`** (the default in development) shows the app's own checkout page with a test card. No real money is taken, and the server refuses to start with it in production.
+- **`none`** (the default in production) turns online payment off, so companies can only start free trials.
+
+A real provider (for example Paystack or Flutterwave for cards and mobile money in Kenya, or Paddle) needs an account in your name and API keys. It plugs in behind the same interface in `backend/app/services/billing.py`; that's planned work (PR 13 in the plan), together with renewals and receipts by email.
+
+To try it locally: open http://localhost:5173, choose a plan, and sign up with a new email. **Pay now and skip the trial** goes to the test checkout; **Try a declined card** shows what happens when a card fails.
 
 ## Production notes (until the deployment guide is written)
 

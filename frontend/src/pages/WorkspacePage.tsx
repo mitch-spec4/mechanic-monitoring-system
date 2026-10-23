@@ -42,7 +42,7 @@ import TeamMap from "../components/TeamMap";
 import { LocationSettings } from "../components/Shift";
 import InviteForm from "../components/InviteForm";
 import ResetPassword from "../components/ResetPassword";
-import { errorMessage, formatDate } from "../lib/format";
+import { errorMessage, formatBytes, formatDate } from "../lib/format";
 
 type Props = { title: string; user: any; onOpenJob?: (id: number) => void; onOpenCustomer?: (id: number) => void };
 type Resource = {
@@ -481,18 +481,6 @@ function ResourceRow({ item, title, Icon, actions, onOpenJob, onOpenCustomer }: 
       {actions}
     </article>
   );
-}
-/** "0 B", "350 KB", "1.2 GB": photo and video storage used. */
-function formatBytes(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ["KB", "MB", "GB", "TB"];
-  let value = bytes / 1024;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
 }
 function ReportSummary({ summary }: any) {
   const jobSummary = summary.jobs || {};

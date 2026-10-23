@@ -6,10 +6,16 @@ import CustomerDashboard from "./pages/CustomerDashboard";
 import WorkspacePage from "./pages/WorkspacePage";
 import JobPage from "./pages/JobPage";
 import CustomerPage from "./pages/CustomerPage";
+import Home from "./pages/Home";
+import Signup from "./pages/Signup";
+import Checkout from "./pages/Checkout";
+import BillingPage from "./pages/BillingPage";
+import { go, readRoute, useRoute } from "./lib/route";
+import type { Interval } from "./components/Plans";
 import Profile from "./components/Profile";
 import Sidebar from "./components/Sidebar";
 import { LocationIndicator, ShiftProvider } from "./components/Shift";
-import { clearSession, logout as endSession, SESSION_EXPIRED_EVENT } from "./services/api";
+import { clearSession, logout as endSession, saveSession, SESSION_EXPIRED_EVENT } from "./services/api";
 import "./style.css";
 import "./components/DashboardShell.css";
 import "./components/Buttons.css";
@@ -22,9 +28,12 @@ export default function App() {
 	const [active, setActive] = useState("Dashboard");
 	const [openJobId, setOpenJobId] = useState<number | null>(null);
 	const [openCustomerId, setOpenCustomerId] = useState<number | null>(null);
+	const [billingFocus, setBillingFocus] = useState<{ plan: string; interval: Interval }>();
+	const route = useRoute();
 	const navigate = (label: string) => {
 		setOpenJobId(null);
 		setOpenCustomerId(null);
+		setBillingFocus(undefined);
 		setActive(label);
 	};
 	const openCustomer = (id: number) => {
@@ -46,32 +55,80 @@ export default function App() {
 	const logout = () => {
 		endSession();
 		signedOut();
+		go("/signin");
+	};
+	const signedIn = (loggedInUser: any) => {
+		setUser(loggedInUser);
+		setActive("Dashboard");
 	};
 
 	useEffect(() => {
-		window.addEventListener(SESSION_EXPIRED_EVENT, signedOut);
-		return () => window.removeEventListener(SESSION_EXPIRED_EVENT, signedOut);
+		// An ended session goes back to the sign-in page, not the homepage; a checkout is kept.
+		const expired = () => {
+			signedOut();
+			const { path } = readRoute();
+			go(path.startsWith("/checkout/") ? `/signin?next=${encodeURIComponent(path)}` : "/signin");
+		};
+		window.addEventListener(SESSION_EXPIRED_EVENT, expired);
+		return () => window.removeEventListener(SESSION_EXPIRED_EVENT, expired);
 	}, []);
 
-	if (!user) {
+	// Paying for a plan happens on its own page, after signup or from Billing.
+	if (route.path.startsWith("/checkout/")) {
 		return (
-			<Login
-				done={(loggedInUser: any) => {
-					setUser(loggedInUser);
-					setActive("Dashboard");
+			<Checkout
+				reference={route.path.slice("/checkout/".length)}
+				user={user}
+				onDone={() => {
+					go("/");
+					navigate("Billing");
 				}}
 			/>
 		);
+	}
+
+	if (!user) {
+		if (route.path === "/signin") {
+			return (
+				<Login
+					done={(loggedInUser: any) => {
+						signedIn(loggedInUser);
+						const next = route.query.get("next") || "";
+						// "Already using MechanicPro?" on the homepage leads to Billing, with the chosen plan picked out.
+						if (next === "billing" && loggedInUser.role === "boss") {
+							setBillingFocus({ plan: route.query.get("plan") || "", interval: route.query.get("interval") === "year" ? "year" : "month" });
+							setActive("Billing");
+						}
+						go(next.startsWith("/checkout/") ? next : "/");
+					}}
+				/>
+			);
+		}
+		if (route.path === "/signup") {
+			return (
+				<Signup
+					query={route.query}
+					onSignedIn={(newUser, checkoutUrl) => {
+						saveSession(newUser);
+						signedIn(newUser);
+						go(checkoutUrl || "/");
+					}}
+				/>
+			);
+		}
+		return <Home />;
 	}
 
 	const dashboard = openJobId ? (
 		<JobPage key={openJobId} jobId={openJobId} user={user} onBack={() => setOpenJobId(null)} />
 	) : openCustomerId ? (
 		<CustomerPage key={openCustomerId} customerId={openCustomerId} onBack={() => setOpenCustomerId(null)} onOpenJob={openJob} />
+	) : active === "Billing" && user.role === "boss" ? (
+		<BillingPage focus={billingFocus} />
 	) : active !== "Dashboard" && active !== "Profile" ? (
 		<WorkspacePage title={active} user={user} onOpenJob={openJob} onOpenCustomer={openCustomer} />
 	) : user.role === "boss" ? (
-		<BossDashboard u={user} onOpenJob={openJob} onOpenCustomer={openCustomer} />
+		<BossDashboard u={user} onOpenJob={openJob} onOpenCustomer={openCustomer} onOpenBilling={() => navigate("Billing")} />
 	) : user.role === "mechanic" ? (
 		<MechanicDashboard u={user} onOpenJob={openJob} />
 	) : (

@@ -18,9 +18,10 @@ import { CreateJobModal, JobTypeSelect } from "../components/JobForms";
 import InviteForm from "../components/InviteForm";
 import { errorMessage, formatDate, greeting } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
-type Props = { u: any; onOpenJob: (id: number) => void; onOpenCustomer: (id: number) => void };
+import { PlanBanner } from "./BillingPage";
+type Props = { u: any; onOpenJob: (id: number) => void; onOpenCustomer: (id: number) => void; onOpenBilling?: () => void };
 
-export default function BossDashboard({ u, onOpenJob, onOpenCustomer }: Props) {
+export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBilling = () => {} }: Props) {
   const [data, setData] = useState<any[]>([]),
     [cs, setCs] = useState<any[]>([]),
     [ms, setMs] = useState<any[]>([]),
@@ -64,6 +65,7 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer }: Props) {
     <>
       <Header u={u} />
       <main className="page">
+        <PlanBanner onOpenBilling={onOpenBilling} />
         <div className="welcome">
           <div>
             <h1>{greeting()}, {u.name.split(" ")[0]}.</h1>
