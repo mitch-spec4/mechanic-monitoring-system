@@ -6,8 +6,9 @@ Built with React + TypeScript (Vite) on the frontend and Flask, SQLAlchemy, Alem
 
 ## Features
 
+- **A public homepage with plans.** Companies sign up themselves and start a 14-day free trial; plans (Starter, Team, Business) set how many mechanics and how much storage they get. Payment runs in test mode until a real payment provider is connected.
 - **Role-based dashboards** for managers (boss), mechanics and customers, with every query scoped to the user's company.
-- **Invite-only accounts.** Managers issue single-use invitation codes that expire after 7 days.
+- **Invite-only team accounts.** Managers issue single-use invitation codes for their mechanics and customers that expire after 7 days.
 - **A job workflow with enforced statuses:** Pending → Assigned → Accepted → In Progress ⇄ Paused → Completed. Mechanics can't decline or cancel jobs.
 - **Job worksheets.** Start, Pause and Resume run a timer automatically; mechanics log work done, parts used (name and quantity) and the job type's checklist, on a phone-friendly screen. A job can't be completed until work is described and every required checklist item is ticked.
 - **Clock in and out, with location.** Mechanics clock in to start work, with their location shared only while clocked in, after they agree to it, and with a "Location on" sign always visible. Start, resume and complete are stamped with a position. Managers see a map of clocked-in mechanics and every shift's hours, and can correct a forgotten clock-out.
@@ -45,4 +46,4 @@ Then open http://localhost:5173.
 
 ## Status
 
-Under active development. Production deployment configuration, email delivery and two-factor authentication haven't been built yet. Don't use the demo data or demo passwords outside local development.
+Under active development. Production deployment configuration, a real payment provider, email delivery and two-factor authentication haven't been built yet. Don't use the demo data or demo passwords outside local development.

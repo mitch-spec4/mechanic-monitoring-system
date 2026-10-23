@@ -17,6 +17,7 @@ from app.models.service_record import ServiceRecord
 from app.models.user import User
 from app.routes.machines import out as machine_out
 from app.routes.services import out as record_out
+from app.services.billing import check_mechanic_limit, require_active
 from app.services.machine_work import with_work
 from app.services.notifications import notify, notify_bosses
 from app.utils.auth import current_user, roles
@@ -123,6 +124,9 @@ def invite():
         raise ValidationError("Only customers and mechanics can be invited")
     if User.query.filter_by(email=email).first():
         raise ValidationError("This email address already has an account", 409)
+    require_active(user.company_id, "invite people")
+    if role == "mechanic":
+        check_mechanic_limit(user.company_id)
 
     code = "DK-" + secrets.token_hex(5).upper()
     invitation = Invitation(

@@ -17,13 +17,16 @@ from app.models import (
     JobPart,
     Machine,
     Notification,
+    Payment,
     Review,
     ServiceRecord,
     ServiceRequest,
     Shift,
+    Subscription,
     User,
     WorkEntry,
 )
+from app.services.plans import CURRENCY, add_period, price_cents
 from app.services.storage import storage
 from app.services.worksheet import copy_checklist, fill_service_record
 from app.utils.time import utcnow
@@ -208,6 +211,25 @@ def stamp(user, shift, kind, place, at, job=None):
     )
 
 
+def add_subscription(company, boss):
+    """The demo company is on the Team plan, paid monthly (a test-mode payment a week ago)."""
+    if Subscription.query.filter_by(company_id=company.id).first():
+        return
+    paid = utcnow() - timedelta(days=7)
+    db.session.add(
+        Subscription(
+            company_id=company.id, plan="team", interval="month", status="active",
+            trial_ends_at=paid, current_period_end=add_period(paid, "month"), created_at=paid - timedelta(days=14),
+        )
+    )
+    db.session.add(
+        Payment(
+            company_id=company.id, user_id=boss.id, plan="team", interval="month", amount_cents=price_cents("team", "month"),
+            currency=CURRENCY, provider="test", reference="pay_demo_first_month", status="paid", created_at=paid, paid_at=paid,
+        )
+    )
+
+
 def add_signature(job, mechanic, name):
     """The customer's sign-off on a completed demo job: a drawn signature stored like a real one."""
     if job.signed_at:
@@ -352,6 +374,7 @@ with app.app_context():
         stamp(mitch, today, "live", (-1.3085, 36.8503), now - timedelta(minutes=4), generator_job)
 
     add_signature(job_named("Conveyor Line CL-4 inspection"), brian, "Grace Wanjiru")
+    add_subscription(company, boss)
 
     add_request("Generator G-102 overheating issue", "The generator overheats and vibrates after extended use.", "High", "Submitted", company.id, abc, generator)
     add_request("Hydraulic leak inspection", "Please inspect the hydraulic line before the next production run.", "Medium", "Reviewing", company.id, kenya, pump)
@@ -367,4 +390,4 @@ with app.app_context():
     add_notification(abc_user, "Review reminder", "Please leave a review for your completed service.", "review")
 
     db.session.commit()
-    print("Demo data ready: 3 customers, 3 mechanics, 6 machines, 6 jobs with worksheets and history, 3 checklists, shifts and locations, 6 service records, 3 reviews, 3 requests, and notifications.")
+    print("Demo data ready: 3 customers, 3 mechanics, 6 machines, 6 jobs with worksheets and history, 3 checklists, shifts and locations, 6 service records, 3 reviews, 3 requests, notifications, and a paid Team plan.")

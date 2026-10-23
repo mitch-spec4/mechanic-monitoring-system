@@ -9,6 +9,7 @@ from app.models.machine import Machine
 from app.models.media import JobFile
 from app.models.user import User
 from app.models.worksheet import WorkEntry
+from app.services.billing import require_active
 from app.services.location import open_shift, stamp_job
 from app.services.notifications import notify, notify_bosses
 from app.services.signature import SIGNATURE_FIELDS, SIGNATURE_PROBLEM, apply_signature, read_signature
@@ -100,6 +101,7 @@ def list_jobs():
 @roles("boss")
 def create_job():
     user = current_user()
+    require_active(user.company_id, "add new jobs")
     data = json_body()
     title = text(data, "title", required=True, max_length=200)
     description = text(data, "description", required=True)

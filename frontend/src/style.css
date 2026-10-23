@@ -795,6 +795,17 @@ header {
 .loginSwitch {
   padding: 4px;
 }
+.loginNew {
+  margin: 4px 0 0 !important;
+  text-align: center;
+  font-size: 12px;
+}
+.loginNew .loginSwitch {
+  font-size: 12px;
+}
+.loginHome {
+  color: #758196;
+}
 @media (max-width: 700px) {
   .reportGrid {
     grid-template-columns: repeat(2, 1fr);

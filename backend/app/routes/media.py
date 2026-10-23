@@ -6,6 +6,7 @@ from flask import Blueprint, Response, current_app, jsonify, redirect, request, 
 from app import db
 from app.models.media import JobFile
 from app.routes.worksheet import job_detail, load_job
+from app.services.billing import check_storage
 from app.services.report_pdf import build_report
 from app.services.storage import StorageError, read_upload_token, storage
 from app.services.worksheet import record_event
@@ -62,6 +63,7 @@ def request_upload(jid):
     limit = max_bytes(kind)
     if size > limit:
         raise ValidationError(f"This {KIND_LABEL[kind]} is too large; the limit is {limit // (1024 * 1024)} MB.", 413)
+    check_storage(job.company_id, size)
     record = JobFile(
         company_id=job.company_id,
         job_id=job.id,
