@@ -73,8 +73,10 @@ function send(path: string, options: RequestInit) {
   if (options.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   const method = (options.method || "GET").toUpperCase();
   if (method !== "GET") headers.set("X-CSRF-TOKEN", readCookie("csrf_access_token"));
-  // Error messages and anything the server writes come back in the reader's language.
+  // Error messages and anything the server writes come back in the reader's language. Firefox keeps
+  // its own Accept-Language, so the app's choice also goes in X-Language, which the server reads first.
   headers.set("Accept-Language", language());
+  headers.set("X-Language", language());
   return fetch(`${BASE}${path.startsWith("/") ? path : `/${path}`}`, { ...options, headers, credentials: "include" });
 }
 

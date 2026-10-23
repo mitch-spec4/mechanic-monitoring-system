@@ -28,11 +28,17 @@ def language_or_default(code):
 
 
 def current_language():
-    """The language set by speaking(), else the one the app asked for (Accept-Language), else English."""
+    """The language set by speaking(), else the one the app asked for, else English.
+
+    The app sends X-Language: some browsers (Firefox) don't let a page change Accept-Language,
+    which is still honoured for anything else that calls the API."""
     if not has_request_context():
         return getattr(_local, "language", DEFAULT)
     if "language" in g:
         return g.language
+    asked = request.headers.get("X-Language", "").strip().lower()
+    if asked in LANGUAGES:
+        return asked
     return language_or_default((request.accept_languages.best_match(LANGUAGES) or DEFAULT))
 
 

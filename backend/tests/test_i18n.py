@@ -29,6 +29,10 @@ def test_errors_come_back_in_the_language_the_app_asks_for(client, data):
     assert client.post("/api/auth/login", json=bad, headers=SWAHILI).get_json()["error"] == "Barua pepe au nenosiri si sahihi"
     # Languages the app doesn't have fall back to English.
     assert client.post("/api/auth/login", json=bad, headers={"Accept-Language": "fr"}).get_json()["error"] == "Invalid email or password"
+    # The app's own header wins over the browser's Accept-Language, which Firefox won't let it change.
+    firefox = {"Accept-Language": "en-US,en;q=0.5", "X-Language": "sw"}
+    assert client.post("/api/auth/login", json=bad, headers=firefox).get_json()["error"] == "Barua pepe au nenosiri si sahihi"
+    assert client.post("/api/auth/login", json=bad, headers={"X-Language": "fr"}).get_json()["error"] == "Invalid email or password"
 
 
 def test_field_names_are_translated_inside_messages(client):
