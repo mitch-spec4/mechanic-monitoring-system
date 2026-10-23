@@ -12,7 +12,7 @@ SIGNUP = {
     "name": "Wanjiku Kamau",
     "email": "owner@riftpower.test",
     "password": "a-long-password",
-    "plan": "team",
+    "plan": "professional",
 }
 
 
@@ -29,10 +29,11 @@ def give_plan(company_id, plan="starter", status="active", **dates):
 
 def test_pricing_is_public(client):
     data = client.get("/api/plans").get_json()
-    assert [plan["key"] for plan in data["plans"]] == ["starter", "team", "business"]
-    team = data["plans"][1]
-    assert team["prices"] == {"month": 4900, "year": 49000} and team["mechanics"] == 10 and team["storage_gb"] == 20
-    assert data["trial_days"] == 14 and data["currency"] == "USD" and data["payment_provider"] == "test"
+    assert [plan["key"] for plan in data["plans"]] == ["starter", "professional", "business"]
+    professional = data["plans"][1]
+    assert professional["prices"] == {"month": 450_000, "year": 4_500_000}
+    assert professional["mechanics"] == 10 and professional["storage_gb"] == 20
+    assert data["trial_days"] == 14 and data["currency"] == "KES" and data["payment_provider"] == "test"
 
 
 def test_signup_starts_a_free_trial_and_signs_the_owner_in(client, auth, data):
@@ -44,7 +45,7 @@ def test_signup_starts_a_free_trial_and_signs_the_owner_in(client, auth, data):
     assert owner.company_id not in (data["acme"], data["other"])
 
     billing = client.get("/api/billing", headers=auth("owner@riftpower.test")).get_json()
-    assert billing["subscription"]["state"] == "trialing" and billing["subscription"]["plan"] == "team"
+    assert billing["subscription"]["state"] == "trialing" and billing["subscription"]["plan"] == "professional"
     assert billing["subscription"]["days_left"] == 14
     assert billing["usage"] == {"mechanics": 0, "mechanic_limit": 10, "storage_bytes": 0, "storage_limit_bytes": 20 * GB}
     assert billing["payments"] == []
@@ -74,7 +75,7 @@ def test_paying_now_goes_through_checkout(client, auth, data):
     owner = auth("owner@riftpower.test")
 
     detail = client.get(f"/api/billing/payments/{reference}", headers=owner).get_json()
-    assert detail["payment"]["amount_cents"] == 49000 and detail["payment"]["status"] == "pending"
+    assert detail["payment"]["amount_cents"] == 4_500_000 and detail["payment"]["status"] == "pending"
     assert detail["company"] == "Rift Valley Power"
 
     # A declined card leaves the checkout open to try again.
@@ -89,17 +90,17 @@ def test_paying_now_goes_through_checkout(client, auth, data):
     assert 364 <= subscription["days_left"] <= 366
     assert client.post(f"/api/billing/test/{reference}/pay", headers=owner, json={}).status_code == 409
     payments = client.get("/api/billing", headers=owner).get_json()["payments"]
-    assert [(p["plan"], p["amount_cents"], p["status"]) for p in payments] == [("team", 49000, "paid")]
+    assert [(p["plan"], p["amount_cents"], p["status"]) for p in payments] == [("professional", 4_500_000, "paid")]
 
 
 def test_renewing_adds_a_period_and_changing_plan_starts_today(client, auth, data):
-    give_plan(data["acme"], "team", trial_ends_at=None, current_period_end=utcnow() + timedelta(days=10))
+    give_plan(data["acme"], "professional", trial_ends_at=None, current_period_end=utcnow() + timedelta(days=10))
 
     def pay(plan, interval="month"):
         url = client.post("/api/billing/checkout", headers=boss(auth), json={"plan": plan, "interval": interval}).get_json()["checkout_url"]
         return client.post(f"/api/billing/test/{url.rsplit('/', 1)[1]}/pay", headers=boss(auth), json={}).get_json()["subscription"]
 
-    renewed = pay("team")
+    renewed = pay("professional")
     assert 38 <= renewed["days_left"] <= 42  # 10 days left plus one month
     changed = pay("business")
     assert changed["plan"] == "business" and 28 <= changed["days_left"] <= 31
@@ -165,7 +166,7 @@ def test_storage_limit_applies_to_uploads(client, auth, data):
 
 
 def test_an_ended_trial_stops_new_work_until_a_plan_is_paid(client, auth, data):
-    give_plan(data["acme"], "team", status="trialing", trial_ends_at=utcnow() - timedelta(hours=1))
+    give_plan(data["acme"], "professional", status="trialing", trial_ends_at=utcnow() - timedelta(hours=1))
     job = {"title": "New job", "description": "Check the pump"}
     refused = client.post("/api/jobs", headers=boss(auth), json=job)
     assert refused.status_code == 402 and "free trial has ended" in refused.get_json()["error"]
@@ -175,7 +176,7 @@ def test_an_ended_trial_stops_new_work_until_a_plan_is_paid(client, auth, data):
     billing = client.get("/api/billing", headers=boss(auth)).get_json()
     assert billing["subscription"]["state"] == "expired" and billing["subscription"]["days_left"] is None
 
-    url = client.post("/api/billing/checkout", headers=boss(auth), json={"plan": "team"}).get_json()["checkout_url"]
+    url = client.post("/api/billing/checkout", headers=boss(auth), json={"plan": "professional"}).get_json()["checkout_url"]
     client.post(f"/api/billing/test/{url.rsplit('/', 1)[1]}/pay", headers=boss(auth), json={})
     assert client.post("/api/jobs", headers=boss(auth), json=job).status_code == 201
 

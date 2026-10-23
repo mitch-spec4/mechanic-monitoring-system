@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, CreditCard, FlaskConical, Lock } from "lucide-react";
 import { checkoutDetail, payTestCheckout } from "../services/api";
 import { go, money } from "../lib/route";
 import { errorMessage, formatDate } from "../lib/format";
-import { SiteHeader } from "./Home";
+import { SiteNav } from "./Home";
 import "./Home.css";
 
 type Props = { reference: string; user: any; onDone: () => void };
@@ -40,35 +39,35 @@ export default function Checkout({ reference, user, onDone }: Props) {
   const paid = payment?.status === "paid";
   return (
     <div className="site checkoutPage">
-      <SiteHeader />
-      <main className="checkoutLayout">
+      <SiteNav />
+      <main className="container checkoutLayout">
         {!user ? (
-          <section className="checkoutCard">
-            <h1>Sign in to finish paying</h1>
-            <p className="muted">This checkout belongs to a company account.</p>
-            <button className="primary" onClick={() => go("/signin")}>
-              Sign in
+          <section className="formCard checkoutCard">
+            <h1>Log in to finish paying</h1>
+            <p className="lead">This checkout belongs to a company account.</p>
+            <button className="btn primary wide" onClick={() => go("/signin")}>
+              Log in
             </button>
           </section>
         ) : !payment ? (
-          <section className="checkoutCard">{error ? <div className="error">{error}</div> : <p className="muted">Loading checkout…</p>}</section>
+          <section className="formCard checkoutCard">{error ? <div className="error">{error}</div> : <p className="lead">Loading checkout…</p>}</section>
         ) : paid ? (
-          <section className="checkoutCard done" role="status">
-            <CheckCircle2 size={54} />
+          <section className="formCard checkoutCard done" role="status">
+            <div className="doneMark" aria-hidden="true">
+              ✓
+            </div>
             <h1>Payment received</h1>
-            <p>
+            <p className="lead">
               Your <b>{payment.plan_name}</b> plan is active
               {subscription?.current_period_end ? ` until ${formatDate(subscription.current_period_end)}` : ""}.
             </p>
-            <button className="primary" onClick={onDone}>
+            <button className="btn primary wide" onClick={onDone}>
               Go to your dashboard
             </button>
           </section>
         ) : (
-          <section className="checkoutCard">
-            <div className="testBanner">
-              <FlaskConical size={16} /> Test mode: no real card is charged.
-            </div>
+          <section className="formCard checkoutCard">
+            <div className="testBanner">Test mode: no real card is charged.</div>
             <h1>Checkout</h1>
             <dl className="orderSummary">
               <div>
@@ -116,11 +115,11 @@ export default function Checkout({ reference, user, onDone }: Props) {
                   <input defaultValue="123" autoComplete="off" />
                 </label>
               </div>
-              <button className="primary" disabled={busy}>
-                <Lock size={15} /> {busy ? "Processing…" : `Pay ${money(payment.amount_cents, payment.currency)}`}
+              <button className="btn primary wide" disabled={busy}>
+                <span aria-hidden="true">🔒</span> {busy ? "Processing…" : `Pay ${money(payment.amount_cents, payment.currency)}`}
               </button>
-              <button type="button" className="siteLink declineLink" disabled={busy} onClick={() => pay("declined")}>
-                <CreditCard size={14} /> Try a declined card
+              <button type="button" className="textLink declineLink" disabled={busy} onClick={() => pay("declined")}>
+                Try a declined card
               </button>
             </form>
           </section>

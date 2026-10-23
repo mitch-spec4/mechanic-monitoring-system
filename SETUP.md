@@ -193,15 +193,15 @@ Photos in a format the phone's browser can't open (for example HEIC in most brow
 
 ## Plans and payments
 
-The homepage (`/`) shows the plans; **Start free trial** creates a new company with its owner as the manager. Plans are set in `backend/app/services/plans.py`:
+The homepage (`/`) shows the plans; **Get started** (or **Choose** on a plan) creates a new company with its owner as the manager. Plans and prices are set in `backend/app/services/plans.py`, in Kenyan shillings; the homepage, signup and checkout all read them from there:
 
-| Plan | Price | Mechanics | Storage |
-| --- | --- | --- | --- |
-| Starter | $19 a month | 3 | 2 GB |
-| Team | $49 a month | 10 | 20 GB |
-| Business | $99 a month | 30 | 100 GB |
+| Plan | Monthly | Yearly | Mechanics | Storage |
+| --- | --- | --- | --- | --- |
+| Starter | KSh 1,500 | KSh 15,000 | 3 | 2 GB |
+| Professional | KSh 4,500 | KSh 45,000 | 10 | 20 GB |
+| Business | KSh 12,000 | KSh 120,000 | 30 | 100 GB |
 
-Yearly billing charges ten months (two months free). Every new company starts with a 14-day free trial; no card is needed. During the trial and once paid, the plan's limits apply: inviting a mechanic is refused once the team (plus open invitations) reaches the limit, and uploads are refused once storage is full. When a trial or paid period runs out, nothing is deleted and work in progress carries on, but creating jobs and inviting people waits until the manager pays under **Billing**. Companies created before plans existed get the Business plan with no end date.
+Yearly billing charges ten months (two months free). Today every plan includes every feature that's built; plans differ in team size and storage. The extra features the homepage lists for Professional and Business are marked **Planned** until they exist (their wording is in `frontend/src/pages/Home.tsx`). Every new company starts with a 14-day free trial; no card is needed. During the trial and once paid, the plan's limits apply: inviting a mechanic is refused once the team (plus open invitations) reaches the limit, and uploads are refused once storage is full. When a trial or paid period runs out, nothing is deleted and work in progress carries on, but creating jobs and inviting people waits until the manager pays under **Billing**. Companies created before plans existed get the Business plan with no end date.
 
 Payment goes through a provider set by `BILLING_PROVIDER`:
 

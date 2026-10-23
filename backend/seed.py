@@ -212,19 +212,19 @@ def stamp(user, shift, kind, place, at, job=None):
 
 
 def add_subscription(company, boss):
-    """The demo company is on the Team plan, paid monthly (a test-mode payment a week ago)."""
+    """The demo company is on the Professional plan, paid monthly (a test-mode payment a week ago)."""
     if Subscription.query.filter_by(company_id=company.id).first():
         return
     paid = utcnow() - timedelta(days=7)
     db.session.add(
         Subscription(
-            company_id=company.id, plan="team", interval="month", status="active",
+            company_id=company.id, plan="professional", interval="month", status="active",
             trial_ends_at=paid, current_period_end=add_period(paid, "month"), created_at=paid - timedelta(days=14),
         )
     )
     db.session.add(
         Payment(
-            company_id=company.id, user_id=boss.id, plan="team", interval="month", amount_cents=price_cents("team", "month"),
+            company_id=company.id, user_id=boss.id, plan="professional", interval="month", amount_cents=price_cents("professional", "month"),
             currency=CURRENCY, provider="test", reference="pay_demo_first_month", status="paid", created_at=paid, paid_at=paid,
         )
     )
@@ -390,4 +390,4 @@ with app.app_context():
     add_notification(abc_user, "Review reminder", "Please leave a review for your completed service.", "review")
 
     db.session.commit()
-    print("Demo data ready: 3 customers, 3 mechanics, 6 machines, 6 jobs with worksheets and history, 3 checklists, shifts and locations, 6 service records, 3 reviews, 3 requests, notifications, and a paid Team plan.")
+    print("Demo data ready: 3 customers, 3 mechanics, 6 machines, 6 jobs with worksheets and history, 3 checklists, shifts and locations, 6 service records, 3 reviews, 3 requests, notifications, and a paid Professional plan.")

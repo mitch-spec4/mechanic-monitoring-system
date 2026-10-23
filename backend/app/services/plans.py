@@ -1,16 +1,16 @@
-"""Subscription plans. Prices are in US cents; yearly billing charges ten months (two free)."""
+"""Subscription plans. Prices are in cents of Kenyan shillings; yearly billing charges ten months (two free)."""
 import calendar
 
-CURRENCY = "USD"
+CURRENCY = "KES"
 TRIAL_DAYS = 14
 INTERVALS = ("month", "year")
 YEARLY_MONTHS = 10
 GB = 1024**3
 
 PLANS = {
-    "starter": {"name": "Starter", "monthly_cents": 1900, "mechanics": 3, "storage_gb": 2},
-    "team": {"name": "Team", "monthly_cents": 4900, "mechanics": 10, "storage_gb": 20},
-    "business": {"name": "Business", "monthly_cents": 9900, "mechanics": 30, "storage_gb": 100},
+    "starter": {"name": "Starter", "monthly_cents": 150_000, "mechanics": 3, "storage_gb": 2},
+    "professional": {"name": "Professional", "monthly_cents": 450_000, "mechanics": 10, "storage_gb": 20},
+    "business": {"name": "Business", "monthly_cents": 1_200_000, "mechanics": 30, "storage_gb": 100},
 }
 
 

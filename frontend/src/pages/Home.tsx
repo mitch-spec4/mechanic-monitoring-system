@@ -1,374 +1,414 @@
-import { useEffect, useState } from "react";
-import {
-  ArrowRight,
-  BarChart3,
-  Camera,
-  Check,
-  ClipboardList,
-  Clock,
-  FileText,
-  History,
-  MapPin,
-  PenLine,
-  ShieldCheck,
-  Smartphone,
-  Star,
-  UserRound,
-  Users,
-  Wrench,
-} from "lucide-react";
-import { plans as fetchPlans } from "../services/api";
+import { useState, type ReactNode } from "react";
 import { go, money } from "../lib/route";
+import { usePricing, type Interval, type Plan, type Pricing } from "../components/Plans";
 import "./Home.css";
 
-export type Pricing = {
-  plans: { key: string; name: string; mechanics: number; storage_gb: number; prices: { month: number; year: number } }[];
-  currency: string;
-  trial_days: number;
-  yearly_months: number;
-  payment_provider: string | null;
-};
+const SECTIONS = [
+  ["features", "Features"],
+  ["roles", "How it works"],
+  ["subscriptions", "Subscriptions"],
+] as const;
 
-export function usePricing() {
-  const [pricing, setPricing] = useState<Pricing | null>(null);
-  useEffect(() => {
-    fetchPlans().then(setPricing).catch(() => setPricing(null));
-  }, []);
-  return pricing;
-}
+const FEATURES = [
+  ["📋", "Job management", "Create jobs, assign mechanics, track progress and keep job information together."],
+  ["🔧", "Machine history", "See previous repairs, replaced parts, solutions and service records for every machine."],
+  ["👨‍🔧", "Mechanic tracking", "Give mechanics their jobs, collect updates and know what work is complete."],
+  ["📦", "Parts tracking", "Record parts used during service and keep a replacement history for every machine."],
+  ["⭐", "Customer feedback", "Customers rate completed work, and their requests and updates stay with the job."],
+  ["📊", "Reports", "Follow jobs by status, customer ratings and the hours your team has worked."],
+  ["📸", "Photos & sign-off", "Before and after photos and videos on every job, and the customer signs on the mechanic's phone."],
+  ["📍", "Clock-in & team map", "Mechanics clock in on their phones, and you see who is on site, with their consent."],
+  ["📄", "PDF service reports", "Every finished job gets a PDF report with the work done, parts, photos and signature."],
+];
 
 const ROLES = [
   {
-    key: "forManager",
-    icon: BarChart3,
-    title: "For the manager",
-    lead: "See the whole operation without a single phone call.",
-    points: [
-      "Create and assign jobs in seconds",
-      "See who is clocked in, and where, on a live team map",
-      "Every customer's machines, with the ones that need work first",
-      "A full history of every job: who did what, and when",
-      "Shifts, hours and reports in one place",
-    ],
+    icon: "👔",
+    title: "Boss / Manager",
+    lead: "Control the operation and keep jobs moving.",
+    points: ["Assign mechanics to jobs", "Monitor job progress", "Manage customers and their machines", "See who is on shift on the team map", "View reports and service history"],
   },
   {
-    key: "forMechanic",
-    icon: Wrench,
-    title: "For the mechanic",
-    lead: "One phone app for the whole job. No paperwork twice.",
-    points: [
-      "Clock in and see today's jobs",
-      "A timer starts with the job, so hours record themselves",
-      "Checklists, parts and notes on one worksheet",
-      "Before and after photos and short videos",
-      "The customer signs on the phone and the job closes",
-    ],
+    icon: "🧰",
+    title: "Mechanic",
+    lead: "Everything needed to complete a job.",
+    points: ["View assigned jobs", "Update work status", "Record parts used", "Add solutions and notes", "Add photos and get the customer's signature"],
   },
   {
-    key: "forCustomer",
-    icon: UserRound,
-    title: "For the customer",
-    lead: "Proof of every job, without chasing anyone.",
-    points: [
-      "Request service for any machine",
-      "Follow each job as it moves",
-      "See the photos, the work done and the signature",
-      "Download the PDF service report",
-      "Rate the service",
-    ],
+    icon: "👤",
+    title: "Customer",
+    lead: "A simple portal for service customers.",
+    points: ["Request service", "Track service requests", "View machine history", "Download signed service reports", "Leave reviews"],
   },
 ];
 
-const STEPS = [
-  { icon: ClipboardList, title: "Request or create the job", text: "A customer requests service, or the manager creates the job for a machine." },
-  { icon: Users, title: "Assign a mechanic", text: "One click. The mechanic is notified straight away." },
-  { icon: Camera, title: "Work on site", text: "Clock in, start the timer, tick the checklist, add parts and photos." },
-  { icon: PenLine, title: "Sign-off and report", text: "The customer signs on the phone and gets a PDF report to keep." },
+/** Words for each plan. What a plan includes and costs comes from the server; "planned" items
+ * aren't built yet and are shown as such. */
+const PLAN_COPY: Record<string, { desc: string; team: string; features: string[]; planned: string[]; best: string }> = {
+  starter: {
+    desc: "Do the work. Keep everyday service jobs organized.",
+    team: "Small teams",
+    features: [
+      "Job creation and assignment",
+      "Machine and customer records",
+      "Service history and repair notes",
+      "Parts, checklists and photos",
+      "Customer sign-off and PDF reports",
+      "Clock-in, team map and notifications",
+    ],
+    planned: [],
+    best: "Small workshops needing a simple, fast workflow.",
+  },
+  professional: {
+    desc: "Organize the work across a growing team.",
+    team: "Growing teams",
+    features: ["Everything in Starter"],
+    planned: ["Custom statuses and fields", "Reminders and approvals", "Workload and job timelines", "More detailed dashboard analytics"],
+    best: "Teams ready for more structure and fewer manual follow-ups.",
+  },
+  business: {
+    desc: "Run a larger operation, with room to grow.",
+    team: "Larger operations",
+    features: ["Everything in Professional"],
+    planned: [
+      "Branch, team and mechanic views",
+      "Bulk actions and saved views",
+      "Costing and operational analytics",
+      "Advanced roles and permissions",
+      "Escalations and assignment rules",
+    ],
+    best: "Established service businesses with multiple teams or sites.",
+  },
+};
+
+const RECOMMENDED = "professional";
+
+const COMPARE: [string, (plan: Plan) => string][] = [
+  ["Mechanics", (plan) => `Up to ${plan.mechanics}`],
+  ["Storage for photos, videos & signatures", (plan) => `${plan.storage_gb} GB`],
+  ["Jobs, customers & machines", () => "Unlimited"],
+  ["Mechanic app, checklists & parts", () => "Included"],
+  ["Photos, sign-off & PDF reports", () => "Included"],
+  ["Team map, shifts & reviews", () => "Included"],
+  ["Custom statuses & fields", (plan) => (plan.key === "starter" ? "—" : "Planned")],
+  ["Reminders & approvals", (plan) => (plan.key === "starter" ? "—" : "Planned")],
+  ["Integrations", (plan) => (plan.key === "starter" ? "—" : "Planned")],
+  ["Branches, roles & costing", (plan) => (plan.key === "business" ? "Planned" : "—")],
 ];
 
-const FAQ = [
-  ["Do I need a card to start the free trial?", "No. Every plan starts with a free trial. Choose a plan and pay when you're ready."],
-  [
-    "What happens when the trial ends?",
-    "Nothing is deleted. You can still see everything and finish jobs already in progress, but adding new jobs and inviting people needs a plan.",
-  ],
-  [
-    "Who can sign in?",
-    "You invite your mechanics and customers with a one-time invitation code. Each person only sees what their role allows, and companies never see each other's data.",
-  ],
-  [
-    "Do mechanics need a special device?",
-    "No, any smartphone with a modern browser. Their location is only shared while they're clocked in, and only after they agree.",
-  ],
-  [
-    "Where are photos and videos kept?",
-    "In private storage. They're only shown to people in your company who are allowed to see that job.",
-  ],
-];
+const scrollToSection = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
-export function PlanCards({ pricing, interval, onChoose, cta }: { pricing: Pricing; interval: "month" | "year"; onChoose: (plan: string) => void; cta: (plan: string) => string }) {
+/** The bar across the top of the public pages; each page adds its own links and buttons. */
+export function SiteNav({ children }: { children?: ReactNode }) {
   return (
-    <div className="planGrid">
-      {pricing.plans.map((plan) => {
-        const price = plan.prices[interval];
-        const featured = plan.key === "team";
-        return (
-          <article key={plan.key} className={`planCard ${featured ? "featured" : ""}`}>
-            {featured && <span className="planBadge">Recommended</span>}
-            <h3>{plan.name}</h3>
-            <p className="planPrice">
-              <strong>{money(interval === "year" ? price / 12 : price, pricing.currency)}</strong>
-              <span>/ month</span>
-            </p>
-            <p className="planBilled">
-              {interval === "year" ? `${money(price, pricing.currency)} billed yearly, ${12 - pricing.yearly_months} months free` : "Billed monthly"}
-            </p>
-            <ul>
-              <li>
-                <Check size={15} /> Up to {plan.mechanics} mechanics
-              </li>
-              <li>
-                <Check size={15} /> {plan.storage_gb} GB for photos and videos
-              </li>
-              <li>
-                <Check size={15} /> Unlimited customers, machines and jobs
-              </li>
-              <li>
-                <Check size={15} /> Every feature included
-              </li>
-            </ul>
-            <button className={featured ? "primary" : "secondary"} onClick={() => onChoose(plan.key)}>
-              {cta(plan.key)}
-            </button>
-          </article>
-        );
-      })}
+    <div className="siteNav">
+      <div className="container navRow">
+        <button className="siteLogo" onClick={() => go("/")}>
+          <span className="logoIcon" aria-hidden="true">
+            🔧
+          </span>
+          MechanicPro
+        </button>
+        {children}
+      </div>
     </div>
   );
 }
 
-export function IntervalSwitch({ value, onChange, freeMonths }: { value: "month" | "year"; onChange: (value: "month" | "year") => void; freeMonths: number }) {
+export function PeriodToggle({ value, onChange, freeMonths }: { value: Interval; onChange: (value: Interval) => void; freeMonths: number }) {
   return (
-    <div className="intervalSwitch" role="group" aria-label="Billing period" style={{ "--pos": value === "year" ? 1 : 0 } as React.CSSProperties}>
-      <span className="intervalThumb" aria-hidden="true" />
+    <div className="periodToggle" role="group" aria-label="Billing period">
       <button type="button" aria-pressed={value === "month"} onClick={() => onChange("month")}>
         Monthly
       </button>
       <button type="button" aria-pressed={value === "year"} onClick={() => onChange("year")}>
-        Yearly <em>{freeMonths} months free</em>
+        Yearly <span className="save">Save {freeMonths} months</span>
       </button>
     </div>
   );
 }
 
-function HeroArt() {
+/** An illustration of the manager's dashboard. */
+function DashboardPreview() {
   const jobs = [
-    ["Service Generator G-102", "In Progress", "progress"],
-    ["Repair Hydraulic Pump H-21", "Assigned", "assigned"],
-    ["Conveyor Line CL-4 inspection", "Completed", "done"],
+    ["Hydraulic pump inspection", "In progress", "progress"],
+    ["Engine service · CAT 320", "Assigned", "assigned"],
+    ["Generator maintenance", "Completed", "done"],
   ];
   return (
-    <div className="heroArt" aria-hidden="true">
-      <div className="artBoard">
-        <div className="artHead">
-          <span>Today's jobs</span>
-          <b>3 active</b>
-        </div>
-        {jobs.map(([title, status, tone]) => (
-          <div className="artJob" key={title}>
-            <i className={tone} />
-            <span>{title}</span>
-            <em className={tone}>{status}</em>
+    <div className="preview" aria-hidden="true">
+      <div className="previewInner">
+        <div className="dots">● &nbsp; ● &nbsp; ●</div>
+        <div className="dash">
+          <div className="side">
+            <div className="current">▣ Dashboard</div>
+            <div>◉ Jobs</div>
+            <div>⚙ Machines</div>
+            <div>♙ Mechanics</div>
+            <div>▤ Service history</div>
           </div>
-        ))}
-        <div className="artTeam">
-          <span className="artPulse" /> 2 mechanics clocked in
+          <div className="dashMain">
+            <h3>Good morning, Manager 👋</h3>
+            <div className="pvStats">
+              <div>
+                <small>ACTIVE JOBS</small>
+                <b>18</b>
+              </div>
+              <div>
+                <small>COMPLETED</small>
+                <b>126</b>
+              </div>
+              <div>
+                <small>MECHANICS</small>
+                <b>12</b>
+              </div>
+            </div>
+            <div className="pvJobs">
+              {jobs.map(([title, status, tone]) => (
+                <div className="pvJob" key={title}>
+                  <span>{title}</span>
+                  <span className="pvStatus" data-tone={tone}>
+                    {status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
-      <div className="artPhone">
-        <div className="artPhoneHead">
-          <PenLine size={12} /> Customer sign-off
-        </div>
-        <div className="artPhotos">
-          <i className="before">Before</i>
-          <i className="after">After</i>
-        </div>
-        <svg viewBox="0 0 200 60" className="artSignature">
-          <path d="M8 40c10-22 18-30 24-26s-6 28-1 30 13-24 20-25 4 21 10 21 11-18 18-18-1 15 6 15 15-21 24-21 3 17 10 17c8 0 18-12 28-14s7 10 15 10 20-7 30-8" />
-        </svg>
-        <div className="artSigned">Signed by Grace Wanjiru</div>
-        <div className="artButton">
-          <Check size={13} /> Complete job
-        </div>
-      </div>
-      <div className="artChip chipOne">
-        <MapPin size={14} /> Mitch is on site
-      </div>
-      <div className="artChip chipTwo">
-        <FileText size={14} /> Report ready
       </div>
     </div>
   );
 }
 
-export function SiteHeader() {
+function PlanCard({ plan, pricing, interval }: { plan: Plan; pricing: Pricing; interval: Interval }) {
+  const copy = PLAN_COPY[plan.key] ?? { desc: "", team: "", features: [], planned: [], best: "" };
+  const recommended = plan.key === RECOMMENDED;
+  const yearlySaving = plan.prices.month * 12 - plan.prices.year;
   return (
-    <header className="siteHeader">
-      <button className="siteLogo" onClick={() => go("/")}>
-        <span className="siteMark">
-          <Wrench size={16} />
-        </span>
-        MECHANIC<em>PRO</em>
+    <article className={`plan ${recommended ? "popular" : ""}`}>
+      {recommended && <span className="tag">Recommended</span>}
+      <h3>{plan.name}</h3>
+      <p className="desc">{copy.desc}</p>
+      <div className="price">
+        {money(plan.prices[interval], pricing.currency)} <small>/ {interval}</small>
+      </div>
+      <div className="yearNote">
+        {interval === "year"
+          ? `Up to ${plan.mechanics} mechanics · Save ${money(yearlySaving, pricing.currency)} a year`
+          : `${copy.team} · Up to ${plan.mechanics} mechanics`}
+      </div>
+      <button className={`btn ${recommended ? "primary" : "outline"}`} onClick={() => go(`/signup?plan=${plan.key}&interval=${interval}`)}>
+        Choose {plan.name}
       </button>
-      <nav>
-        <button className="siteLink" onClick={() => go("/signin")}>
-          Sign in
+      <ul>
+        {copy.features.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+        {copy.planned.map((item) => (
+          <li key={item} className="planned">
+            {item} <em>Planned</em>
+          </li>
+        ))}
+      </ul>
+      <h4>Customers & jobs</h4>
+      <p className="detail">Unlimited customers, machines and jobs.</p>
+      <h4>Storage</h4>
+      <p className="detail">{plan.storage_gb} GB for photos, videos and signatures.</p>
+      <h4>Best for</h4>
+      <p className="detail">{copy.best}</p>
+    </article>
+  );
+}
+
+function CompareCell({ value }: { value: string }) {
+  if (value === "Planned") return <em className="pill">Planned</em>;
+  if (value === "Included") return <span className="yes">✓ Included</span>;
+  return <>{value}</>;
+}
+
+/** Existing companies change plan from Billing, after signing in. */
+function PlanSwitcher({ plans, interval }: { plans: Plan[]; interval: Interval }) {
+  const [choice, setChoice] = useState(RECOMMENDED);
+  return (
+    <div className="switcher">
+      <h3>Already using MechanicPro?</h3>
+      <p>
+        Change your plan from Billing in your account. Renewing the plan you have adds time after it ends; a different plan starts the day you pay.
+      </p>
+      <div className="switchRow">
+        <select aria-label="Choose a subscription plan" value={choice} onChange={(event) => setChoice(event.target.value)}>
+          {plans.map((plan) => (
+            <option key={plan.key} value={plan.key}>
+              {plan.name}
+            </option>
+          ))}
+        </select>
+        <button className="btn primary" onClick={() => go(`/signin?next=billing&plan=${choice}&interval=${interval}`)}>
+          Continue to Billing
         </button>
-        <button className="primary" onClick={() => go("/signup")}>
-          Start free trial
-        </button>
-      </nav>
-    </header>
+      </div>
+    </div>
   );
 }
 
 /** The public homepage: what MechanicPro does, for whom, and what it costs. */
 export default function Home() {
-  const pricing = usePricing();
-  const [interval, setPeriod] = useState<"month" | "year">("month");
-  const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const [pricing, failed] = usePricing();
+  const [interval, setPeriod] = useState<Interval>("month");
   const trialDays = pricing?.trial_days ?? 14;
   return (
-    <div className="site">
-      <SiteHeader />
-      <section className="hero">
-        <div className="heroText">
-          <span className="heroEyebrow">For equipment service companies</span>
-          <h1>Every service job, from call-out to customer sign-off.</h1>
-          <p>
-            MechanicPro gives managers, mechanics and customers one shared record of every job: who is on site, what was done, the photos, and the
-            customer's signature.
-          </p>
-          <div className="heroActions">
-            <button className="primary" onClick={() => go("/signup")}>
-              Start your {trialDays}-day free trial <ArrowRight size={16} />
+    <div className="site home">
+      <SiteNav>
+        <nav className="navLinks" aria-label="Sections">
+          {SECTIONS.map(([id, label]) => (
+            <button key={id} onClick={() => scrollToSection(id)}>
+              {label}
             </button>
-            <button className="secondary" onClick={() => scrollTo("pricing")}>
-              See pricing
+          ))}
+        </nav>
+        <div className="navActions">
+          <button className="btn outline" onClick={() => go("/signin")}>
+            Log in
+          </button>
+          <button className="btn primary" onClick={() => go("/signup")}>
+            Get started
+          </button>
+        </div>
+      </SiteNav>
+
+      <section className="hero">
+        <div className="container">
+          <div className="badge">● Field service management made simple</div>
+          <h1>
+            Run your service team from <span className="gradient">one place.</span>
+          </h1>
+          <p>Manage jobs, mechanics, machines, parts, service history and customers without drowning in paperwork.</p>
+          <div className="heroButtons">
+            <button className="btn primary" onClick={() => go("/signup")}>
+              Start now →
+            </button>
+            <button className="btn outline" onClick={() => scrollToSection("features")}>
+              Explore features
             </button>
           </div>
-          <small>No card needed for the trial.</small>
+          <DashboardPreview />
         </div>
-        <HeroArt />
       </section>
 
-      <section className="siteSection" id="features">
-        <div className="sectionHead">
-          <span>One app, three accounts</span>
-          <h2>Everyone sees the same job, from their side.</h2>
+      <section id="features" className="siteSection">
+        <div className="container">
+          <div className="head">
+            <h2>Everything your service operation needs.</h2>
+            <p>Keep the whole service lifecycle connected, from the first request to the final report.</p>
+          </div>
+          <div className="featureGrid">
+            {FEATURES.map(([icon, title, text]) => (
+              <article className="feature" key={title}>
+                <div className="ico" aria-hidden="true">
+                  {icon}
+                </div>
+                <h3>{title}</h3>
+                <p>{text}</p>
+              </article>
+            ))}
+          </div>
         </div>
-        <div className="roleGrid">
-          {ROLES.map(({ key, icon: Icon, title, lead, points }) => (
-            <article key={key} className={`roleCard ${key}`}>
-              <span className="roleIcon">
-                <Icon size={20} />
-              </span>
-              <h3>{title}</h3>
-              <p>{lead}</p>
-              <ul>
-                {points.map((point) => (
-                  <li key={point}>
-                    <Check size={15} /> {point}
-                  </li>
+      </section>
+
+      <section id="roles" className="siteSection">
+        <div className="container">
+          <div className="head">
+            <h2>One workflow. Three powerful views.</h2>
+            <p>Everyone gets the information they need without exposing what they don't.</p>
+          </div>
+          <div className="roleGrid">
+            {ROLES.map(({ icon, title, lead, points }) => (
+              <article className="role" key={title}>
+                <div className="ico" aria-hidden="true">
+                  {icon}
+                </div>
+                <h3>{title}</h3>
+                <p>{lead}</p>
+                <ul>
+                  {points.map((point) => (
+                    <li key={point}>{point}</li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="subscriptions" className="siteSection">
+        <div className="container">
+          <div className="head">
+            <h2>Choose the level that fits your operation.</h2>
+            <p>Every plan includes everything that works today. Bigger plans add mechanics and storage now, with more control and automation on the way.</p>
+          </div>
+          {pricing ? (
+            <>
+              <PeriodToggle value={interval} onChange={setPeriod} freeMonths={12 - pricing.yearly_months} />
+              <div className="pricingGrid">
+                {pricing.plans.map((plan) => (
+                  <PlanCard key={plan.key} plan={plan} pricing={pricing} interval={interval} />
                 ))}
-              </ul>
-            </article>
-          ))}
+              </div>
+              <div className="compareWrap">
+                <table className="compare">
+                  <thead>
+                    <tr>
+                      <th>Capability</th>
+                      {pricing.plans.map((plan) => (
+                        <th key={plan.key}>{plan.name}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {COMPARE.map(([label, value]) => (
+                      <tr key={label}>
+                        <td>{label}</td>
+                        {pricing.plans.map((plan) => (
+                          <td key={plan.key}>
+                            <CompareCell value={value(plan)} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <PlanSwitcher plans={pricing.plans} interval={interval} />
+              <p className="pricingNote">
+                Prices in Kenyan shillings. Every plan starts with a {trialDays}-day free trial, no card needed. When a trial ends nothing is deleted, and
+                jobs in progress can still be finished. Planned features are on the way and not available yet.
+                {pricing.payment_provider === "test" && " Payments on this server are in test mode: no real money is taken."}
+                {!pricing.payment_provider && " Online payment isn't switched on yet, so every company starts on the free trial."}
+              </p>
+            </>
+          ) : (
+            <p className="pricingNote">{failed ? "Prices couldn't be loaded. Refresh the page to try again." : "Loading plans…"}</p>
+          )}
         </div>
       </section>
 
-      <section className="siteSection steps">
-        <div className="sectionHead">
-          <span>How it works</span>
-          <h2>From the first call to the signed report.</h2>
+      <section className="siteSection ctaSection">
+        <div className="container">
+          <div className="cta">
+            <h2>Stop managing service work in spreadsheets.</h2>
+            <p>Bring your jobs, mechanics, machines and customers into one organized system.</p>
+            <button className="btn primary" onClick={() => go("/signup")}>
+              Create your account →
+            </button>
+          </div>
         </div>
-        <ol className="stepGrid">
-          {STEPS.map(({ icon: Icon, title, text }, index) => (
-            <li key={title}>
-              <span className="stepNumber">{index + 1}</span>
-              <Icon size={20} />
-              <h3>{title}</h3>
-              <p>{text}</p>
-            </li>
-          ))}
-        </ol>
-        <div className="trustRow">
-          <span>
-            <ShieldCheck size={16} /> Invite-only accounts, each company's data kept apart
-          </span>
-          <span>
-            <Smartphone size={16} /> Built for phones on site
-          </span>
-          <span>
-            <History size={16} /> Records and reviews can't be deleted
-          </span>
-          <span>
-            <Clock size={16} /> Hours recorded automatically
-          </span>
-        </div>
-      </section>
-
-      <section className="siteSection pricing" id="pricing">
-        <div className="sectionHead">
-          <span>Pricing</span>
-          <h2>Simple plans. Every feature included.</h2>
-          <p>
-            Start with a {trialDays}-day free trial on any plan. Prices in US dollars.
-          </p>
-        </div>
-        {pricing ? (
-          <>
-            <IntervalSwitch value={interval} onChange={setPeriod} freeMonths={12 - pricing.yearly_months} />
-            <PlanCards
-              pricing={pricing}
-              interval={interval}
-              onChoose={(plan) => go(`/signup?plan=${plan}&interval=${interval}`)}
-              cta={() => "Start free trial"}
-            />
-          </>
-        ) : (
-          <p className="muted pricingLoading">Loading plans…</p>
-        )}
-      </section>
-
-      <section className="siteSection faq">
-        <div className="sectionHead">
-          <span>Questions</span>
-          <h2>Good to know</h2>
-        </div>
-        <div className="faqList">
-          {FAQ.map(([question, answer]) => (
-            <details key={question}>
-              <summary>{question}</summary>
-              <p>{answer}</p>
-            </details>
-          ))}
-        </div>
-      </section>
-
-      <section className="finalCta">
-        <Star size={22} />
-        <h2>Run your next job on MechanicPro.</h2>
-        <button className="primary" onClick={() => go("/signup")}>
-          Start your free trial <ArrowRight size={16} />
-        </button>
       </section>
 
       <footer className="siteFooter">
-        <span>© {new Date().getFullYear()} MechanicPro</span>
-        <button className="siteLink" onClick={() => go("/signin")}>
-          Sign in
-        </button>
+        <div className="container foot">
+          <span>© {new Date().getFullYear()} MechanicPro. Field service management.</span>
+          <span>Built for service teams.</span>
+        </div>
       </footer>
     </div>
   );

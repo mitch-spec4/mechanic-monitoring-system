@@ -3,8 +3,7 @@ import { AlertTriangle, CreditCard, HardDrive, Receipt, Sparkles, Users } from "
 import { billing, startCheckout } from "../services/api";
 import { go, money } from "../lib/route";
 import { errorMessage, formatBytes, formatDate } from "../lib/format";
-import { IntervalSwitch, PlanCards } from "./Home";
-import "./Home.css";
+import { IntervalSwitch, PlanCards, type Interval } from "../components/Plans";
 import "./Billing.css";
 
 const STATE_LABEL: Record<string, string> = { trialing: "Free trial", active: "Active", expired: "Ended" };
@@ -34,18 +33,21 @@ function Meter({ icon, label, used, limit, text }: { icon: any; label: string; u
   );
 }
 
-/** The boss's plan, usage against its limits, choosing or renewing a plan, and past payments. */
-export default function BillingPage() {
+type Props = { focus?: { plan: string; interval: Interval } };
+
+/** The boss's plan, usage against its limits, choosing or renewing a plan, and past payments.
+ * Coming from the homepage, the plan chosen there is picked out. */
+export default function BillingPage({ focus }: Props) {
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
-  const [interval, setPeriod] = useState<"month" | "year">("month");
+  const [interval, setPeriod] = useState<Interval>(focus?.interval || "month");
 
   useEffect(() => {
     billing()
       .then((result) => {
         setData(result);
-        if (result.subscription?.interval === "year") setPeriod("year");
+        if (!focus && result.subscription?.interval === "year") setPeriod("year");
       })
       .catch((problem) => setError(errorMessage(problem)));
   }, []);
@@ -140,7 +142,13 @@ export default function BillingPage() {
             <CreditCard size={15} /> Payments are in test mode: no real card is charged.
           </p>
         )}
-        <PlanCards pricing={data} interval={interval} onChoose={(plan) => data.payment_provider && !busy && choose(plan)} cta={label} />
+        <PlanCards
+          pricing={data}
+          interval={interval}
+          onChoose={(plan) => data.payment_provider && !busy && choose(plan)}
+          cta={label}
+          focus={focus?.plan}
+        />
       </section>
 
       <section className="billingCard">

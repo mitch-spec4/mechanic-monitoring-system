@@ -78,8 +78,136 @@
 .billingCardHead .intervalSwitch {
   margin: 0;
 }
-.billingPage .planCard {
-  box-shadow: none;
+.intervalSwitch {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: min(100%, 360px);
+  padding: 4px;
+  border-radius: 14px;
+  background: #e6edf5;
+}
+.intervalThumb {
+  position: absolute;
+  z-index: -1;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 4px 12px -6px rgba(15, 29, 51, 0.4);
+  transform: translateX(calc(var(--pos) * 100%));
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.intervalSwitch button {
+  min-height: 40px;
+  border: 0;
+  background: none;
+  font-size: 13px;
+  font-weight: 800;
+  color: #5b6b82;
+}
+.intervalSwitch button[aria-pressed="true"] {
+  color: #0f1d33;
+}
+.intervalSwitch em {
+  font-style: normal;
+  font-size: 11px;
+  color: #168b4b;
+  margin-left: 4px;
+}
+.planGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  align-items: stretch;
+}
+.planCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 28px 22px 22px;
+  border-radius: 20px;
+  background: #fff;
+  border: 1px solid #e3e9f1;
+  scroll-margin: 90px;
+}
+.planCard.featured {
+  border: 2px solid var(--role-color, #0969d7);
+  box-shadow: 0 26px 60px -30px rgba(9, 105, 215, 0.55);
+}
+.planCard.focused {
+  outline: 3px solid color-mix(in srgb, var(--role-color, #0969d7) 35%, transparent);
+  outline-offset: 4px;
+}
+.planBadge {
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--role-color, #0969d7);
+}
+.planCard h3 {
+  margin: 0;
+  font-size: 20px;
+}
+.planPrice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin: 14px 0 2px;
+}
+.planPrice strong {
+  font-size: 30px;
+  white-space: nowrap;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+.planPrice span,
+.planBilled {
+  font-weight: 600;
+  color: #5b6b82;
+}
+.planBilled {
+  min-height: 20px;
+  margin: 0 0 18px;
+  font-size: 13px;
+}
+.planCard ul {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 22px;
+  padding: 0;
+  list-style: none;
+}
+.planCard li {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.planCard li svg {
+  margin-top: 2px;
+  color: #168b4b;
+}
+.appShell .planCard .primary,
+.appShell .planCard .secondary {
+  width: 100%;
+  min-height: 46px;
+  margin-top: auto;
+  font-size: 14px;
+  border-radius: 12px;
 }
 .billingNote {
   display: flex;
