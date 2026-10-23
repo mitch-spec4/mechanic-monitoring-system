@@ -140,7 +140,7 @@ All backend settings live in `backend/.env` (see `backend/.env.example`).
 | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | | **Required** with `s3`. A key that can only read, write and delete objects in this bucket |
 | `MAX_PHOTO_MB` / `MAX_VIDEO_MB` | `10` / `50` | Largest photo and video accepted |
 | `MAX_VIDEO_SECONDS` | `60` | Longest video the phone will upload |
-| `BILLING_PROVIDER` | `test` | `none` (the default): free trials only. `test` is refused in production. See [Plans and payments](#plans-and-payments) |
+| `BILLING_PROVIDER` | `test` | Leave unset: `none` (free trials only). `test` is refused in production. See [Plans and payments](#plans-and-payments) |
 
 Live positions taken during jobs are deleted after 30 days. The app removes old ones whenever new positions arrive; in production, also run `flask --app run.py purge-locations` once a day (for example from cron).
 
