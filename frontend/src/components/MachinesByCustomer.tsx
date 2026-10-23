@@ -3,6 +3,8 @@ import { MachineCard } from "../pages/CustomerPage";
 import { CreateJobModal } from "./JobForms";
 import { EditMachine } from "./MachineForms";
 import { t } from "../i18n";
+import { EmptyState } from "./States";
+import { Wrench } from "lucide-react";
 
 type Props = {
   machines: any[];
@@ -49,10 +51,11 @@ export default function MachinesByCustomer({ machines, customers, query, onOpenJ
         </label>
       </div>
       {groups.length === 0 && (
-        <div className="subEmpty">
-          <strong>{onlyNeedsWork ? t("No equipment needs work") : t("No equipment found")}</strong>
-          <span>{onlyNeedsWork ? t("All equipment is operational, with no open jobs or requests.") : t("Try a different search.")}</span>
-        </div>
+        <EmptyState
+          icon={<Wrench size={26} />}
+          title={onlyNeedsWork ? t("No equipment needs work") : t("No equipment found")}
+          text={onlyNeedsWork ? t("All equipment is operational, with no open jobs or requests.") : t("Try a different search.")}
+        />
       )}
       {groups.map(({ customer, machines: own }) => (
         <section className="machineGroup" key={customer.id} aria-label={customer.name}>

@@ -12,6 +12,7 @@ from app.services.machine_work import with_work
 from app.utils.auth import current_user, roles
 from app.utils.validation import ValidationError, choice, integer, json_body, text
 from app.i18n import _
+from app.services import audit
 
 bp = Blueprint("machines", __name__)
 
@@ -103,6 +104,7 @@ def delete(mid):
     )
     if has_history:
         return jsonify(error=_("This equipment has service history and cannot be deleted. Mark it as Retired instead.")), 409
+    audit.record("machine_deleted", user=current_user(), detail=machine.name)
     db.session.delete(machine)
     db.session.commit()
     return jsonify(ok=True)

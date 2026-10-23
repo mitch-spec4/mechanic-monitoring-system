@@ -1473,3 +1473,254 @@ body {
 #content:focus {
   outline: none;
 }
+
+/* ---------- Security: two-step sign-in, consent, activity, company data ---------- */
+.checkRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  cursor: pointer;
+}
+.login .checkRow input,
+.site .checkRow input,
+.checkRow input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 1px 0 0;
+  padding: 0;
+  accent-color: #0969d7;
+}
+.checkRow a {
+  color: #0969d7;
+  font-weight: 700;
+}
+.codeInput {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 22px !important;
+  letter-spacing: 0.3em;
+  text-align: center;
+}
+.login.twoFactorPage {
+  padding: 32px 0;
+}
+.login.twoFactorPage .loginCard {
+  width: 480px;
+}
+/* The steps are a form inside the card: not a second card. */
+.login.twoFactorPage .twoFactorSteps {
+  width: auto;
+  max-width: none;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  animation: none;
+}
+.twoFactorSteps {
+  display: grid;
+  gap: 14px;
+}
+.twoFactorSteps h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.setupSteps {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: setup;
+}
+.setupSteps > li {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding-inline-start: 38px;
+  font-size: 13px;
+  color: #4b5a70;
+  counter-increment: setup;
+}
+.setupSteps > li::before {
+  content: counter(setup);
+  position: absolute;
+  inset-inline-start: 0;
+  top: -2px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #0969d7;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+}
+.setupSteps strong {
+  color: #172033;
+  font-size: 14px;
+}
+.setupSteps label {
+  display: grid;
+  gap: 8px;
+}
+/* A QR code needs a light background to scan, in dark mode too. */
+.qrCode {
+  /* light-only */
+  justify-self: start;
+  width: 180px;
+  height: 180px;
+  padding: 6px;
+  border: 1px solid #dce3eb;
+  border-radius: 12px;
+  background: #fff;
+}
+.setupKey {
+  justify-self: start;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #eef3f9;
+  color: #172033;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.onPhones {
+  display: none !important;
+  justify-self: start;
+  text-decoration: none;
+}
+@media (pointer: coarse) {
+  .onPhones {
+    display: inline-flex !important;
+  }
+}
+.backupCodes {
+  display: grid;
+  gap: 12px;
+}
+.backupCodes p {
+  margin: 0;
+  font-size: 13px;
+}
+.backupCodeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 14px;
+  border: 1px dashed #b9c7d8;
+  border-radius: 12px;
+  background: #f6f9fc;
+  list-style: none;
+}
+.backupCodeGrid code {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: center;
+  color: #172033;
+}
+.backupCodeActions,
+.settingsActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.statusOn {
+  color: #0f8a4b;
+}
+.statusOff {
+  color: #68768a;
+}
+.statusLow {
+  color: #b45309;
+}
+.settingsSection.dangerZone {
+  border-color: #f3c0c0;
+}
+.settingsSection.dangerZone h3 {
+  color: #b91c1c;
+}
+.dangerZone .dangerButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 11px 15px;
+}
+.dangerZone .dangerButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.activityLog {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.activityLog li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 14px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid #edf1f5;
+  border-inline-start: 3px solid transparent;
+}
+.activityLog li.warning {
+  border-inline-start-color: #f59e0b;
+}
+.activityLog li div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.activityLog strong {
+  font-size: 14px;
+}
+.activityLog small {
+  color: #68768a;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.activityLog time {
+  color: #68768a;
+  font-size: 12px;
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  .activityLog li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.loadMore {
+  justify-self: center;
+  margin: 14px auto 0;
+  display: flex;
+}
+.deletionBanner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid #f3c0c0;
+  border-radius: 14px;
+  background: #fff1f1;
+  color: #8f1d1d;
+  font-size: 14px;
+  font-weight: 600;
+}
+.deletionBanner span {
+  flex: 1 1 240px;
+}
+

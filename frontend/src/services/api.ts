@@ -5,6 +5,8 @@ import { language, t } from "../i18n";
 const BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 
 export const SESSION_EXPIRED_EVENT = "mechanicpro:session-expired";
+// The server says this person must set up two-step sign-in before doing anything else.
+export const TWO_FACTOR_SETUP_EVENT = "mechanicpro:two-factor-setup";
 // Fired after any successful change so always-visible widgets (sidebar, bell) refresh at once.
 export const DATA_CHANGED_EVENT = "mechanicpro:data-changed";
 
@@ -23,6 +25,10 @@ export type User = {
   language: string;
   timezone: string;
   units: string;
+  two_factor_enabled: boolean;
+  two_factor_setup_needed: boolean;
+  /** Set while the company waits to be deleted: when it happens. */
+  deletion_due: string | null;
 };
 
 export function saveSession(user: unknown) {
@@ -94,6 +100,7 @@ export async function api(path: string, options: RequestInit = {}, announce = tr
     }
   }
   const data = await response.json().catch(() => ({}));
+  if (response.status === 403 && data.two_factor_setup) window.dispatchEvent(new Event(TWO_FACTOR_SETUP_EVENT));
   if (!response.ok) {
     throw new ApiError(data.error || data.message || data.msg || t("Request failed ({status})", { status: response.status }), response.status, data);
   }
@@ -104,7 +111,31 @@ export async function api(path: string, options: RequestInit = {}, announce = tr
 const post = (path: string, data: unknown) => api(path, { method: "POST", body: JSON.stringify(data) });
 const patch = (path: string, data: unknown) => api(path, { method: "PATCH", body: JSON.stringify(data) });
 
+/** Either a session ({ user }), or { two_factor_required, ticket } when a code is needed next. */
 export const login = (email: string, password: string) => post("/auth/login", { email, password });
+export const verifyTwoFactor = (ticket: string, code: string, remember: boolean) => post("/auth/two-factor/verify", { ticket, code, remember });
+export const startTwoFactorSetup = () => post("/auth/two-factor/setup", {});
+export const enableTwoFactor = (setupToken: string, code: string) => post("/auth/two-factor/enable", { setup_token: setupToken, code });
+export const twoFactorStatus = () => api("/auth/two-factor");
+export const renewBackupCodes = (password: string) => post("/auth/two-factor/backup-codes", { password });
+export const resetTwoFactor = (userId: number) => post(`/users/${userId}/reset-two-factor`, {});
+export const legalDocument = (name: "privacy" | "terms") => api(`/legal/${name}`);
+
+// The company's data (managers): the activity log, export, and deleting the company
+export const activity = (before?: number) => api(`/company/activity${before ? `?before=${before}` : ""}`);
+export const deleteCompany = (companyName: string, password: string) => post("/company/delete", { company_name: companyName, password });
+export const cancelCompanyDeletion = () => post("/company/delete/cancel", {});
+
+/** "Export my data": the ZIP comes back as a file, so this reads the response itself. */
+export async function exportData(password: string) {
+  const response = await send("/company/export", { method: "POST", body: JSON.stringify({ password }) });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new ApiError(data.error || t("Request failed ({status})", { status: response.status }), response.status, data);
+  }
+  const name = /filename="?([^";]+)"?/.exec(response.headers.get("Content-Disposition") || "")?.[1] || "mechanicpro-export.zip";
+  return { blob: await response.blob(), name };
+}
 export const logout = () => post("/auth/logout", {}).catch(() => {});
 export const acceptInvitation = (invitation: any) => post("/auth/accept-invitation", invitation);
 export const resetPassword = (data: any) => post("/auth/reset-password", data);

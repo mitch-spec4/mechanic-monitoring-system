@@ -8,6 +8,7 @@ import { mapLink } from "../lib/location";
 import { usePolling } from "../lib/usePolling";
 import { mark, t } from "../i18n";
 import "./Team.css";
+import { EmptyState } from "./States";
 
 const SEEN: Record<string, string> = {
   clock_in: mark("Seen {ago} at clock-in"),
@@ -103,10 +104,7 @@ export default function TeamMap({ onOpenJob }: { onOpenJob?: (id: number) => voi
           {t("Only technicians who are clocked in are shown. Positions update while a job is in progress and the technician has the app open.")}
         </p>
         {team && team.length === 0 && (
-          <div className="subEmpty">
-            <strong>{t("Nobody is clocked in")}</strong>
-            <span>{t("Technicians appear here when they clock in.")}</span>
-          </div>
+          <EmptyState icon={<MapPin size={26} />} title={t("Nobody is clocked in")} text={t("Technicians appear here when they clock in.")} />
         )}
         {team?.map((person) => (
           <article className="teamRow" key={person.user_id}>

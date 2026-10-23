@@ -24,7 +24,8 @@ def test_translations_keep_their_placeholders(english, swahili):
 
 
 def test_errors_come_back_in_the_language_the_app_asks_for(client, data):
-    bad = {"email": "boss@acme.test", "password": "wrong-password"}
+    # An address with no account: five wrong passwords on a real one would lock it.
+    bad = {"email": "nobody@acme.test", "password": "wrong-password"}
     assert client.post("/api/auth/login", json=bad).get_json()["error"] == "Invalid email or password"
     assert client.post("/api/auth/login", json=bad, headers=SWAHILI).get_json()["error"] == "Barua pepe au nenosiri si sahihi"
     # Languages the app doesn't have fall back to English.
@@ -77,7 +78,7 @@ def test_people_choose_their_own_language(client, data, auth):
 def test_new_accounts_start_in_the_language_the_app_is_in(client):
     response = client.post(
         "/api/signup",
-        json={"company_name": "Pwani Power", "name": "Amani", "email": "amani@pwani.test", "password": "a-long-password"},
+        json={"company_name": "Pwani Power", "name": "Amani", "email": "amani@pwani.test", "password": "a-long-password", "accept_terms": True},
         headers=SWAHILI,
     )
     assert response.status_code == 201 and response.get_json()["user"]["language"] == "sw"

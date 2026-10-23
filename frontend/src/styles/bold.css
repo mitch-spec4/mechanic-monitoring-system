@@ -1,0 +1,950 @@
+/*
+ * The look of the signed-in app. Loaded after every other stylesheet: the layouts stay where the
+ * page CSS puts them, and this layer sets type, colour, depth and motion on top.
+ *
+ * Tokens first. Each role keeps its colour (boss blue, technician green, customer rose) and gets a
+ * second one for gradients. Dark values are set by hand below, for better contrast than the
+ * automatic ones in scripts/dark-colors.mjs.
+ */
+:root {
+  --font-body: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Plus Jakarta Sans Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --bg: #eef2f8;
+  --surface: #ffffff;
+  --surface-2: #f5f7fb;
+  --ink: #0c1626;
+  --ink-2: #33445b;
+  --muted: #64748b;
+  --line: #e3e9f2;
+  --line-strong: #cfd8e5;
+  --shadow-1: 0 1px 2px rgba(12, 22, 38, 0.06), 0 6px 18px -10px rgba(12, 22, 38, 0.16);
+  --shadow-2: 0 2px 6px rgba(12, 22, 38, 0.06), 0 22px 44px -22px rgba(12, 22, 38, 0.32);
+  --radius: 20px;
+  --radius-sm: 13px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* One colour per status, used by every pill. */
+  --st-pending: #d97706;
+  --st-assigned: #6366f1;
+  --st-accepted: #0891b2;
+  --st-progress: #2563eb;
+  --st-paused: #ea580c;
+  --st-done: #16a34a;
+  --st-cancel: #64748b;
+  --st-urgent: #dc2626;
+
+  --accent: #0969d7;
+  --accent-2: #6d4aff;
+  --accent-deep: #061b3a;
+}
+.appShell.role-boss {
+  --accent: #0b6bdc;
+  --accent-2: #7048ff;
+  --accent-deep: #061a38;
+}
+.appShell.role-mechanic {
+  --accent: #14975a;
+  --accent-2: #0ea5a4;
+  --accent-deep: #052a1f;
+}
+.appShell.role-customer {
+  --accent: #d63a5c;
+  --accent-2: #f97316;
+  --accent-deep: #34081a;
+}
+
+:root[data-theme="dark"] {
+  /* light-only: these are the dark values already; the build step must not flip them back */
+  --bg: #0a111c;
+  --surface: #121b29;
+  --surface-2: #172233;
+  --ink: #edf2f9;
+  --ink-2: #c3cedc;
+  --muted: #8d9bb0;
+  --line: #233148;
+  --line-strong: #2f4060;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 22px -12px rgba(0, 0, 0, 0.7);
+  --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.45), 0 26px 50px -24px rgba(0, 0, 0, 0.85);
+  --st-pending: #fbbf24;
+  --st-assigned: #a5b4fc;
+  --st-accepted: #22d3ee;
+  --st-progress: #60a5fa;
+  --st-paused: #fb923c;
+  --st-done: #4ade80;
+  --st-cancel: #94a3b8;
+  --st-urgent: #f87171;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    /* light-only: dark values already */
+    --bg: #0a111c;
+    --surface: #121b29;
+    --surface-2: #172233;
+    --ink: #edf2f9;
+    --ink-2: #c3cedc;
+    --muted: #8d9bb0;
+    --line: #233148;
+    --line-strong: #2f4060;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 22px -12px rgba(0, 0, 0, 0.7);
+    --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.45), 0 26px 50px -24px rgba(0, 0, 0, 0.85);
+    --st-pending: #fbbf24;
+    --st-assigned: #a5b4fc;
+    --st-accepted: #22d3ee;
+    --st-progress: #60a5fa;
+    --st-paused: #fb923c;
+    --st-done: #4ade80;
+    --st-cancel: #94a3b8;
+    --st-urgent: #f87171;
+  }
+}
+
+/* ---------- Canvas and type ---------- */
+body {
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.appShell {
+  min-height: 100vh;
+  color: var(--ink);
+  font-size: 14px;
+  background:
+    radial-gradient(1200px 520px at 100% -10%, color-mix(in srgb, var(--accent-2) 13%, transparent), transparent 70%),
+    radial-gradient(900px 480px at 10% -20%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%),
+    var(--bg);
+  background-attachment: fixed;
+}
+/* :where keeps these broad rules weaker than any page rule that sets its own. */
+.appShell :where(h1, h2, h3, h4) {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.appShell :where(.muted, small) {
+  color: var(--muted);
+}
+.appShell .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: fit-content;
+  padding: 5px 11px 5px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 11%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.appShell .eyebrow::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* ---------- Sidebar ---------- */
+.appShell .sidebar {
+  background:
+    radial-gradient(240px 260px at 0% 0%, color-mix(in srgb, var(--accent) 45%, transparent), transparent 70%),
+    radial-gradient(260px 300px at 100% 100%, color-mix(in srgb, var(--accent-2) 32%, transparent), transparent 70%),
+    var(--accent-deep);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 8px 0 30px -18px rgba(0, 0, 0, 0.6);
+}
+.appShell .sidebarBrand {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+.appShell .sidebarNav {
+  gap: 3px;
+}
+.appShell .sidebarLink {
+  position: relative;
+  border-radius: 12px;
+  padding: 10px 11px;
+  color: rgba(226, 235, 247, 0.78);
+  font-size: 13px;
+  font-weight: 600;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.18s var(--ease);
+}
+.appShell .sidebarLink svg {
+  flex: none;
+  transition: transform 0.25s var(--ease);
+}
+.appShell .sidebarLink:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.appShell .sidebarLink:hover svg {
+  transform: scale(1.12);
+}
+.appShell .sidebarLink.active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent-2) 80%, var(--accent)));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 10px 24px -10px color-mix(in srgb, var(--accent) 85%, transparent);
+}
+.appShell .sidebarLink.active svg {
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.55));
+}
+.appShell .sidebarLink.active::before {
+  /* light-only: the sidebar is dark in both themes */
+  content: "";
+  position: absolute;
+  left: -7px;
+  top: 22%;
+  bottom: 22%;
+  width: 4px;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.8);
+}
+.appShell .sidebarUser {
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(8px);
+}
+.appShell .sidebarStats span {
+  font-size: 11px;
+}
+
+/* A wider sidebar on computers, so bigger labels such as "Jobs / Requests" fit on one line. */
+@media (min-width: 761px) {
+  .appShell .sidebar {
+    width: 200px;
+  }
+  .appShell .appMain {
+    margin-left: 200px;
+  }
+  .appShell .demoBar {
+    left: 200px;
+  }
+}
+
+/* ---------- The bar along the top and the profile button ---------- */
+.appShell .appMain header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  backdrop-filter: saturate(1.4) blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+.appShell .appMain .logo {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 14px;
+}
+
+/* ---------- Page headings ---------- */
+.appShell .subPageHeading {
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.appShell .subPageHeading > div {
+  display: grid;
+  gap: 8px;
+}
+.appShell .subPageHeading h1 {
+  margin: 0;
+  font-size: clamp(26px, 3.2vw, 36px);
+  font-weight: 800;
+  line-height: 1.1;
+}
+.appShell .subPageHeading p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+.appShell .subPageUser {
+  font-size: 12px;
+}
+
+/* Dashboards open on a banner in the role's colours. */
+.appShell :is(.appMain .welcome, .dashHeading) {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  padding: 26px 28px;
+  border-radius: calc(var(--radius) + 4px);
+  color: #fff;
+  background:
+    radial-gradient(420px 220px at 92% 10%, rgba(255, 255, 255, 0.22), transparent 70%),
+    linear-gradient(125deg, var(--accent-deep) 0%, var(--accent) 45%, var(--accent-2) 80%, var(--accent) 100%);
+  background-size:
+    100% 100%,
+    220% 100%;
+  box-shadow: var(--shadow-2);
+  /* The colours drift slowly, like light moving across the banner. */
+  animation: bannerDrift 14s ease-in-out infinite alternate;
+}
+@keyframes bannerDrift {
+  from {
+    background-position:
+      0 0,
+      0% 50%;
+  }
+  to {
+    background-position:
+      0 0,
+      100% 50%;
+  }
+}
+.appShell :is(.appMain .welcome, .dashHeading)::before,
+.appShell :is(.appMain .welcome, .dashHeading)::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  pointer-events: none;
+}
+.appShell :is(.appMain .welcome, .dashHeading)::before {
+  width: 260px;
+  height: 260px;
+  right: -60px;
+  top: -120px;
+}
+.appShell :is(.appMain .welcome, .dashHeading)::after {
+  width: 160px;
+  height: 160px;
+  right: 140px;
+  bottom: -110px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.12), transparent 70%);
+}
+.appShell :is(.appMain .welcome h1, .dashHeading h1) {
+  margin: 0 0 6px;
+  color: #fff;
+  font-size: clamp(24px, 3vw, 34px);
+  font-weight: 800;
+  line-height: 1.12;
+}
+.appShell :is(.appMain .welcome p, .dashSubhead) {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 14px;
+}
+.appShell .dashHeading .eyebrow {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.24);
+  margin-bottom: 10px;
+}
+.appShell .dashHeading .eyebrow::before {
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25);
+}
+/* The banner's button is white, so it stands out on the colour. */
+.appShell .appMain .welcome .primary {
+  /* light-only: a white button on the coloured banner, in both themes */
+  color: var(--accent);
+  background: #fff;
+  border-color: rgba(255, 255, 255, 0.6);
+  text-shadow: none;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 11px 18px;
+  box-shadow: 0 12px 28px -12px rgba(0, 0, 0, 0.55);
+}
+.appShell .appMain .welcome .primary:hover:not(:disabled) {
+  /* light-only */
+  background: #fff;
+}
+
+/* ---------- Cards ---------- */
+/* Plain white cards only; the job header, clock card and plan banner keep their own colours. */
+.appShell :is(.panel, .dashPanel, .pendingPanel, .subPagePanel, .chartPanel, .settingsSection, .billingCard, .jobCard) {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-1);
+}
+.appShell :is(.panelHead h2, .dashPanelTitle h2, .subPagePanelHead h2, .chartHeading h2, .jobCardHead h2, .settingsSection h3) {
+  font-size: 16px;
+  font-weight: 800;
+}
+.appShell :is(.panelHead, .dashPanelTitle, .subPagePanelHead) {
+  border-bottom-color: var(--line);
+}
+
+/* Settings and Profile: the sections are the cards, so the panel around them steps back. */
+.appShell .subPagePanel:has(> .settingsStack) {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.appShell .subPagePanel:has(> .settingsStack) > .subPagePanelHead {
+  display: none;
+}
+.appShell .settingsView {
+  gap: 10px;
+  background: transparent;
+}
+.appShell .settingsView div {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.appShell .settingsView span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.appShell .settingsView strong {
+  font-size: 14.5px;
+  color: var(--ink);
+}
+
+/* ---------- Numbers: stat cards everywhere ---------- */
+.appShell :is(.appMain .stat, .subPageStats > div, .kpi, .reportGrid > div, .statCard) {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-1);
+  transition:
+    transform 0.22s var(--ease),
+    box-shadow 0.25s var(--ease);
+}
+.appShell :is(.appMain .stat, .subPageStats > div, .kpi, .reportGrid > div):hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-2);
+}
+/* A thin colour line across the top of each card, a different hue per card. */
+.appShell :is(.appMain .stat, .subPageStats > div, .kpi, .reportGrid > div)::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, var(--tone, var(--accent)), color-mix(in srgb, var(--tone, var(--accent)) 30%, var(--accent-2)));
+}
+.appShell :is(.appMain .stat, .subPageStats > div, .reportGrid > div):nth-child(4n + 1) {
+  --tone: var(--accent);
+}
+.appShell :is(.appMain .stat, .subPageStats > div, .reportGrid > div):nth-child(4n + 2) {
+  --tone: #f59e0b;
+}
+.appShell :is(.appMain .stat, .subPageStats > div, .reportGrid > div):nth-child(4n + 3) {
+  --tone: #8b5cf6;
+}
+.appShell :is(.appMain .stat, .subPageStats > div, .reportGrid > div):nth-child(4n + 4) {
+  --tone: #10b981;
+}
+.appShell .kpi.blue {
+  --tone: #3b82f6;
+}
+.appShell .kpi.green {
+  --tone: #10b981;
+}
+.appShell .kpi.amber {
+  --tone: #f59e0b;
+}
+.appShell .kpi.violet {
+  --tone: #8b5cf6;
+}
+.appShell .kpi.cyan {
+  --tone: #06b6d4;
+}
+.appShell :is(.appMain .stat b, .subPageStats strong, .kpi strong, .reportGrid strong, .statCard strong) {
+  font-family: var(--font-display);
+  font-size: clamp(26px, 2.6vw, 34px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: var(--ink);
+}
+.appShell :is(.appMain .stat span, .subPageStats span, .kpi small, .kpi em, .reportGrid span, .statCard span) {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+/* Icon tiles: white icon on the card's colour. */
+/* [class] lifts these above the older per-role tile colours. */
+.appShell.appShell[class] :is(.statIcon, .kpi > span, .subPageStats > div > svg, .listIcon, .appMain .stat > svg) {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: #fff;
+  background: linear-gradient(135deg, var(--tone, var(--accent)), color-mix(in srgb, var(--tone, var(--accent)) 55%, var(--accent-2)));
+  box-shadow: 0 10px 20px -10px color-mix(in srgb, var(--tone, var(--accent)) 90%, transparent);
+}
+.appShell :is(.statIcon, .kpi > span) {
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border-radius: 14px;
+}
+.appShell .subPageStats {
+  gap: 14px;
+  margin: 18px 0;
+}
+.appShell .subPageStats > div {
+  grid-template-columns: 40px minmax(0, 1fr);
+  column-gap: 14px;
+  padding: 16px 20px 16px 16px;
+  min-width: 190px;
+}
+.appShell .appMain .stat > svg {
+  width: 46px;
+  height: 46px;
+  padding: 12px;
+  border-radius: 14px;
+  box-sizing: border-box;
+}
+.appShell .subPageStats > div > svg {
+  width: 40px;
+  height: 40px;
+  padding: 10px;
+  border-radius: 13px;
+  box-sizing: border-box;
+}
+.appShell .listIcon {
+  border-radius: 12px;
+}
+.appShell :is(.statIcon, .kpi > span) svg {
+  width: 22px;
+  height: 22px;
+  color: #fff;
+}
+
+/* ---------- Rows in lists ---------- */
+.appShell :is(.job, .request, .subPageList article, .pendingJob, .record, .machine, .scheduleRow, .serviceItem, .reviewItem) {
+  border-radius: var(--radius-sm);
+  transition:
+    background 0.18s ease,
+    transform 0.18s var(--ease),
+    box-shadow 0.2s var(--ease);
+}
+.appShell :is(.job, .pendingJob) {
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.appShell :is(.job, .pendingJob):hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  box-shadow: 0 14px 30px -20px color-mix(in srgb, var(--accent) 70%, transparent);
+  transform: translateY(-1px);
+}
+.appShell :is(.subPageList article, .request, .record, .machine):hover {
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+.appShell :is(.jobTitle b, .jobTitle strong, .request b, .subPageList strong, .record b, .machine b, .customer-info b) {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.appShell :is(.job p, .pendingJob p, .request span, .subPageList small, .record span, .machine span) {
+  font-size: 13px;
+  color: var(--muted);
+}
+.appShell :is(.job small, .pendingJob small) {
+  font-size: 12px;
+}
+.appShell .customer-card {
+  border-radius: var(--radius-sm);
+  transition:
+    transform 0.2s var(--ease),
+    box-shadow 0.2s var(--ease);
+}
+.appShell .customer-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2);
+}
+.appShell :is(.avatar, .avatar-lg, .sidebarAvatar, .teamAvatar) {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+
+/* ---------- Status and priority pills ---------- */
+.appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus, .statePill) {
+  --st: var(--st-cancel);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 4px 10px 4px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--st) 30%, transparent);
+  background: color-mix(in srgb, var(--st) 13%, var(--surface));
+  color: color-mix(in srgb, var(--st) 82%, var(--ink));
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus, .statePill)::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--st);
+}
+.appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus):is(.pending, .submitted) {
+  --st: var(--st-pending);
+}
+.appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus):is(.assigned, .received, .reviewing, .mechanicassigned, .scheduled) {
+  --st: var(--st-assigned);
+}
+.appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus):is(.accepted, .approved) {
+  --st: var(--st-accepted);
+}
+.appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus):is(.inprogress, .undermaintenance) {
+  --st: var(--st-progress);
+}
+.appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus):is(.paused, .underrepair) {
+  --st: var(--st-paused);
+}
+.appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus, .statePill):is(.completed, .operational, .active) {
+  --st: var(--st-done);
+}
+.appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus, .statePill):is(.cancelled, .retired, .expired) {
+  --st: var(--st-cancel);
+}
+.appShell .statePill.trialing {
+  --st: var(--st-assigned);
+}
+/* Work in progress pulses. */
+.appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill).inprogress::before {
+  animation: livePulse 1.8s ease-out infinite;
+}
+@keyframes livePulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--st) 70%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+.appShell .priority {
+  --st: var(--st-assigned);
+  padding: 3px 9px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--st) 12%, var(--surface));
+  color: color-mix(in srgb, var(--st) 85%, var(--ink));
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.appShell .priority[data-level="low"] {
+  --st: var(--st-cancel);
+}
+.appShell .priority[data-level="high"] {
+  --st: var(--st-paused);
+}
+.appShell .priority[data-level="urgent"] {
+  --st: var(--st-urgent);
+}
+.appShell :is(.pill, .pendingCount, .jobBadge) {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* ---------- Fields ---------- */
+.appShell :is(input:not([type="checkbox"], [type="radio"], [type="file"], [type="hidden"]), select, textarea),
+.overlay :is(input:not([type="checkbox"], [type="radio"], [type="file"], [type="hidden"]), select, textarea) {
+  min-height: 42px;
+  padding: 10px 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background-color: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.2s ease;
+}
+.appShell textarea,
+.overlay textarea {
+  min-height: 90px;
+}
+.appShell :is(input, select, textarea):hover,
+.overlay :is(input, select, textarea):hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line-strong));
+}
+.appShell :is(input, select, textarea):focus,
+.overlay :is(input, select, textarea):focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.appShell :is(.formGroup label, .inlineForm label, .signField span),
+.overlay .formGroup label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+/* The search box draws the border; its input sits inside without one. */
+.appShell .searchBox {
+  padding: 2px 6px 2px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.2s ease;
+}
+.appShell .searchBox:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.appShell .searchBox input,
+.appShell .searchBox input:is(:hover, :focus) {
+  min-height: 36px;
+  width: 170px;
+  padding: 6px 8px;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+/* ---------- Dialogs ---------- */
+.overlay {
+  background: rgba(6, 12, 24, 0.5);
+  backdrop-filter: blur(6px) saturate(1.1);
+  animation: fadeIn 0.18s ease;
+}
+.overlay :is(.modal, .confirmDialog) {
+  border-radius: 24px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.55);
+  animation: popIn 0.26s var(--ease);
+}
+.overlay :is(.modalHead h2, .modalHeader h2, .confirmDialog h2) {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.overlay .modalIcon {
+  color: #fff;
+  background: linear-gradient(135deg, #0b6bdc, #7048ff);
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+}
+
+/* ---------- Empty and loading states (components/States.tsx) ---------- */
+.emptyState {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 34px 18px;
+  text-align: center;
+}
+.emptyState .emptyIcon {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  margin-bottom: 4px;
+  border-radius: 18px;
+  color: var(--accent);
+  background:
+    radial-gradient(circle at 30% 25%, color-mix(in srgb, var(--accent-2) 22%, transparent), transparent 60%),
+    color-mix(in srgb, var(--accent) 12%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.emptyState strong {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.emptyState span {
+  max-width: 420px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.skeleton {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+.skeleton i {
+  display: block;
+  height: 14px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--surface-2) 0%, color-mix(in srgb, var(--accent) 8%, var(--surface-2)) 40%, var(--surface-2) 80%);
+  background-size: 300% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+.skeleton i:nth-child(1) {
+  width: 38%;
+  height: 22px;
+}
+.skeleton i:nth-child(2) {
+  width: 92%;
+}
+.skeleton i:nth-child(3) {
+  width: 76%;
+}
+.skeleton i:nth-child(4) {
+  width: 84%;
+}
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+/* ---------- Toasts ---------- */
+.toasts .toast {
+  border-radius: 16px;
+  font-weight: 600;
+  box-shadow: 0 24px 50px -20px rgba(0, 0, 0, 0.45);
+}
+
+/* ---------- Pages arrive with a short rise ---------- */
+.appShell #content > * > * {
+  animation: rise 0.42s var(--ease) both;
+}
+.appShell #content > * > *:nth-child(2) {
+  animation-delay: 0.04s;
+}
+.appShell #content > * > *:nth-child(3) {
+  animation-delay: 0.08s;
+}
+.appShell #content > * > *:nth-child(4) {
+  animation-delay: 0.12s;
+}
+.appShell #content > * > *:nth-child(n + 5) {
+  animation-delay: 0.16s;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* ---------- Sign-in ---------- */
+.login {
+  background:
+    radial-gradient(700px 420px at 85% 10%, rgba(112, 72, 255, 0.45), transparent 70%),
+    radial-gradient(600px 400px at 10% 90%, rgba(11, 107, 220, 0.55), transparent 70%),
+    #050d1c;
+}
+.login :is(form, .loginCard) {
+  border-radius: 26px;
+  box-shadow: 0 50px 120px -40px rgba(0, 0, 0, 0.8);
+  animation: popIn 0.4s var(--ease);
+}
+.login h1 {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.login .brand {
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+.login input {
+  min-height: 46px;
+  border-radius: 12px;
+  font-size: 15px;
+}
+.login :is(.loginSwitch, .loginNew) {
+  font-size: 13px;
+}
+
+/* ---------- Phones ---------- */
+@media (max-width: 760px) {
+  .appShell :is(.appMain .welcome, .dashHeading) {
+    padding: 20px;
+    border-radius: var(--radius);
+  }
+  .appShell .sidebarLink.active::before {
+    display: none;
+  }
+  .appShell .subPageStats > div {
+    min-width: 0;
+  }
+  /* The profile button sits in the top corner; the technician's banner starts below it. */
+  .appShell .dashHeading {
+    margin-top: 58px;
+  }
+  .appShell .pendingJob {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .appShell .pendingActions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+  .appShell .kpi {
+    gap: 10px;
+    padding: 14px 12px;
+  }
+  .appShell.appShell[class] .kpi > span {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+  }
+  .appShell .kpi :is(small, em) {
+    font-size: 12px;
+  }
+  .appShell :is(.appMain .stat b, .subPageStats strong, .kpi strong, .reportGrid strong) {
+    font-size: 22px;
+    overflow-wrap: anywhere;
+  }
+}
+/* The narrowest phones: the icon sits above the number, so two cards fit side by side. */
+@media (max-width: 400px) {
+  .appShell .subPageStats > div {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 8px;
+    padding: 14px;
+  }
+  .appShell .subPageStats > div > svg {
+    grid-row: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .appShell :is(.appMain .welcome, .dashHeading),
+  .appShell #content > * > *,
+  .overlay,
+  .overlay :is(.modal, .confirmDialog),
+  .login :is(form, .loginCard),
+  .skeleton i,
+  .appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill).inprogress::before {
+    animation: none;
+  }
+}

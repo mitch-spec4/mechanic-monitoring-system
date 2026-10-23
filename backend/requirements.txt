@@ -13,3 +13,6 @@ boto3==1.43.117
 fpdf2==2.8.9
 Pillow==13.0.0
 tzdata==2025.2
+pyotp==2.9.0
+segno==1.6.6
+cryptography==50.0.2

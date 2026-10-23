@@ -6,6 +6,7 @@ import { errorMessage } from "../lib/format";
 import { confirmAction, toast } from "./Feedback";
 import { t } from "../i18n";
 import "./ChecklistManager.css";
+import { EmptyState } from "./States";
 
 type Item = { label: string; required: boolean };
 type Template = { id: number; job_type: string; items: Item[] };
@@ -52,10 +53,11 @@ export default function ChecklistManager() {
         </button>
       </div>
       {templates.length === 0 ? (
-        <div className="subEmpty">
-          <strong>{t("No checklists yet")}</strong>
-          <span>{t("Create one for each kind of job your team does, such as Repair or Inspection.")}</span>
-        </div>
+        <EmptyState
+          icon={<ListChecks size={26} />}
+          title={t("No checklists yet")}
+          text={t("Create one for each kind of job your team does, such as Repair or Inspection.")}
+        />
       ) : (
         <div className="checklistCards">
           {templates.map((template) => (
@@ -78,7 +80,7 @@ export default function ChecklistManager() {
                 <button className="listAction" onClick={() => setEditing(template)}>
                   {t("Edit")}
                 </button>
-                <button className="iconButton" title={t("Delete checklist")} aria-label={t("Delete the {name} checklist", { name: template.job_type })} onClick={() => remove(template)}>
+                <button className="iconButton delete" title={t("Delete checklist")} aria-label={t("Delete the {name} checklist", { name: template.job_type })} onClick={() => remove(template)}>
                   <Trash2 size={14} />
                 </button>
               </div>

@@ -8,6 +8,7 @@ import { usePolling } from "../lib/usePolling";
 import { t } from "../i18n";
 import "./JobPage.css";
 import "./CustomerPage.css";
+import { Loading } from "../components/States";
 
 type Props = { customerId: number; onBack: () => void; onOpenJob: (id: number) => void };
 
@@ -44,7 +45,7 @@ export default function CustomerPage({ customerId, onBack, onOpenJob }: Props) {
     return (
       <main className="jobPage customerPage">
         <BackButton onBack={onBack} />
-        {error ? <div className="error">{error}</div> : <p className="muted">{t("Loading customer…")}</p>}
+        {error ? <div className="error">{error}</div> : <Loading label={t("Loading customer…")} />}
       </main>
     );
   }

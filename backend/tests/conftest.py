@@ -29,6 +29,8 @@ def app(tmp_path):
         {
             "SQLALCHEMY_DATABASE_URI": database_url,
             "RATELIMIT_ENABLED": False,
+            # The two-step sign-in tests turn it on; everything else signs in with a password.
+            "TWO_FACTOR_REQUIRED": False,
             "TESTING": True,
             "STORAGE_LOCAL_DIR": str(tmp_path / "uploads"),
         }

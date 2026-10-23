@@ -76,7 +76,7 @@ def test_migrations_roll_back_and_forward(tmp_path):
         upgrade(directory=migrations)
         downgrade(directory=migrations, revision="base")
         upgrade(directory=migrations)
-    assert sqlite3.connect(path).execute("select version_num from alembic_version").fetchone() == ("0008_language_settings",)
+    assert sqlite3.connect(path).execute("select version_num from alembic_version").fetchone() == ("0009_security",)
 
 
 def test_the_old_team_plan_becomes_professional(tmp_path):

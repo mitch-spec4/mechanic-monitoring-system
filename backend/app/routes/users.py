@@ -7,12 +7,13 @@ from app import db
 from app.models.job import Job
 from app.models.notification import Notification
 from app.models.review import Review
-from app.models.security import PasswordReset
+from app.models.security import AuditEvent, PasswordReset
 from app.models.service_record import ServiceRecord
 from app.models.user import User
 from app.models.location import Shift
 from app.models.worksheet import JobEvent
 from app.routes.auth import hash_code, user_payload
+from app.services import audit, two_factor
 from app.services.accounts import send_verification
 from app.i18n import LANGUAGES
 from app.utils.auth import current_user, roles
@@ -26,7 +27,7 @@ RESET_CODE_HOURS = 24
 
 
 def out(user):
-    return {"id": user.id, "name": user.name, "email": user.email, "role": user.role}
+    return {"id": user.id, "name": user.name, "email": user.email, "role": user.role, "two_factor_enabled": user.totp_enabled_at is not None}
 
 
 @bp.get("")
@@ -40,17 +41,17 @@ def list_users():
 @roles("boss")
 def mechanics():
     users = User.query.filter_by(company_id=current_user().company_id, role="mechanic").order_by(User.name).all()
-    return jsonify(mechanics=[{"id": user.id, "name": user.name, "email": user.email} for user in users])
+    return jsonify(mechanics=[{"id": user.id, "name": user.name, "email": user.email, "two_factor_enabled": user.totp_enabled_at is not None} for user in users])
 
 
 @bp.get("/me")
-@roles("boss", "mechanic", "customer")
+@roles("boss", "mechanic", "customer", before_two_factor=True)
 def me():
     return jsonify(user=user_payload(current_user()))
 
 
 @bp.patch("/me")
-@roles("boss", "mechanic", "customer")
+@roles("boss", "mechanic", "customer", before_two_factor=True)
 def update_me():
     """Each person picks the language they read the app, emails and notifications in."""
     user = current_user()
@@ -101,6 +102,22 @@ def issue_reset_code(uid):
     return jsonify(code=code, email=user.email, name=user.name, expires_at=reset.expires_at.isoformat()), 201
 
 
+@bp.post("/<int:uid>/reset-two-factor")
+@roles("boss")
+def reset_two_factor(uid):
+    """For someone who lost their phone and backup codes: they're signed out and set up two-step
+    sign-in again at their next sign-in."""
+    manager = current_user()
+    if uid == manager.id:
+        return jsonify(error=_("Use your backup codes, or ask another manager, to reset your own two-step sign-in.")), 400
+    user = User.query.filter_by(id=uid, company_id=manager.company_id).first_or_404()
+    two_factor.disable(user)
+    user.token_version = (user.token_version or 0) + 1
+    audit.record("two_factor_reset", user=manager, detail=user.email)
+    db.session.commit()
+    return jsonify(ok=True)
+
+
 @bp.delete("/<int:uid>")
 @roles("boss")
 def delete_user(uid):
@@ -121,6 +138,10 @@ def delete_user(uid):
         return jsonify(error=_("This technician has shift records and cannot be deleted.")), 409
     Notification.query.filter_by(user_id=user.id).delete()
     PasswordReset.query.filter((PasswordReset.user_id == user.id) | (PasswordReset.created_by == user.id)).delete()
+    two_factor.disable(user)
+    # The activity log keeps their name, not a link to an account that no longer exists.
+    AuditEvent.query.filter_by(user_id=user.id).update({"user_id": None})
+    audit.record("member_removed", user=current_user(), detail=user.email)
     db.session.delete(user)
     db.session.commit()
     return jsonify(ok=True)

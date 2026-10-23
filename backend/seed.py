@@ -7,9 +7,15 @@ from flask_migrate import upgrade
 
 from app import create_app, db
 from app.models import Company, User
+from app.services import two_factor
+from app.services.legal import record_agreement
+from app.utils.time import utcnow
 from app.services.demo import populate
 
 DEMO_PASSWORD = "password"
+# Every demo account's two-step sign-in key: add it to an authenticator app (Google Authenticator,
+# Microsoft Authenticator...) as "MechanicPro demo" to get the codes. Local development only.
+DEMO_TOTP_SECRET = "MECHANICPRODEMO2"
 BOSS_EMAIL = "james@mechanicpro.test"
 
 app = create_app()
@@ -25,6 +31,11 @@ with app.app_context():
         db.session.add(company)
         db.session.flush()
         populate(company, password=DEMO_PASSWORD)
+        db.session.flush()
+        for user in User.query.filter_by(company_id=company.id):
+            user.totp_secret = two_factor.encrypt_secret(DEMO_TOTP_SECRET)
+            user.totp_enabled_at = utcnow()
+            record_agreement(user)
         db.session.commit()
         print(
             "Demo data ready: 3 customers, 3 mechanics, 6 machines, 6 jobs with worksheets and history, 3 checklists, "

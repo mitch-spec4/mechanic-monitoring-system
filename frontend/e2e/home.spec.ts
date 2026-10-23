@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { DEMO_PASSWORD, failOnPageErrors } from "./helpers";
+import { DEMO_PASSWORD, failOnPageErrors, finishSignIn, setUpTwoFactor } from "./helpers";
 
 // New companies sign up here; each test uses its own email.
 test.describe.configure({ mode: "serial" });
@@ -9,6 +9,7 @@ async function fillSignup(page: import("@playwright/test").Page, email: string) 
   await page.getByLabel("Your name").fill("Wanjiku Kamau");
   await page.getByLabel("Work email").fill(email);
   await page.getByLabel("Password").fill("rift-valley-1");
+  await page.getByLabel(/I agree to the privacy policy/).check();
 }
 
 test("the homepage explains the product and shows the plans", async ({ page }) => {
@@ -45,6 +46,8 @@ test("a new company starts a free trial, then pays from Billing", async ({ page 
   await page.goto("/#/signup?plan=professional");
   await fillSignup(page, "wanjiku@riftpower.test");
   await page.getByRole("button", { name: /Start 14-day free trial/ }).click();
+  // Two-step sign-in is set up before anything else.
+  await setUpTwoFactor(page, "wanjiku@riftpower.test");
   await expect(page.locator(".sidebar")).toBeVisible();
   await expect(page.locator(".planBanner")).toContainText("14 days left");
 
@@ -69,6 +72,7 @@ test("paying at signup skips the trial", async ({ page }) => {
   await page.goto("/#/signup?plan=business&interval=year");
   await fillSignup(page, "accounts@riftpower.test");
   await page.getByRole("button", { name: "Pay now and skip the trial" }).click();
+  await setUpTwoFactor(page, "accounts@riftpower.test");
   await expect(page.locator(".orderSummary")).toContainText("Business · Yearly");
   await expect(page.locator(".orderTotal")).toContainText("KSh 120,000");
   await page.getByRole("button", { name: "Pay KSh 120,000" }).click();
@@ -95,6 +99,7 @@ test("a manager changes plan from the homepage", async ({ page }) => {
   await page.getByLabel("Email").fill("james@mechanicpro.test");
   await page.getByLabel("Password").fill(DEMO_PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
+  await finishSignIn(page, "james@mechanicpro.test");
   await expect(page.locator(".billingPage")).toBeVisible();
   await expect(page.locator(".planCard.focused h3")).toHaveText("Business");
   await expect(page.locator(".planCard.focused")).toContainText("KSh 12,000");
@@ -106,6 +111,7 @@ test("signing in from a checkout comes back to it", async ({ page }) => {
   await page.goto("/#/signup?plan=starter");
   await fillSignup(page, "finance@riftpower.test");
   await page.getByRole("button", { name: "Pay now and skip the trial" }).click();
+  await setUpTwoFactor(page, "finance@riftpower.test");
   await expect(page.locator(".orderSummary")).toContainText("Starter · Monthly");
   // The session ends, then the same checkout link is opened.
   await page.context().clearCookies();
@@ -116,6 +122,7 @@ test("signing in from a checkout comes back to it", async ({ page }) => {
   await page.getByLabel("Email").fill("finance@riftpower.test");
   await page.getByLabel("Password").fill("rift-valley-1");
   await page.getByRole("button", { name: "Sign in" }).click();
+  await finishSignIn(page, "finance@riftpower.test", ".orderTotal");
   await expect(page.locator(".orderTotal")).toContainText("KSh 1,500");
   await page.getByRole("button", { name: "Pay KSh 1,500" }).click();
   await expect(page.getByRole("heading", { name: "Payment received" })).toBeVisible();

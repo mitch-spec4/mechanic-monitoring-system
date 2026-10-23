@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { failOnPageErrors, openPage, signIn } from "./helpers";
+import { failOnPageErrors, finishSignIn, openPage, signIn } from "./helpers";
 
 // Each test puts back what it changes: the database is shared with the other spec files.
 test.describe.configure({ mode: "serial" });
@@ -41,6 +41,8 @@ test("a technician switches the whole app to Kiswahili in Settings", async ({ pa
   await page.getByLabel("Email").fill("brian@mechanicpro.test");
   await page.getByLabel("Password").fill("password");
   await page.getByRole("button", { name: "Sign in" }).click();
+  // A new browser: the sign-in code step comes up in Kiswahili too.
+  await finishSignIn(page, "brian@mechanicpro.test");
   await expect(page.locator(".sidebarLink", { hasText: "Dashibodi" })).toBeVisible();
   await expect(page.locator(".clockCard")).toContainText("Umetoka kazini");
 

@@ -13,6 +13,7 @@ SIGNUP = {
     "email": "owner@riftpower.test",
     "password": "a-long-password",
     "plan": "professional",
+    "accept_terms": True,
 }
 
 

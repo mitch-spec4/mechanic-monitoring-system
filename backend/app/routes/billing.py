@@ -25,7 +25,8 @@ from app.services.billing import (
 from app.services.plans import CURRENCY, GB, INTERVALS, PLANS, TRIAL_DAYS, YEARLY_MONTHS, plan_out
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
-from app.utils.validation import ValidationError, choice, json_body, text
+from app.utils.validation import ValidationError, agreed_to_terms, choice, json_body, text
+from app.services.legal import record_agreement
 from app.utils.validation import email as read_email
 from app.i18n import _, current_language
 
@@ -111,6 +112,7 @@ def signup():
     password = new_password(data)
     plan, interval = read_plan(data)
     pay_now = data.get("pay_now") is True
+    agreed_to_terms(data)
     if email_in_use(email):
         raise ValidationError(EMAIL_TAKEN, 409)
     if pay_now and not provider():
@@ -121,6 +123,7 @@ def signup():
     db.session.flush()
     boss = User(name=name, email=email, role="boss", company_id=company.id, language=current_language())
     boss.set_password(password)
+    record_agreement(boss)
     db.session.add(boss)
     try:
         db.session.flush()

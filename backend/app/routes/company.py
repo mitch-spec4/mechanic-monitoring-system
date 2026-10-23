@@ -1,6 +1,7 @@
+import io
 from zoneinfo import available_timezones
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request, send_file
 from sqlalchemy import or_
 
 from app import db
@@ -9,7 +10,11 @@ from app.models.customer import Customer
 from app.models.invitation import Invitation
 from app.models.job import Job
 from app.models.machine import Machine
+from app.models.security import AuditEvent
 from app.models.user import User
+from app.services import audit, rate_limit
+from app.services.company_data import cancel_deletion, request_deletion
+from app.services.data_export import build_export
 from app.i18n import _
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
@@ -104,3 +109,74 @@ def update_settings():
     company.units = choice(data, "units", UNITS, "Units", default=company.units)
     db.session.commit()
     return jsonify(settings=settings_out(company))
+
+
+def confirm_password(user, data):
+    password = data.get("password")
+    if not isinstance(password, str) or not user.check_password(password):
+        raise ValidationError(_("Your current password is incorrect"))
+
+
+@bp.get("/activity")
+@roles("boss")
+def activity():
+    """The activity log, newest first, 50 at a time (?before=<id> for the next page)."""
+    user = current_user()
+    query = AuditEvent.query.filter_by(company_id=user.company_id)
+    before = request.args.get("before", type=int)
+    if before:
+        query = query.filter(AuditEvent.id < before)
+    events = query.order_by(AuditEvent.id.desc()).limit(51).all()
+    return jsonify(events=[audit.event_out(event) for event in events[:50]], more=len(events) > 50)
+
+
+@bp.post("/export")
+@roles("boss")
+def export():
+    """Download everything as a ZIP. Asks for the password again: it's the whole company's data."""
+    user = current_user()
+    key = f"export:{user.company_id}"
+    rate_limit.check(key, setting="EXPORT_RATE_LIMIT")
+    confirm_password(user, json_body())
+    rate_limit.record(key)
+    audit.record("data_exported", user=user)
+    db.session.commit()
+    data, filename = build_export(user.company_id)
+    return send_file(io.BytesIO(data), mimetype="application/zip", as_attachment=True, download_name=filename)
+
+
+@bp.post("/delete")
+@roles("boss")
+def delete_company_request():
+    """'Delete my company': type the company's name and your password. Everyone is signed out,
+    and everything is deleted in 30 days unless a manager cancels."""
+    user = current_user()
+    company = db.get_or_404(Company, user.company_id)
+    if company.is_demo:
+        raise ValidationError(_("Demo companies delete themselves after 24 hours."))
+    data = json_body()
+    confirm_password(user, data)
+    if str(data.get("company_name") or "").strip().casefold() != company.name.strip().casefold():
+        raise ValidationError(_("Type the company's name exactly as it is shown."))
+    if company.deletion_due_at:
+        raise ValidationError(_("This company is already waiting to be deleted."), 409)
+    request_deletion(company, user)
+    audit.record("deletion_requested", user=user)
+    # Sign everyone out, the manager included: the next sign-in shows the deletion date.
+    for member in User.query.filter_by(company_id=company.id):
+        member.token_version = (member.token_version or 0) + 1
+    db.session.commit()
+    return jsonify(deletion_due=company.deletion_due_at.isoformat())
+
+
+@bp.post("/delete/cancel")
+@roles("boss")
+def cancel_company_deletion():
+    user = current_user()
+    company = db.get_or_404(Company, user.company_id)
+    if not company.deletion_due_at:
+        raise ValidationError(_("This company isn't waiting to be deleted."), 409)
+    cancel_deletion(company)
+    audit.record("deletion_cancelled", user=user)
+    db.session.commit()
+    return jsonify(ok=True)

@@ -8,6 +8,8 @@ import hmac
 from flask import Blueprint, abort, current_app, jsonify, request
 
 from app import db
+from app.services.audit import purge_old_events
+from app.services.company_data import delete_due_companies
 from app.services.demo import purge_expired
 from app.services.location import purge_old_live_points
 from app.services.media import purge_abandoned_uploads
@@ -19,7 +21,10 @@ def run_daily():
     removed = {"demo_companies": purge_expired()}
     removed["abandoned_uploads"] = purge_abandoned_uploads()
     removed["old_live_locations"] = purge_old_live_points()
+    removed["old_activity"] = purge_old_events()
     db.session.commit()
+    # Companies whose 30 days after "Delete my company" are up (commits each one).
+    removed["deleted_companies"] = delete_due_companies()
     return removed
 
 

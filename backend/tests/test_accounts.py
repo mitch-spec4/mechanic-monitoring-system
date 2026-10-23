@@ -10,7 +10,7 @@ from app.models import Invitation, User
 from app.services.accounts import reset_token, verification_token
 from tests.conftest import PASSWORD, cookie, login
 
-SIGNUP = {"company_name": "Rift Valley Power", "name": "Wanjiku Kamau", "email": "owner@riftpower.test", "password": "a-long-password"}
+SIGNUP = {"company_name": "Rift Valley Power", "name": "Wanjiku Kamau", "email": "owner@riftpower.test", "password": "a-long-password", "accept_terms": True}
 
 
 @pytest.fixture

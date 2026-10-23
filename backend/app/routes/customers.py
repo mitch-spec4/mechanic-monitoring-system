@@ -26,6 +26,8 @@ from app.utils.time import utcnow
 from app.utils.validation import ValidationError, choice, integer, json_body, text
 from app.utils.validation import email as read_email
 from app.i18n import N_, _
+from app.services import audit, two_factor
+from app.models.security import AuditEvent
 
 bp = Blueprint("customers", __name__)
 INVITATION_DAYS = 7
@@ -39,6 +41,7 @@ def customer_out(customer):
         "email": customer.email,
         "phone": customer.phone,
         "user_id": login_user.id if login_user else None,
+        "two_factor_enabled": bool(login_user and login_user.totp_enabled_at),
     }
 
 
@@ -147,6 +150,7 @@ def invite():
         expires_at=utcnow() + timedelta(days=INVITATION_DAYS),
     )
     db.session.add(invitation)
+    audit.record("invitation_sent", user=user, detail=email)
     db.session.commit()
     emailed = send_invitation(invitation, user)
     return jsonify(code=code, expires_at=invitation.expires_at.isoformat(), emailed=emailed), 201
@@ -234,8 +238,11 @@ def delete_customer(cid):
     for customer_user in User.query.filter_by(customer_id=customer.id).all():
         Notification.query.filter_by(user_id=customer_user.id).delete()
         PasswordReset.query.filter_by(user_id=customer_user.id).delete()
+        two_factor.disable(customer_user)
+        AuditEvent.query.filter_by(user_id=customer_user.id).update({"user_id": None})
         db.session.delete(customer_user)
     db.session.flush()
+    audit.record("customer_deleted", user=current_user(), detail=customer.name)
     db.session.delete(customer)
     db.session.commit()
     return jsonify(ok=True)

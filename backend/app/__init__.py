@@ -1,6 +1,7 @@
 import os
 from datetime import timedelta
 
+import click
 from dotenv import load_dotenv
 from flask import Flask, jsonify
 from flask_cors import CORS
@@ -107,6 +108,8 @@ def build_config():
         "EMAIL_RATE_LIMIT": os.getenv("EMAIL_RATE_LIMIT", "1 per minute;5 per hour"),
         # "Try the demo": private demo companies one visitor (IP address) can start.
         "DEMO_RATE_LIMIT": os.getenv("DEMO_RATE_LIMIT", "10 per hour"),
+        # "Export my data": a whole company's data in one ZIP, so not too often.
+        "EXPORT_RATE_LIMIT": os.getenv("EXPORT_RATE_LIMIT", "3 per hour"),
         # The public address of the web app, used in links inside emails.
         "APP_URL": app_url,
         # Email: "log" writes emails to the server log (development); "smtp" sends them (production).
@@ -137,6 +140,8 @@ def build_config():
         # Taking payment for plans: "test" (a pretend card page, development only) or "none"
         # (free trials only) until a real provider is connected. See SETUP.md.
         "BILLING_PROVIDER": os.getenv("BILLING_PROVIDER", "none" if is_production else "test").strip().lower(),
+        # Two-step sign-in for everyone (demo copies excepted). Only the API tests turn it off.
+        "TWO_FACTOR_REQUIRED": os.getenv("TWO_FACTOR_REQUIRED", "1") != "0" or is_production,
         # Sessions live in httpOnly cookies (unreadable by page scripts), with CSRF protection
         # on every state-changing request. Headers are also accepted for API clients and tests.
         "JWT_TOKEN_LOCATION": ["headers", "cookies"],
@@ -182,6 +187,7 @@ def create_app(overrides=None):
     from app.routes.demo import bp as demo
     from app.routes.jobs import bp as jobs
     from app.routes.maintenance import bp as maintenance
+    from app.routes.legal import bp as legal
     from app.routes.machines import bp as machines
     from app.routes.media import bp as media
     from app.routes.notifications import bp as notifications
@@ -211,6 +217,7 @@ def create_app(overrides=None):
     app.register_blueprint(billing, url_prefix="/api")
     app.register_blueprint(demo, url_prefix="/api/demo")
     app.register_blueprint(maintenance, url_prefix="/api/cron")
+    app.register_blueprint(legal, url_prefix="/api/legal")
 
     @app.cli.command("purge-locations")
     def purge_locations():
@@ -236,6 +243,39 @@ def create_app(overrides=None):
         from app.services.demo import purge_expired
 
         print(f"Removed {purge_expired()} expired demo company(ies).")
+
+    @app.cli.command("reset-2fa")
+    @click.argument("email")
+    def reset_2fa(email):
+        """Turn off someone's two-step sign-in so they set it up again at their next sign-in.
+        For a boss who lost their phone and their backup codes; check who is asking first."""
+        from app.models.user import User
+        from app.services import audit, two_factor
+
+        user = User.query.filter_by(email=email.strip().lower()).first()
+        if not user:
+            raise click.ClickException(f"No account uses {email}.")
+        two_factor.disable(user)
+        user.token_version = (user.token_version or 0) + 1
+        audit.record("two_factor_reset", user=user, detail="server command")
+        db.session.commit()
+        print(f"Two-step sign-in is off for {user.email}; they will set it up again when they sign in.")
+
+    @app.cli.command("delete-due-companies")
+    def delete_due_companies():
+        """Delete companies whose 30 days after "Delete my company" are up (run daily)."""
+        from app.services.company_data import delete_due_companies as run
+
+        print(f"Deleted {run()} company(ies).")
+
+    @app.cli.command("purge-activity")
+    def purge_activity():
+        """Delete activity log entries older than 12 months (run daily)."""
+        from app.services.audit import purge_old_events
+
+        removed = purge_old_events()
+        db.session.commit()
+        print(f"Removed {removed} activity log entr(ies).")
 
     if app.config["TEST_OUTBOX"]:
 

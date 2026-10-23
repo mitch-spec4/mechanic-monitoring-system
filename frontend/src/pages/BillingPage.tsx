@@ -6,6 +6,7 @@ import { errorMessage, formatBytes, formatDay } from "../lib/format";
 import { IntervalSwitch, PlanCards, type Interval, type Plan } from "../components/Plans";
 import { mark, t } from "../i18n";
 import "./Billing.css";
+import { Loading } from "../components/States";
 
 const STATE_LABEL: Record<string, string> = { trialing: mark("Free trial"), active: mark("Active"), expired: mark("Ended") };
 
@@ -76,7 +77,7 @@ export default function BillingPage({ focus }: Props) {
     }
   };
 
-  if (!data) return <main className="billingPage">{error ? <div className="error">{error}</div> : <p className="muted">{t("Loading billing…")}</p>}</main>;
+  if (!data) return <main className="billingPage">{error ? <div className="error">{error}</div> : <Loading label={t("Loading billing…")} />}</main>;
   const { subscription, usage, payments } = data;
   const current = subscription && subscription.state !== "expired" && subscription.state !== "trialing" ? subscription : null;
   const label = (plan: string) => {

@@ -113,13 +113,13 @@ def test_invitation_flow_creates_customer_account(client, auth):
     code = invite(client, auth, name="New Customer", email="New@Example.com").get_json()["code"]
     response = client.post(
         "/api/auth/accept-invitation",
-        json={"code": code, "name": "New Customer", "email": "new@example.com", "password": "long-enough"},
+        json={"code": code, "name": "New Customer", "email": "new@example.com", "password": "long-enough", "accept_terms": True},
     )
     assert response.status_code == 201
     assert login(client, "new@example.com", "long-enough").status_code == 200
     reused = client.post(
         "/api/auth/accept-invitation",
-        json={"code": code, "name": "Again", "email": "new@example.com", "password": "long-enough"},
+        json={"code": code, "name": "Again", "email": "new@example.com", "password": "long-enough", "accept_terms": True},
     )
     assert reused.status_code == 400
 
@@ -130,7 +130,7 @@ def test_invitation_requires_matching_email_and_valid_input(client, auth):
     code = invite(client, auth, name="X", email="x@example.com").get_json()["code"]
     wrong_email = client.post(
         "/api/auth/accept-invitation",
-        json={"code": code, "name": "X", "email": "y@example.com", "password": "long-enough"},
+        json={"code": code, "name": "X", "email": "y@example.com", "password": "long-enough", "accept_terms": True},
     )
     assert wrong_email.status_code == 403
     short = client.post(
@@ -146,7 +146,7 @@ def test_expired_invitation_is_rejected(client, auth):
     db.session.commit()
     response = client.post(
         "/api/auth/accept-invitation",
-        json={"code": code, "name": "Late", "email": "late@example.com", "password": "long-enough"},
+        json={"code": code, "name": "Late", "email": "late@example.com", "password": "long-enough", "accept_terms": True},
     )
     assert response.status_code == 400
 

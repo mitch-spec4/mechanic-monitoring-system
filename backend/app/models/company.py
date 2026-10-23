@@ -14,6 +14,10 @@ class Company(db.Model):
     timezone = db.Column(db.String(64), nullable=False, default="Africa/Nairobi", server_default="Africa/Nairobi")
     currency = db.Column(db.String(3), nullable=False, default="KES", server_default="KES")
     units = db.Column(db.String(10), nullable=False, default="metric", server_default="metric")
+    # "Delete my company": when it was asked for, by whom, and when it happens unless cancelled.
+    deletion_requested_at = db.Column(db.DateTime)
+    deletion_requested_by = db.Column(db.Integer)
+    deletion_due_at = db.Column(db.DateTime, index=True)
 
     @property
     def is_demo(self):
