@@ -14,10 +14,12 @@ from app.models.location import Shift
 from app.models.worksheet import JobEvent
 from app.routes.auth import hash_code, user_payload
 from app.services.accounts import send_verification
+from app.i18n import LANGUAGES
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
-from app.utils.validation import ValidationError, json_body, text
+from app.utils.validation import ValidationError, choice, json_body, text
 from app.utils.validation import email as read_email
+from app.i18n import _
 
 bp = Blueprint("users", __name__)
 RESET_CODE_HOURS = 24
@@ -47,6 +49,16 @@ def me():
     return jsonify(user=user_payload(current_user()))
 
 
+@bp.patch("/me")
+@roles("boss", "mechanic", "customer")
+def update_me():
+    """Each person picks the language they read the app, emails and notifications in."""
+    user = current_user()
+    user.language = choice(json_body(), "language", tuple(LANGUAGES), "Language", default=user.language)
+    db.session.commit()
+    return jsonify(user=user_payload(user))
+
+
 @bp.patch("/<int:uid>")
 @roles("boss")
 def update_user(uid):
@@ -58,7 +70,7 @@ def update_user(uid):
     if "email" in data:
         email = read_email(data)
         if User.query.filter(User.email == email, User.id != uid).first():
-            raise ValidationError("That email address cannot be used", 409)
+            raise ValidationError(_("That email address cannot be used"), 409)
         if email != user.email:
             # The new address isn't proven until its owner opens a link sent to it.
             user.email, user.email_verified_at, changed_email = email, None, True
@@ -74,7 +86,7 @@ def issue_reset_code(uid):
     """Give a team member a one-time code to set a new password (until email delivery exists)."""
     manager = current_user()
     if uid == manager.id:
-        return jsonify(error="Use Change password in Settings for your own account"), 400
+        return jsonify(error=_("Use Change password in Settings for your own account")), 400
     user = User.query.filter_by(id=uid, company_id=manager.company_id).first_or_404()
     PasswordReset.query.filter_by(user_id=user.id, used=False).update({"used": True})
     code = "RS-" + secrets.token_hex(5).upper()
@@ -93,7 +105,7 @@ def issue_reset_code(uid):
 @roles("boss")
 def delete_user(uid):
     if uid == current_user().id:
-        return jsonify(error="You cannot delete your own account"), 400
+        return jsonify(error=_("You cannot delete your own account")), 400
     user = User.query.filter_by(id=uid, company_id=current_user().company_id).first_or_404()
     if user.role == "mechanic":
         has_history = (
@@ -102,11 +114,11 @@ def delete_user(uid):
             or Review.query.filter_by(mechanic_id=user.id).first()
         )
         if has_history:
-            return jsonify(error="This mechanic has jobs or service history and cannot be deleted."), 409
+            return jsonify(error=_("This technician has jobs or service history and cannot be deleted.")), 409
     if JobEvent.query.filter_by(user_id=user.id).first():
-        return jsonify(error="This person appears in job history and cannot be deleted."), 409
+        return jsonify(error=_("This person appears in job history and cannot be deleted.")), 409
     if Shift.query.filter_by(user_id=user.id).first():
-        return jsonify(error="This mechanic has shift records and cannot be deleted."), 409
+        return jsonify(error=_("This technician has shift records and cannot be deleted.")), 409
     Notification.query.filter_by(user_id=user.id).delete()
     PasswordReset.query.filter((PasswordReset.user_id == user.id) | (PasswordReset.created_by == user.id)).delete()
     db.session.delete(user)

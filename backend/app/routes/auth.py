@@ -24,6 +24,7 @@ from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
 from app.utils.validation import ValidationError, json_body, text
 from app.utils.validation import email as read_email
+from app.i18n import _, current_language
 
 bp = Blueprint("auth", __name__)
 MIN_PASSWORD_LENGTH = 8
@@ -41,6 +42,9 @@ def user_payload(user):
         "email_verified": user.email_verified_at is not None,
         # A visitor's private demo company: when it will be deleted.
         "demo_until": company.demo_expires_at.isoformat() if company and company.is_demo else None,
+        "language": user.language,
+        # Times are shown in the company's time zone, so everyone on the team sees the same times.
+        "timezone": company.timezone if company else "Africa/Nairobi",
     }
 
 
@@ -73,7 +77,7 @@ def signed_in_response(user, status=200, **extra):
 def new_password(data, field="password"):
     password = data.get(field)
     if not isinstance(password, str) or len(password) < MIN_PASSWORD_LENGTH:
-        raise ValidationError(f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
+        raise ValidationError(_("Password must be at least {count} characters", count=MIN_PASSWORD_LENGTH))
     return password
 
 
@@ -91,7 +95,7 @@ def login():
     user = User.query.filter_by(email=email).first() if email else None
     if not user or not isinstance(password, str) or not user.check_password(password):
         rate_limit.record(*keys)
-        return jsonify(error="Invalid email or password"), 401
+        return jsonify(error=_("Invalid email or password")), 401
     return signed_in_response(user)
 
 
@@ -100,7 +104,7 @@ def login():
 def refresh():
     user = db.session.get(User, int(get_jwt_identity()))
     if not user or get_jwt().get("tv") != user.token_version or demo_ended(user):
-        response = jsonify(error="Your session has ended. Please sign in again.")
+        response = jsonify(error=_("Your session has ended. Please sign in again."))
         unset_jwt_cookies(response)
         return response, 401
     response = jsonify(user=user_payload(user))
@@ -117,7 +121,7 @@ def logout():
 
 @bp.post("/register")
 def register():
-    return jsonify(error="Accounts are created through a company invitation"), 403
+    return jsonify(error=_("Accounts are created through a company invitation")), 403
 
 
 @bp.post("/accept-invitation")
@@ -133,11 +137,11 @@ def accept_invitation():
 
     invitation = Invitation.query.filter_by(code=code, used=False).first()
     if not invitation or invitation.expires_at < utcnow():
-        return jsonify(error="Invalid or expired invitation"), 400
+        return jsonify(error=_("Invalid or expired invitation")), 400
     if email != invitation.email.strip().lower():
-        return jsonify(error="This invitation was issued to a different email address"), 403
+        return jsonify(error=_("This invitation was issued to a different email address")), 403
     if User.query.filter_by(email=email).first():
-        return jsonify(error="An account with this email already exists. Sign in instead."), 409
+        return jsonify(error=_("An account with this email already exists. Sign in instead.")), 409
 
     customer_id = None
     if invitation.role == "customer":
@@ -152,12 +156,13 @@ def accept_invitation():
         role=invitation.role,
         company_id=invitation.company_id,
         customer_id=customer_id,
+        language=current_language(),
     )
     user.set_password(password)
     invitation.used = True
     db.session.add(user)
     db.session.commit()
-    return jsonify(message="Invitation accepted"), 201
+    return jsonify(message=_("Invitation accepted")), 201
 
 
 @bp.post("/verify-email")
@@ -166,7 +171,7 @@ def verify_email():
     user = user_for_verification(json_body().get("token"))
     mark_verified(user)
     db.session.commit()
-    return jsonify(message="Your email address is confirmed.", email=user.email)
+    return jsonify(message=_("Your email address is confirmed."), email=user.email)
 
 
 @bp.post("/resend-verification")
@@ -174,13 +179,13 @@ def verify_email():
 def resend_verification():
     user = current_user()
     if user.email_verified_at:
-        return jsonify(message="Your email address is already confirmed.", sent=False)
+        return jsonify(message=_("Your email address is already confirmed."), sent=False)
     key = f"verify-mail:{user.id}"
     rate_limit.check(key, setting="EMAIL_RATE_LIMIT")
     rate_limit.record(key)
     if not send_verification(user):
-        raise ValidationError("The email couldn't be sent just now. Please try again in a few minutes.", 503)
-    return jsonify(message=f"We sent a new link to {user.email}.", sent=True)
+        raise ValidationError(_("The email couldn't be sent just now. Please try again in a few minutes."), 503)
+    return jsonify(message=_("We sent a new link to {email}.", email=user.email), sent=True)
 
 
 @bp.post("/forgot-password")
@@ -195,7 +200,7 @@ def forgot_password():
     user = User.query.filter_by(email=email).first()
     if user:
         send_password_reset(user)
-    return jsonify(message="If an account uses that email, we've sent it a link to choose a new password. The link works for 1 hour.")
+    return jsonify(message=_("If an account uses that email, we've sent it a link to choose a new password. The link works for 1 hour."))
 
 
 @bp.post("/reset-password")
@@ -212,7 +217,7 @@ def reset_password():
         # Only the owner of the address could open the link.
         mark_verified(user)
         db.session.commit()
-        return jsonify(message="Password updated. You can now sign in.", email=user.email)
+        return jsonify(message=_("Password updated. You can now sign in."), email=user.email)
     email = read_email(data)
     code = text(data, "code", "Reset code", required=True, max_length=40)
     password = new_password(data)
@@ -224,11 +229,11 @@ def reset_password():
         else None
     )
     if not reset or reset.user_id != user.id or reset.expires_at < utcnow():
-        return jsonify(error="Invalid or expired reset code"), 400
+        return jsonify(error=_("Invalid or expired reset code")), 400
     user.set_password(password)
     reset.used = True
     db.session.commit()
-    return jsonify(message="Password updated. You can now sign in.")
+    return jsonify(message=_("Password updated. You can now sign in."))
 
 
 @bp.post("/change-password")
@@ -238,7 +243,7 @@ def change_password():
     data = json_body()
     current = data.get("current_password")
     if not isinstance(current, str) or not user.check_password(current):
-        return jsonify(error="Your current password is incorrect"), 400
+        return jsonify(error=_("Your current password is incorrect")), 400
     user.set_password(new_password(data, "new_password"))
     db.session.commit()
     # Changing the password ends every other session; keep this one signed in.

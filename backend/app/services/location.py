@@ -7,6 +7,7 @@ from app import db
 from app.models.location import LocationPoint, Shift
 from app.utils.time import utcnow
 from app.utils.validation import ValidationError
+from app.i18n import _
 
 LIVE_RETENTION = timedelta(days=30)
 LIVE_MIN_INTERVAL = timedelta(seconds=60)
@@ -21,9 +22,9 @@ def open_shift(user):
 def _coordinate(data, field, label, limit):
     value = data.get(field)
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-        raise ValidationError(f"{label} must be a number")
+        raise ValidationError(_("{label} must be a number", label=_(label)))
     if not -limit <= value <= limit:
-        raise ValidationError(f"{label} must be between -{limit} and {limit}")
+        raise ValidationError(_("{label} must be between {minimum} and {maximum}", label=_(label), minimum=-limit, maximum=limit))
     return float(value)
 
 
@@ -37,7 +38,7 @@ def parse_fix(data):
     accuracy = data.get("accuracy")
     if accuracy is not None:
         if isinstance(accuracy, bool) or not isinstance(accuracy, (int, float)) or not math.isfinite(accuracy) or accuracy < 0:
-            raise ValidationError("Accuracy must be a positive number of metres")
+            raise ValidationError(_("Accuracy must be a positive number of metres"))
         accuracy = min(float(accuracy), 100000.0)
     return (latitude, longitude, accuracy), None
 
@@ -45,9 +46,9 @@ def parse_fix(data):
 def record_point(user, shift, kind, fix, missing_reason=None, job=None):
     """Store a position (or why there is none). Refuses anything outside a consented, open shift."""
     if not shift or shift.clocked_out_at is not None or shift.user_id != user.id:
-        raise ValidationError("Location is only recorded while you are clocked in", 409)
+        raise ValidationError(_("Location is only recorded while you are clocked in"), 409)
     if not user.location_consent_at:
-        raise ValidationError("You haven't agreed to location sharing", 409)
+        raise ValidationError(_("You haven't agreed to location sharing"), 409)
     latitude, longitude, accuracy = fix if fix else (None, None, None)
     point = LocationPoint(
         company_id=user.company_id,

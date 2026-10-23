@@ -11,6 +11,7 @@ from app.models.service_record import ServiceRecord
 from app.services.machine_work import with_work
 from app.utils.auth import current_user, roles
 from app.utils.validation import ValidationError, choice, integer, json_body, text
+from app.i18n import _
 
 bp = Blueprint("machines", __name__)
 
@@ -55,9 +56,9 @@ def create():
     serial_no = text(data, "serial_no", "Serial number", required=True, max_length=120)
     customer_id = integer(data, "customer_id", "Customer", required=True)
     if not Customer.query.filter_by(id=customer_id, company_id=company_id).first():
-        raise ValidationError("Customer not found", 404)
+        raise ValidationError(_("Customer not found"), 404)
     if serial_taken(company_id, serial_no):
-        raise ValidationError("A machine with this serial number already exists", 409)
+        raise ValidationError(_("Equipment with this serial number already exists"), 409)
 
     machine = Machine(
         company_id=company_id,
@@ -84,7 +85,7 @@ def update(mid):
     if "serial_no" in data:
         serial_no = text(data, "serial_no", "Serial number", required=True, max_length=120)
         if serial_taken(machine.company_id, serial_no, exclude_id=machine.id):
-            raise ValidationError("A machine with this serial number already exists", 409)
+            raise ValidationError(_("Equipment with this serial number already exists"), 409)
         machine.serial_no = serial_no
     if "status" in data:
         machine.status = choice(data, "status", MACHINE_STATUSES, "Status", default=machine.status)
@@ -101,7 +102,7 @@ def delete(mid):
         for model in (Job, ServiceRecord, ServiceRequest, Review)
     )
     if has_history:
-        return jsonify(error="This machine has service history and cannot be deleted. Mark it as Retired instead."), 409
+        return jsonify(error=_("This equipment has service history and cannot be deleted. Mark it as Retired instead.")), 409
     db.session.delete(machine)
     db.session.commit()
     return jsonify(ok=True)

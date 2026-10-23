@@ -42,6 +42,7 @@ from app.services.storage import storage
 from app.services.worksheet import copy_checklist, fill_service_record
 from app.utils.time import utcnow
 from app.utils.validation import ValidationError
+from app.i18n import _
 
 DEMO_HOURS = 24
 # A ceiling on demo copies alive at once, so a flood of visitors can't fill the database.
@@ -306,7 +307,7 @@ def start_copy():
     """A visitor's private copy of the demo company. Expired copies are cleared out first."""
     purge_expired(limit=5)
     if Company.query.filter(Company.demo_expires_at > utcnow()).count() >= MAX_LIVE_COPIES:
-        raise ValidationError("The demo is busy right now. Please try again in a few minutes.", 503)
+        raise ValidationError(_("The demo is busy right now. Please try again in a few minutes."), 503)
     company = Company(name="DK Engineering", location="Nairobi", demo_expires_at=utcnow() + timedelta(hours=DEMO_HOURS))
     db.session.add(company)
     db.session.flush()

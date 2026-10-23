@@ -1,3 +1,5 @@
+from zoneinfo import available_timezones
+
 from flask import Blueprint, jsonify
 from sqlalchemy import or_
 
@@ -8,8 +10,14 @@ from app.models.invitation import Invitation
 from app.models.job import Job
 from app.models.machine import Machine
 from app.models.user import User
+from app.i18n import _
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
+from app.utils.validation import ValidationError, choice, json_body, text
+
+# The currencies a company can show money in (more can be added; amounts are stored in cents).
+CURRENCIES = ("KES", "TZS", "UGX", "RWF", "ETB", "NGN", "GHS", "ZAR", "USD", "EUR", "GBP")
+UNITS = ("metric", "imperial")
 
 bp = Blueprint("company", __name__)
 
@@ -67,3 +75,32 @@ def dismiss_setup():
     company.setup_dismissed_at = company.setup_dismissed_at or utcnow()
     db.session.commit()
     return jsonify(ok=True)
+
+
+def settings_out(company):
+    return {"timezone": company.timezone, "currency": company.currency, "units": company.units}
+
+
+@bp.get("/settings")
+@roles("boss")
+def settings():
+    company = db.get_or_404(Company, current_user().company_id)
+    return jsonify(settings=settings_out(company), currencies=CURRENCIES, units=UNITS, timezones=sorted(available_timezones()))
+
+
+@bp.patch("/settings")
+@roles("boss")
+def update_settings():
+    """Company-wide settings: the time zone everyone's times are shown in, and the currency and
+    units for money and distances."""
+    company = db.get_or_404(Company, current_user().company_id)
+    data = json_body()
+    if "timezone" in data:
+        zone = text(data, "timezone", "Time zone", required=True, max_length=64)
+        if zone not in available_timezones():
+            raise ValidationError(_("Choose a time zone from the list"))
+        company.timezone = zone
+    company.currency = choice(data, "currency", CURRENCIES, "Currency", default=company.currency)
+    company.units = choice(data, "units", UNITS, "Units", default=company.units)
+    db.session.commit()
+    return jsonify(settings=settings_out(company))

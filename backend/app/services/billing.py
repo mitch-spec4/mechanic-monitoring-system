@@ -19,6 +19,7 @@ from app.models.user import User
 from app.services.plans import CURRENCY, GB, PLANS, TRIAL_DAYS, add_period, price_cents
 from app.utils.time import utcnow
 from app.utils.validation import ValidationError
+from app.i18n import _
 
 PROVIDERS = ("test", "none")
 
@@ -74,9 +75,9 @@ def state(subscription, now=None):
 def create_payment(user, plan, interval):
     checkout = provider()
     if not checkout:
-        raise ValidationError("Online payments aren't set up yet. Start with the free trial.", 409)
+        raise ValidationError(_("Online payments aren't set up yet. Start with the free trial."), 409)
     if checkout.name != "test" and db.session.get(Company, user.company_id).is_demo:
-        raise ValidationError("This is a demo company, so it can't take real payments.", 403)
+        raise ValidationError(_("This is a demo company, so it can't take real payments."), 403)
     payment = Payment(
         company_id=user.company_id,
         user_id=user.id,
@@ -114,11 +115,13 @@ def mark_paid(payment):
 
 
 def require_active(company_id, action):
-    """Once a trial or paid period runs out, existing work carries on but nothing new is added."""
+    """Once a trial or paid period runs out, existing work carries on but nothing new is added.
+    `action` is already translated, e.g. _("invite people")."""
     subscription = subscription_for(company_id)
     if subscription and state(subscription) == "expired":
-        ended = "Your free trial has ended" if subscription.status == "trialing" else "Your plan has run out"
-        raise ValidationError(f"{ended}. Choose a plan under Billing to {action}.", 402)
+        if subscription.status == "trialing":
+            raise ValidationError(_("Your free trial has ended. Choose a plan under Billing to {action}.", action=action), 402)
+        raise ValidationError(_("Your plan has run out. Choose a plan under Billing to {action}.", action=action), 402)
 
 
 def mechanic_count(company_id):
@@ -139,8 +142,12 @@ def check_mechanic_limit(company_id):
     plan = PLANS[subscription.plan]
     if mechanic_count(company_id) >= plan["mechanics"]:
         raise ValidationError(
-            f"Your {plan['name']} plan includes up to {plan['mechanics']} mechanics, counting open invitations. "
-            "Choose a bigger plan under Billing to add more.",
+            _(
+                "Your {plan} plan includes up to {count} technicians, counting open invitations. "
+                "Choose a bigger plan under Billing to add more.",
+                plan=plan["name"],
+                count=plan["mechanics"],
+            ),
             409,
         )
 
@@ -163,6 +170,10 @@ def check_storage(company_id, adding_bytes, lock=False):
     plan = PLANS[subscription.plan]
     if storage_used(company_id) + adding_bytes > plan["storage_gb"] * GB:
         raise ValidationError(
-            f"Your {plan['name']} plan's {plan['storage_gb']} GB of storage is full. Choose a bigger plan under Billing for more space.",
+            _(
+                "Your {plan} plan's {size} GB of storage is full. Choose a bigger plan under Billing for more space.",
+                plan=plan["name"],
+                size=plan["storage_gb"],
+            ),
             413,
         )

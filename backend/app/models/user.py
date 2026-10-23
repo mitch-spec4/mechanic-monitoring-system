@@ -17,6 +17,8 @@ class User(db.Model):
     location_consent_at = db.Column(db.DateTime)
     # When the owner of the email address proved it (a verification or password-reset link).
     email_verified_at = db.Column(db.DateTime)
+    # The language this person reads the app, emails and notifications in (see app/i18n).
+    language = db.Column(db.String(5), nullable=False, default="en", server_default="en")
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)

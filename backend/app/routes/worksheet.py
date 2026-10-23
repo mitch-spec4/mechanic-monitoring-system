@@ -17,6 +17,7 @@ from app.services.worksheet import FINISHED, completion_problems, format_quantit
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
 from app.utils.validation import ValidationError, json_body, text
+from app.i18n import _, local_time
 
 bp = Blueprint("worksheet", __name__)
 MAX_ENTRY_HOURS = 24
@@ -47,7 +48,7 @@ def editable_job(jid):
     """A job whose worksheet the current mechanic may change."""
     job = load_job(jid)
     if job.status in FINISHED:
-        raise ValidationError(f"This job is {job.status.lower()}; its worksheet can no longer be changed.", 409)
+        raise ValidationError(_("This job is finished ({status}), so its worksheet can no longer be changed.", status=_(job.status)), 409)
     return job
 
 
@@ -215,16 +216,16 @@ def parse_time(data, field, label, required=False):
     value = data.get(field)
     if value in (None, ""):
         if required:
-            raise ValidationError(f"{label} is required")
+            raise ValidationError(_("{label} is required", label=_(label)))
         return None
     try:
         moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except ValueError:
-        raise ValidationError(f"{label} must be a date and time") from None
+        raise ValidationError(_("{label} must be a date and time", label=_(label))) from None
     if moment.tzinfo:
         moment = moment.astimezone(timezone.utc).replace(tzinfo=None)
     if moment > utcnow() + CLOCK_SKEW:
-        raise ValidationError(f"{label} cannot be in the future")
+        raise ValidationError(_("{label} cannot be in the future", label=_(label)))
     return moment
 
 
@@ -234,17 +235,16 @@ def check_overlap(job, started_at, ended_at, exclude_id=None):
     for other in WorkEntry.query.filter(WorkEntry.job_id == job.id, WorkEntry.id != (exclude_id or 0)).all():
         other_end = other.ended_at or utcnow()
         if other.started_at < end and other_end > started_at:
-            span = f"{other.started_at:%d %b %H:%M}–{'now' if other.ended_at is None else f'{other_end:%H:%M}'} UTC"
-            raise ValidationError(f"This overlaps another time entry on this job ({span})", 409)
+            raise ValidationError(_("This overlaps another time entry on this job, started {start}", start=local_time(other.started_at)), 409)
 
 
 def check_span(started_at, ended_at):
     if ended_at is None:
         return
     if ended_at <= started_at:
-        raise ValidationError("End time must be after the start time")
+        raise ValidationError(_("End time must be after the start time"))
     if ended_at - started_at > timedelta(hours=MAX_ENTRY_HOURS):
-        raise ValidationError(f"A single time entry can be at most {MAX_ENTRY_HOURS} hours")
+        raise ValidationError(_("A single time entry can be at most {count} hours", count=MAX_ENTRY_HOURS))
 
 
 @bp.post("/<int:jid>/entries")
@@ -287,9 +287,9 @@ def update_entry(jid, eid):
         started_at = parse_time(data, "started_at", "Start time") or entry.started_at
         ended_at = parse_time(data, "ended_at", "End time") if "ended_at" in data else entry.ended_at
         if entry.ended_at is None and ended_at is not None:
-            raise ValidationError("Use Pause or Complete to stop the running timer")
+            raise ValidationError(_("Use Pause or Complete to stop the running timer"))
         if entry.ended_at is not None and ended_at is None:
-            raise ValidationError("End time is required")
+            raise ValidationError(_("End time is required"))
         check_span(started_at, ended_at)
         check_overlap(job, started_at, ended_at, exclude_id=entry.id)
         if (started_at, ended_at) != (entry.started_at, entry.ended_at):
@@ -304,9 +304,9 @@ def parse_quantity(data):
     try:
         quantity = Decimal(str(value).strip())
     except (InvalidOperation, ValueError):
-        raise ValidationError("Quantity must be a number") from None
+        raise ValidationError(_("Quantity must be a number")) from None
     if not quantity.is_finite() or quantity <= 0 or quantity > 100000:
-        raise ValidationError("Quantity must be more than 0")
+        raise ValidationError(_("Quantity must be more than 0"))
     return quantity.quantize(Decimal("0.01"))
 
 
@@ -351,7 +351,7 @@ def update_checklist_item(jid, item_id):
         item.note = text(data, "note", "Note")
     if "done" in data:
         if not isinstance(data["done"], bool):
-            raise ValidationError("Done must be true or false")
+            raise ValidationError(_("Done must be true or false"))
         if data["done"] != item.done:
             item.done = data["done"]
             item.done_by = user.id if item.done else None
@@ -368,7 +368,7 @@ def save_record(jid):
     user = current_user()
     job = editable_job(jid)
     if not job.machine_id:
-        raise ValidationError("This job has no machine, so it has no service record. Ask your manager to link one.")
+        raise ValidationError(_("This job has no equipment, so it has no service record. Ask your manager to link one."))
     data = json_body()
     record = ServiceRecord.query.filter_by(job_id=job.id).first()
     if not record:

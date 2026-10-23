@@ -5,6 +5,7 @@ from app.models.job import Job
 from app.models.worksheet import ChecklistTemplate, ChecklistTemplateItem
 from app.utils.auth import current_user, roles
 from app.utils.validation import ValidationError, json_body, text
+from app.i18n import _
 
 bp = Blueprint("checklists", __name__)
 MAX_ITEMS = 50
@@ -22,13 +23,13 @@ def out(template):
 def read_items(data):
     items = data.get("items")
     if not isinstance(items, list) or not items:
-        raise ValidationError("Add at least one checklist item")
+        raise ValidationError(_("Add at least one checklist item"))
     if len(items) > MAX_ITEMS:
-        raise ValidationError(f"A checklist can have at most {MAX_ITEMS} items")
+        raise ValidationError(_("A checklist can have at most {count} items", count=MAX_ITEMS))
     rows = []
     for item in items:
         if not isinstance(item, dict):
-            raise ValidationError("Each checklist item needs a label")
+            raise ValidationError(_("Each checklist item needs a label"))
         label = text(item, "label", "Checklist item", required=True, max_length=200)
         rows.append((label, bool(item.get("required"))))
     return rows
@@ -47,7 +48,7 @@ def unique_type(company_id, job_type, exclude_id=None):
     if exclude_id:
         query = query.filter(ChecklistTemplate.id != exclude_id)
     if query.first():
-        raise ValidationError(f"There is already a checklist for {job_type}", 409)
+        raise ValidationError(_("There is already a checklist for {job_type}", job_type=job_type), 409)
 
 
 @bp.get("")

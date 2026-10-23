@@ -10,6 +10,7 @@ from app.models.worksheet import (
     WorkEntry,
 )
 from app.utils.time import utcnow
+from app.i18n import _
 
 FINISHED = ("Completed", "Cancelled")
 
@@ -60,12 +61,12 @@ def completion_problems(job):
     problems = []
     entries = WorkEntry.query.filter_by(job_id=job.id).all()
     if not entries:
-        problems.append("Start work so the worksheet has a time entry")
+        problems.append(_("Start work so the worksheet has a time entry"))
     elif not any((entry.work_done or "").strip() for entry in entries):
-        problems.append("Describe the work done on the worksheet")
+        problems.append(_("Describe the work done on the worksheet"))
     missing = JobChecklistItem.query.filter_by(job_id=job.id, required=True, done=False).count()
     if missing:
-        problems.append(f"Tick {missing} required checklist item{'s' if missing != 1 else ''}")
+        problems.append(_("Tick 1 required checklist item") if missing == 1 else _("Tick {count} required checklist items", count=missing))
     return problems
 
 

@@ -123,7 +123,7 @@ def test_invitations_are_emailed_with_a_link_that_fills_in_the_form(client, auth
     assert email["To"] == "grace+site@buyer.test"
     assert email["Subject"] == "Boss One invited you to Acme Service on MechanicPro"
     text = email.get_body(("plain",)).get_content()
-    assert "as a mechanic" in text and body["code"] in text
+    assert "as a technician" in text and body["code"] in text
     # The address is encoded, so "+" survives the trip through the link.
     assert f"/#/join?code={body['code']}&email=grace%2Bsite%40buyer.test" in text
 

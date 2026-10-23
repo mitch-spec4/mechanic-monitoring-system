@@ -11,9 +11,10 @@ from app.services.storage import storage
 from app.services.worksheet import record_event
 from app.utils.time import utcnow
 from app.utils.validation import ValidationError, text
+from app.i18n import N_, _
 
 SIGNATURE_FIELDS = {"signature", "no_signature_reason"}
-SIGNATURE_PROBLEM = "Get the customer's signature, or record why they couldn't sign"
+SIGNATURE_PROBLEM = N_("Get the customer's signature, or record why they couldn't sign")
 MAX_SIGNATURE_BYTES = 512 * 1024
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
@@ -23,17 +24,17 @@ def read_signature(data):
     signature = data.get("signature")
     if signature is not None:
         if not isinstance(signature, dict):
-            raise ValidationError("Signature must include a name and an image")
+            raise ValidationError(_("Signature must include a name and an image"))
         name = text(signature, "name", "Signer's name", required=True, max_length=120)
         image = signature.get("image")
         if not isinstance(image, str) or not image.startswith("data:image/png;base64,"):
-            raise ValidationError("Signature image must be a PNG")
+            raise ValidationError(_("Signature image must be a PNG"))
         try:
             png = base64.b64decode(image.split(",", 1)[1], validate=True)
         except (binascii.Error, ValueError):
-            raise ValidationError("Signature image is not valid") from None
+            raise ValidationError(_("Signature image is not valid")) from None
         if not png.startswith(PNG_MAGIC) or len(png) > MAX_SIGNATURE_BYTES:
-            raise ValidationError("Signature image is not valid")
+            raise ValidationError(_("Signature image is not valid"))
         return {"name": name, "png": png}
     reason = text(data, "no_signature_reason", "Reason", max_length=500)
     return {"reason": reason} if reason else None

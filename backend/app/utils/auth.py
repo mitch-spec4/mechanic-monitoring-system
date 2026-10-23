@@ -5,6 +5,7 @@ from flask_jwt_extended import get_jwt, get_jwt_identity, verify_jwt_in_request
 
 from app import db
 from app.models.user import User
+from app.i18n import _
 
 
 def roles(*allowed):
@@ -27,9 +28,9 @@ def roles(*allowed):
                 or user.customer_id != claims.get("customer_id")
                 or user.token_version != claims.get("tv")
             ):
-                return jsonify(error="Your account has changed. Please sign in again."), 401
+                return jsonify(error=_("Your account has changed. Please sign in again.")), 401
             if user.role not in allowed:
-                return jsonify(error="Forbidden"), 403
+                return jsonify(error=_("Forbidden")), 403
             g.user = user
             return fn(*args, **kwargs)
 
