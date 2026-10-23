@@ -213,6 +213,11 @@ header {
   color: #78859a;
   font-size: 13px;
 }
+/* .primary buttons are full width elsewhere; the header's Create Job keeps its own size. */
+.welcome .primary {
+  width: auto;
+  flex: none;
+}
 .stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -316,6 +321,26 @@ header {
   display: flex;
   align-items: center;
   gap: 3px;
+}
+.job > select,
+.job > .iconButton {
+  align-self: center;
+}
+.requestActions {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.requestActions select {
+  max-width: 170px;
+  border: 1px solid #dce3eb;
+  border-radius: 7px;
+  padding: 6px 8px;
+  font-size: 11px;
+  background: white;
+  color: inherit;
 }
 .job select,
 .form select,
@@ -667,15 +692,27 @@ header {
   .welcome button {
     margin-top: 15px;
   }
+  .welcome .primary {
+    width: 100%;
+  }
   .stats {
     grid-template-columns: 1fr 1fr;
   }
   .customerGrid {
     grid-template-columns: 1fr;
   }
-  .job,
   .mechanicJob {
     display: block;
+  }
+  /* The job's text above, its assign picker and buttons in one row underneath. */
+  .job {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 8px;
+  }
+  .job .jobMain {
+    flex-basis: 100%;
   }
   .actions {
     margin-top: 12px;

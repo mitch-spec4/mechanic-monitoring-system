@@ -7,7 +7,7 @@ class Subscription(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     company_id = db.Column(db.Integer, db.ForeignKey("company.id"), nullable=False, unique=True)
-    plan = db.Column(db.String(20), nullable=False)  # starter, team, business
+    plan = db.Column(db.String(20), nullable=False)  # starter, professional, business
     interval = db.Column(db.String(10), nullable=False, default="month")  # month, year
     # trialing or active; whether a trial or paid period has run out is worked out from the dates.
     status = db.Column(db.String(20), nullable=False, default="trialing")

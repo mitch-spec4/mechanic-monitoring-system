@@ -340,3 +340,25 @@ def test_abandoned_uploads_are_purged(client, data, auth):
     assert db.session.get(JobFile, abandoned["file_id"]) is None
     assert db.session.get(JobFile, fresh["file_id"]) is not None
     assert db.session.get(JobFile, kept["id"]).status == "ready"
+
+
+def test_uploads_started_together_cannot_pass_the_storage_limit(client, data, auth):
+    """Both fit when they are reserved, but only the first one confirmed fits."""
+    from app.models import Subscription
+    from app.services.plans import GB
+
+    photo = jpeg()
+    db.session.add(Subscription(company_id=data["acme"], plan="starter", interval="month", status="active"))
+    db.session.add(JobFile(company_id=data["acme"], job_id=data["job"], uploaded_by=data["mechanic"], kind="before", content_type="image/jpeg",
+                           size_bytes=2 * GB - len(photo) - len(photo) // 2, storage_key="1/jobs/1/old.jpg", status="ready"))
+    db.session.commit()
+    start(client, auth, data)
+    reserved = [request_upload(client, auth, data["job"], size=len(photo)) for _ in range(2)]
+    assert [r.status_code for r in reserved] == [201, 201]
+    for r in reserved:
+        target = r.get_json()["upload"]
+        assert client.put(target["url"], data=photo, headers=target["headers"]).status_code == 204
+    first, second = (client.post(f"/api/files/{r.get_json()['file_id']}/confirm", headers=mech(auth)) for r in reserved)
+    assert first.status_code == 200
+    assert second.status_code == 413 and "storage is full" in second.get_json()["error"]
+    assert db.session.get(JobFile, reserved[1].get_json()["file_id"]) is None

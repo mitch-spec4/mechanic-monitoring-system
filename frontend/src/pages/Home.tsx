@@ -103,11 +103,11 @@ export function SiteNav({ children }: { children?: ReactNode }) {
   return (
     <div className="siteNav">
       <div className="container navRow">
-        <button className="siteLogo" onClick={() => go("/")}>
+        <button className="siteLogo" onClick={() => go("/")} aria-label="MechanicPro home">
           <span className="logoIcon" aria-hidden="true">
             🔧
           </span>
-          MechanicPro
+          <span className="logoText">MechanicPro</span>
         </button>
         {children}
       </div>
@@ -138,7 +138,9 @@ function DashboardPreview() {
   return (
     <div className="preview" aria-hidden="true">
       <div className="previewInner">
-        <div className="dots">● &nbsp; ● &nbsp; ●</div>
+        <div className="dots">
+          ● &nbsp; ● &nbsp; ●<span className="sample">Sample data</span>
+        </div>
         <div className="dash">
           <div className="side">
             <div className="current">▣ Dashboard</div>

@@ -181,6 +181,16 @@ def test_an_ended_trial_stops_new_work_until_a_plan_is_paid(client, auth, data):
     assert client.post("/api/jobs", headers=boss(auth), json=job).status_code == 201
 
 
+def test_two_signups_with_one_email_at_once_give_a_clear_answer(client, monkeypatch):
+    """The second signup passes the email check before the first is saved; the database refuses it."""
+    import app.routes.billing as billing_routes
+
+    assert client.post("/api/signup", json={**SIGNUP, "email": "same@riftpower.test"}).status_code == 201
+    monkeypatch.setattr(billing_routes, "email_in_use", lambda email: False)
+    raced = client.post("/api/signup", json={**SIGNUP, "email": "same@riftpower.test"})
+    assert raced.status_code == 409 and "already exists" in raced.get_json()["error"]
+
+
 def test_signups_are_rate_limited(client, app):
     app.config.update(RATELIMIT_ENABLED=True, LOGIN_RATE_LIMIT="2 per minute")
     for number in range(2):
