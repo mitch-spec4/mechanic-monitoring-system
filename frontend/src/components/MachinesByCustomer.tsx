@@ -2,6 +2,7 @@ import { useState } from "react";
 import { MachineCard } from "../pages/CustomerPage";
 import { CreateJobModal } from "./JobForms";
 import { EditMachine } from "./MachineForms";
+import { t } from "../i18n";
 
 type Props = {
   machines: any[];
@@ -12,7 +13,7 @@ type Props = {
   onChanged: () => void;
 };
 
-/** Managers: every machine under its customer, with a filter for the ones needing work. */
+/** Managers: all equipment under its customer, with a filter for the pieces needing work. */
 export default function MachinesByCustomer({ machines, customers, query, onOpenJob, onOpenCustomer, onChanged }: Props) {
   const [onlyNeedsWork, setOnlyNeedsWork] = useState(false);
   const [creatingFor, setCreatingFor] = useState<any>(null);
@@ -40,17 +41,17 @@ export default function MachinesByCustomer({ machines, customers, query, onOpenJ
     <div className="machineGroups">
       <div className="machineGroupsBar">
         <span>
-          {machines.length} machines · <b className="needsWorkText">{needing} need work</b>
+          {t("{count} pieces of equipment", { count: machines.length })} · <b className="needsWorkText">{t("{count} need work", { count: needing })}</b>
         </span>
         <label>
           <input type="checkbox" checked={onlyNeedsWork} onChange={(e) => setOnlyNeedsWork(e.target.checked)} />
-          Needs work only
+          {t("Needs work only")}
         </label>
       </div>
       {groups.length === 0 && (
         <div className="subEmpty">
-          <strong>{onlyNeedsWork ? "No machines need work" : "No machines found"}</strong>
-          <span>{onlyNeedsWork ? "Every machine is operational with no open jobs or requests." : "Try a different search."}</span>
+          <strong>{onlyNeedsWork ? t("No equipment needs work") : t("No equipment found")}</strong>
+          <span>{onlyNeedsWork ? t("All equipment is operational, with no open jobs or requests.") : t("Try a different search.")}</span>
         </div>
       )}
       {groups.map(({ customer, machines: own }) => (
@@ -60,8 +61,8 @@ export default function MachinesByCustomer({ machines, customers, query, onOpenJ
               <strong>{customer.name}</strong>
             </button>
             <span>
-              {own.length} machine{own.length === 1 ? "" : "s"}
-              {own.some((m) => m.needs_work) ? ` · ${own.filter((m) => m.needs_work).length} need work` : ""}
+              {own.length === 1 ? t("1 piece of equipment") : t("{count} pieces of equipment", { count: own.length })}
+              {own.some((m) => m.needs_work) ? ` · ${t("{count} need work", { count: own.filter((m) => m.needs_work).length })}` : ""}
             </span>
           </div>
           <ul className="machineCards">
@@ -81,7 +82,7 @@ export default function MachinesByCustomer({ machines, customers, query, onOpenJ
       ))}
       {creatingFor && (
         <CreateJobModal
-          preset={{ customer_id: creatingFor.customer_id, machine_id: creatingFor.id, title: `Service ${creatingFor.name}` }}
+          preset={{ customer_id: creatingFor.customer_id, machine_id: creatingFor.id, title: t("Service {name}", { name: creatingFor.name }) }}
           onClose={() => setCreatingFor(null)}
           onCreated={done}
         />

@@ -25,6 +25,7 @@ from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
 from app.utils.validation import ValidationError, choice, integer, json_body, text
 from app.utils.validation import email as read_email
+from app.i18n import N_, _
 
 bp = Blueprint("customers", __name__)
 INVITATION_DAYS = 7
@@ -122,9 +123,9 @@ def invite():
     email = read_email(data)
     role = data.get("role") or "customer"
     if role not in {"customer", "mechanic"}:
-        raise ValidationError("Only customers and mechanics can be invited")
+        raise ValidationError(_("Only customers and technicians can be invited"))
     if User.query.filter_by(email=email).first():
-        raise ValidationError("This email address already has an account", 409)
+        raise ValidationError(_("This email address already has an account"), 409)
     if not user.email_verified_at:
         # Invitations are emailed, so an unconfirmed account can't make the app email strangers.
         raise ValidationError(
@@ -132,7 +133,7 @@ def invite():
             "You can send a new link from the banner at the top of the page.",
             403,
         )
-    require_active(user.company_id, "invite people")
+    require_active(user.company_id, _("invite people"))
     if role == "mechanic":
         check_mechanic_limit(user.company_id)
 
@@ -182,12 +183,12 @@ def requests_list():
 def create_request():
     user = current_user()
     data = json_body()
-    machine_id = integer(data, "machine_id", "Machine", required=True)
+    machine_id = integer(data, "machine_id", "Equipment", required=True)
     machine = Machine.query.filter_by(
         id=machine_id, customer_id=user.customer_id, company_id=user.company_id
     ).first()
     if not machine:
-        raise ValidationError("Machine not found", 404)
+        raise ValidationError(_("Equipment not found"), 404)
 
     service_request = ServiceRequest(
         customer_id=user.customer_id,
@@ -198,7 +199,7 @@ def create_request():
         priority=choice(data, "priority", PRIORITIES, default=DEFAULT_PRIORITY),
     )
     db.session.add(service_request)
-    notify_bosses(user.company_id, "New customer service request", f"{service_request.subject} was submitted.", "request")
+    notify_bosses(user.company_id, N_("New customer service request"), N_("{subject} was submitted."), "request", subject=service_request.subject)
     db.session.commit()
     return jsonify(id=service_request.id), 201
 
@@ -214,7 +215,7 @@ def update_request(rid):
         for customer_user in User.query.filter_by(
             company_id=service_request.company_id, customer_id=service_request.customer_id, role="customer"
         ).all():
-            notify(customer_user.id, "Service request updated", f"Your request is now {status}.", "request")
+            notify(customer_user.id, N_("Service request updated"), N_("Your request is now {status}."), "request", ("status",), status=status)
     db.session.commit()
     return jsonify(ok=True, status=service_request.status)
 
@@ -228,7 +229,7 @@ def delete_customer(cid):
         for model in (Machine, Job, ServiceRecord, ServiceRequest, Review)
     )
     if has_history:
-        return jsonify(error="This customer has machines or service history and cannot be deleted."), 409
+        return jsonify(error=_("This customer has equipment or service history and cannot be deleted.")), 409
 
     for customer_user in User.query.filter_by(customer_id=customer.id).all():
         Notification.query.filter_by(user_id=customer_user.id).delete()

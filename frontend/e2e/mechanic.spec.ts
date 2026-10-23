@@ -46,7 +46,7 @@ test("mechanic takes an assigned job all the way to completed", async ({ page })
 
 test("mechanic only sees their own machines and real stats", async ({ page }) => {
   await signIn(page, "brian@mechanicpro.test");
-  const machines = page.locator(".kpi", { hasText: "Machines" });
+  const machines = page.locator(".kpi", { hasText: "Equipment" });
   await expect(machines.locator("strong")).toHaveText("2");
   await expect(page.locator(".sidebarStats")).not.toContainText("147");
   await expect(page.locator(".pendingJob", { hasText: "Industrial Mixer MX-08 repair" }).getByRole("button", { name: "Resume" })).toBeVisible();

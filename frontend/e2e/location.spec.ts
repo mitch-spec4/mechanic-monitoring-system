@@ -1,12 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { failOnPageErrors, openPage, signIn } from "./helpers";
+import { confirmDialog, failOnPageErrors, openPage, signIn } from "./helpers";
 
 // Brian starts clocked out and hasn't agreed to location sharing; Mitch and Amina are clocked in.
 test.describe.configure({ mode: "serial" });
 
 test("mechanic must clock in, with consent and location, before working", async ({ page }) => {
   const noErrors = failOnPageErrors(page);
-  page.on("dialog", (dialog) => dialog.accept());
   await signIn(page, "brian@mechanicpro.test");
   const clock = page.locator(".clockCard");
   const job = page.locator(".pendingJob", { hasText: "Industrial Mixer MX-08 repair" });
@@ -30,6 +29,7 @@ test("mechanic must clock in, with consent and location, before working", async 
 
   // Clocking out pauses the job and stops sharing.
   await clock.getByRole("button", { name: "Clock out" }).click();
+  await confirmDialog(page, "Clock out");
   await expect(clock).toContainText("You're clocked out");
   await expect(job.locator(".jobStatus")).toHaveText("Paused");
   await expect(page.locator(".locationPill")).toHaveCount(0);
@@ -76,7 +76,7 @@ test("boss sees clocked-in mechanics on the map, shifts, and job locations", asy
   await expect(page.locator(".teamMap")).not.toContainText("Brian Kariuki");
 
   await openPage(page, "Shifts");
-  await page.getByLabel("Mechanic").selectOption({ label: "Brian Kariuki" });
+  await page.getByLabel("Technician").selectOption({ label: "Brian Kariuki" });
   const corrected = page.locator(".shiftRow", { hasText: "Set by James Mwangi" });
   await expect(corrected).toContainText("Not shared");
   await corrected.getByRole("button", { name: "Fix clock-out" }).click();

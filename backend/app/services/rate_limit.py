@@ -12,6 +12,7 @@ from app import db
 from app.models.security import AuthAttempt
 from app.utils.time import utcnow
 from app.utils.validation import ValidationError
+from app.i18n import _
 
 UNITS = {"second": 1, "minute": 60, "hour": 3600, "day": 86400}
 RULE = re.compile(r"^\s*(\d+)\s*(?:per|/)\s*(second|minute|hour|day)s?\s*$")
@@ -42,7 +43,7 @@ def check(*keys, setting="LOGIN_RATE_LIMIT"):
         since = now - timedelta(seconds=seconds)
         for key in keys:
             if AuthAttempt.query.filter(AuthAttempt.key == key, AuthAttempt.created_at >= since).count() >= limit:
-                raise ValidationError("Too many attempts. Please wait a few minutes and try again.", 429)
+                raise ValidationError(_("Too many attempts. Please wait a few minutes and try again."), 429)
 
 
 def record(*keys):

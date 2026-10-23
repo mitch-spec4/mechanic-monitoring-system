@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { checkoutDetail, payTestCheckout } from "../services/api";
+import { checkoutDetail, payTestCheckout, type User } from "../services/api";
 import { go, money } from "../lib/route";
-import { errorMessage, formatDate } from "../lib/format";
+import { errorMessage, formatDay } from "../lib/format";
+import { Trans } from "../i18n/Trans";
+import { t } from "../i18n";
 import { SiteNav } from "./Home";
 import "./Home.css";
 
-type Props = { reference: string; user: any; onDone: () => void };
+type Props = { reference: string; user: User | null; onDone: () => void };
 
 /** The test payment provider's card page. No real card is charged in test mode. */
 export default function Checkout({ reference, user, onDone }: Props) {
@@ -43,49 +45,52 @@ export default function Checkout({ reference, user, onDone }: Props) {
       <main className="container checkoutLayout">
         {!user ? (
           <section className="formCard checkoutCard">
-            <h1>Log in to finish paying</h1>
-            <p className="lead">This checkout belongs to a company account.</p>
+            <h1>{t("Log in to finish paying")}</h1>
+            <p className="lead">{t("This checkout belongs to a company account.")}</p>
             <button className="btn primary wide" onClick={() => go(`/signin?next=${encodeURIComponent(`/checkout/${reference}`)}`)}>
-              Log in
+              {t("Log in")}
             </button>
           </section>
         ) : !payment ? (
-          <section className="formCard checkoutCard">{error ? <div className="error">{error}</div> : <p className="lead">Loading checkout…</p>}</section>
+          <section className="formCard checkoutCard">{error ? <div className="error">{error}</div> : <p className="lead">{t("Loading checkout…")}</p>}</section>
         ) : paid ? (
           <section className="formCard checkoutCard done" role="status">
             <div className="doneMark" aria-hidden="true">
               ✓
             </div>
-            <h1>Payment received</h1>
+            <h1>{t("Payment received")}</h1>
             <p className="lead">
-              Your <b>{payment.plan_name}</b> plan is active
-              {subscription?.current_period_end ? ` until ${formatDate(subscription.current_period_end)}` : ""}.
+              {subscription?.current_period_end ? (
+                <Trans text="Your {plan} plan is active until {date}." values={{ plan: <b>{t(payment.plan_name)}</b>, date: formatDay(subscription.current_period_end) }} />
+              ) : (
+                <Trans text="Your {plan} plan is active." values={{ plan: <b>{t(payment.plan_name)}</b> }} />
+              )}
             </p>
             <button className="btn primary wide" onClick={onDone}>
-              Go to your dashboard
+              {t("Go to your dashboard")}
             </button>
           </section>
         ) : (
           <section className="formCard checkoutCard">
-            <div className="testBanner">Test mode: no real card is charged.</div>
-            <h1>Checkout</h1>
+            <div className="testBanner">{t("Test mode: no real card is charged.")}</div>
+            <h1>{t("Checkout")}</h1>
             <dl className="orderSummary">
               <div>
-                <dt>Company</dt>
+                <dt>{t("Company")}</dt>
                 <dd>{detail.company}</dd>
               </div>
               <div>
-                <dt>Plan</dt>
+                <dt>{t("Plan")}</dt>
                 <dd>
-                  {payment.plan_name} · {payment.interval === "year" ? "Yearly" : "Monthly"}
+                  {t(payment.plan_name)} · {payment.interval === "year" ? t("Yearly") : t("Monthly")}
                 </dd>
               </div>
               <div>
-                <dt>Receipt to</dt>
+                <dt>{t("Receipt to")}</dt>
                 <dd>{detail.email}</dd>
               </div>
               <div className="orderTotal">
-                <dt>Total today</dt>
+                <dt>{t("Total today")}</dt>
                 <dd>{money(payment.amount_cents, payment.currency)}</dd>
               </div>
             </dl>
@@ -102,12 +107,12 @@ export default function Checkout({ reference, user, onDone }: Props) {
               }}
             >
               <label>
-                Card number
+                {t("Card number")}
                 <input defaultValue="4242 4242 4242 4242" inputMode="numeric" autoComplete="off" />
               </label>
               <div className="cardRow">
                 <label>
-                  Expiry
+                  {t("Expiry")}
                   <input defaultValue="12 / 34" autoComplete="off" />
                 </label>
                 <label>
@@ -116,10 +121,10 @@ export default function Checkout({ reference, user, onDone }: Props) {
                 </label>
               </div>
               <button className="btn primary wide" disabled={busy}>
-                <span aria-hidden="true">🔒</span> {busy ? "Processing…" : `Pay ${money(payment.amount_cents, payment.currency)}`}
+                <span aria-hidden="true">🔒</span> {busy ? t("Processing…") : t("Pay {amount}", { amount: money(payment.amount_cents, payment.currency) })}
               </button>
               <button type="button" className="textLink declineLink" disabled={busy} onClick={() => pay("declined")}>
-                Try a declined card
+                {t("Try a declined card")}
               </button>
             </form>
           </section>

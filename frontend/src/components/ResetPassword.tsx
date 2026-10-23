@@ -4,6 +4,8 @@ import Modal from "./Modal";
 import ShareCode, { formatExpiry } from "./ShareCode";
 import { issueResetCode } from "../services/api";
 import { errorMessage } from "../lib/format";
+import { t } from "../i18n";
+import { Trans } from "../i18n/Trans";
 
 type Props = { userId: number; name: string; onClose: () => void };
 
@@ -24,40 +26,42 @@ export default function ResetPassword({ userId, name, onClose }: Props) {
     }
   };
   return (
-    <Modal title="Reset password" icon={<KeyRound size={20} />} onClose={onClose}>
+    <Modal title={t("Reset password")} icon={<KeyRound size={20} />} onClose={onClose}>
       {result ? (
         <ShareCode
           code={result.code}
           email={result.email}
           onDone={onClose}
           summary={
-            <>
-              Share this code with <b>{result.name}</b>. They choose a new password on the sign-in page under
-              "Forgot password?". It works once and expires {formatExpiry(result.expires_at)}.
-            </>
+            <Trans
+              text='Share this code with {name}. They enter it on the sign-in page under "Forgot password?" and "Have a reset code from your manager?". It works once and expires {date}.'
+              values={{ name: <b>{result.name}</b>, date: formatExpiry(result.expires_at) }}
+            />
           }
-          subject="Reset your MechanicPro password"
+          subject={t("Reset your MechanicPro password")}
           lines={[
-            `Hi ${result.name},`,
+            t("Hi {name},", { name: result.name }),
             "",
-            `Your password reset code: ${result.code}`,
+            t("Your password reset code: {code}", { code: result.code }),
             "",
-            `1. Open ${window.location.origin}`,
-            '2. Choose "Forgot password?"',
-            `3. Enter this email address (${result.email}), the code, and your new password.`,
+            t("1. Open {address}", { address: window.location.origin }),
+            t('2. Choose "Forgot password?", then "Have a reset code from your manager?"'),
+            t("3. Enter this email address ({email}), the code, and your new password.", { email: result.email }),
             "",
-            `The code works once and expires ${formatExpiry(result.expires_at)}.`,
+            t("The code works once and expires {date}.", { date: formatExpiry(result.expires_at) }),
           ]}
         />
       ) : (
         <div className="form form-upgraded">
           {error && <div className="error">{error}</div>}
           <p>
-            Create a one-time code so <b>{name}</b> can choose a new password. Their current password and any
-            earlier reset code stop working once they use it.
+            <Trans
+              text="Create a one-time code so {name} can choose a new password. Their current password and any earlier reset code stop working once they use it."
+              values={{ name: <b>{name}</b> }}
+            />
           </p>
           <button type="button" className="primary" onClick={issue} disabled={busy}>
-            <KeyRound size={15} /> Create reset code
+            <KeyRound size={15} /> {t("Create reset code")}
           </button>
         </div>
       )}

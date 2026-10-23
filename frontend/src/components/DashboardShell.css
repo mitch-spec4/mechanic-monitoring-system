@@ -89,7 +89,6 @@
 }
 .sidebarUser small {
   color: #a9c0da;
-  text-transform: capitalize;
 }
 .sidebarRating {
   grid-column: 2;
@@ -912,7 +911,6 @@
 .subPageUser {
   font-size: 10px;
   color: #758398;
-  text-transform: capitalize;
 }
 .subPageStats {
   display: flex;

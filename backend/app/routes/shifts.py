@@ -22,11 +22,12 @@ from app.services.notifications import notify
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
 from app.utils.validation import ValidationError, integer, json_body
+from app.i18n import N_, _, local_time
 
 bp = Blueprint("shifts", __name__)
 location_bp = Blueprint("location", __name__)
 
-NEEDS_LOCATION = (
+NEEDS_LOCATION = N_(
     "Your location is needed to clock in. Turn on location for this site in your browser "
     "and on your phone, then try again. If it keeps failing, step outside for a better signal."
 )
@@ -90,9 +91,9 @@ def consent():
     user = current_user()
     agreed = json_body().get("consent")
     if not isinstance(agreed, bool):
-        raise ValidationError("Consent must be true or false")
+        raise ValidationError(_("Consent must be true or false"))
     if not agreed and open_shift(user):
-        raise ValidationError("Clock out first. Location sharing is part of being clocked in.", 409)
+        raise ValidationError(_("Clock out first. Location sharing is part of being clocked in."), 409)
     if agreed and not user.location_consent_at:
         user.location_consent_at = utcnow()
     if not agreed:
@@ -106,12 +107,12 @@ def consent():
 def clock_in():
     user = current_user()
     if open_shift(user):
-        raise ValidationError("You are already clocked in", 409)
+        raise ValidationError(_("You are already clocked in"), 409)
     if not user.location_consent_at:
-        raise ValidationError("Agree to location sharing before clocking in", 409)
+        raise ValidationError(_("Agree to location sharing before clocking in"), 409)
     fix, _reason = parse_fix(json_body())
     if not fix:
-        raise ValidationError(NEEDS_LOCATION, 422)
+        raise ValidationError(_(NEEDS_LOCATION), 422)
     shift = Shift(company_id=user.company_id, user_id=user.id, clocked_in_at=utcnow())
     db.session.add(shift)
     db.session.flush()
@@ -128,7 +129,7 @@ def clock_out():
     user = current_user()
     shift = open_shift(user)
     if not shift:
-        raise ValidationError("You are not clocked in", 409)
+        raise ValidationError(_("You are not clocked in"), 409)
     paused = pause_running_jobs(user, user)
     fix, reason = parse_fix(json_body())
     if user.location_consent_at:
@@ -148,7 +149,7 @@ def list_shifts():
     if user.role == "mechanic":
         query = query.filter_by(user_id=user.id)
     else:
-        mechanic_id = integer(request.args, "mechanic_id", "Mechanic")
+        mechanic_id = integer(request.args, "mechanic_id", "Technician")
         if mechanic_id:
             query = query.filter_by(user_id=mechanic_id)
     days = integer(request.args, "days", "Days", minimum=1, maximum=366) or 14
@@ -173,11 +174,11 @@ def correct_shift(sid):
     shift = Shift.query.filter_by(id=sid, company_id=user.company_id).first_or_404()
     ended = parse_time(json_body(), "clocked_out_at", "Clock-out time", required=True)
     if ended <= shift.clocked_in_at:
-        raise ValidationError("Clock-out time must be after the clock-in time")
+        raise ValidationError(_("Clock-out time must be after the clock-in time"))
     later = Shift.query.filter(Shift.user_id == shift.user_id, Shift.id != shift.id, Shift.clocked_in_at > shift.clocked_in_at)
     next_shift = later.order_by(Shift.clocked_in_at).first()
     if next_shift and ended > next_shift.clocked_in_at:
-        raise ValidationError("That overlaps the mechanic's next shift", 409)
+        raise ValidationError(_("That overlaps the technician's next shift"), 409)
     mechanic = db.session.get(User, shift.user_id)
     if shift.clocked_out_at is None:
         pause_running_jobs(mechanic, user, at=ended)
@@ -186,7 +187,7 @@ def correct_shift(sid):
     shift.clocked_out_at = ended
     shift.edited_by = user.id
     shift.edited_at = utcnow()
-    notify(mechanic.id, "Shift corrected", f"{user.name} set your clock-out time for the shift that started {shift.clocked_in_at:%d %b %H:%M} UTC.", "shift")
+    notify(mechanic.id, N_("Shift corrected"), N_("{name} set your clock-out time for the shift that started {start}."), "shift", name=user.name, start=local_time(shift.clocked_in_at))
     db.session.commit()
     return jsonify(shift=shift_out(shift, {mechanic.id: mechanic.name, user.id: user.name}))
 
@@ -201,10 +202,10 @@ def live():
     job_id = integer(data, "job_id", "Job", required=True)
     job = Job.query.filter_by(id=job_id, company_id=user.company_id, mechanic_id=user.id).first_or_404()
     if job.status != "In Progress":
-        raise ValidationError("Live location is only shared while a job is in progress", 409)
+        raise ValidationError(_("Live location is only shared while a job is in progress"), 409)
     fix, _reason = parse_fix(data)
     if not fix:
-        raise ValidationError("A position is required")
+        raise ValidationError(_("A position is required"))
     last = (
         LocationPoint.query.filter_by(user_id=user.id, kind="live")
         .order_by(LocationPoint.recorded_at.desc())

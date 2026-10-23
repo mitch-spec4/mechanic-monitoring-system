@@ -3,6 +3,8 @@ import { ListChecks, Plus, Trash2 } from "lucide-react";
 import Modal from "./Modal";
 import { checklists, createChecklist, deleteChecklist, updateChecklist } from "../services/api";
 import { errorMessage } from "../lib/format";
+import { confirmAction, toast } from "./Feedback";
+import { t } from "../i18n";
 import "./ChecklistManager.css";
 
 type Item = { label: string; required: boolean };
@@ -22,9 +24,16 @@ export default function ChecklistManager() {
   }, []);
 
   const remove = async (template: Template) => {
-    if (!confirm(`Delete the ${template.job_type} checklist? Jobs already started keep their copy.`)) return;
+    const ok = await confirmAction({
+      title: t("Delete the {name} checklist?", { name: template.job_type }),
+      message: t("Jobs already started keep their copy."),
+      confirmLabel: t("Delete checklist"),
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await deleteChecklist(template.id);
+      toast(t("Checklist deleted"));
       load();
     } catch (e) {
       setError(errorMessage(e));
@@ -36,17 +45,16 @@ export default function ChecklistManager() {
       {error && <div className="error">{error}</div>}
       <div className="checklistIntro">
         <p className="muted">
-          Pick a job type when you create a job. When the mechanic starts work, that type's checklist is copied onto
-          the job. Required items must be ticked before the job can be completed.
+          {t("Pick a job type when you create a job. When the technician starts work, that type's checklist is copied onto the job. Required items must be ticked before the job can be completed.")}
         </p>
         <button className="primary" onClick={() => setEditing("new")}>
-          <Plus size={14} /> New checklist
+          <Plus size={14} /> {t("New checklist")}
         </button>
       </div>
       {templates.length === 0 ? (
         <div className="subEmpty">
-          <strong>No checklists yet</strong>
-          <span>Create one for each kind of job your team does, such as Repair or Inspection.</span>
+          <strong>{t("No checklists yet")}</strong>
+          <span>{t("Create one for each kind of job your team does, such as Repair or Inspection.")}</span>
         </div>
       ) : (
         <div className="checklistCards">
@@ -56,21 +64,21 @@ export default function ChecklistManager() {
                 <h3>
                   <ListChecks size={16} /> {template.job_type}
                 </h3>
-                <span>{template.items.length} items</span>
+                <span>{template.items.length === 1 ? t("1 item") : t("{count} items", { count: template.items.length })}</span>
               </div>
               <ol>
                 {template.items.map((item, index) => (
                   <li key={index}>
                     {item.label}
-                    {item.required && <em>Required</em>}
+                    {item.required && <em>{t("Required")}</em>}
                   </li>
                 ))}
               </ol>
               <div className="checklistCardFoot">
                 <button className="listAction" onClick={() => setEditing(template)}>
-                  Edit
+                  {t("Edit")}
                 </button>
-                <button className="iconButton" title="Delete checklist" aria-label={`Delete ${template.job_type} checklist`} onClick={() => remove(template)}>
+                <button className="iconButton" title={t("Delete checklist")} aria-label={t("Delete the {name} checklist", { name: template.job_type })} onClick={() => remove(template)}>
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -98,7 +106,7 @@ function ChecklistEditor({ template, onClose, onSaved }: { template: Template | 
   const [error, setError] = useState("");
   const update = (index: number, change: Partial<Item>) => setItems((rows) => rows.map((row, i) => (i === index ? { ...row, ...change } : row)));
 
-  const save = async (event: any) => {
+  const save = async (event: React.FormEvent) => {
     event.preventDefault();
     setError("");
     const payload = { job_type: jobType, items: items.filter((item) => item.label.trim()) };
@@ -112,32 +120,32 @@ function ChecklistEditor({ template, onClose, onSaved }: { template: Template | 
   };
 
   return (
-    <Modal title={template ? `Edit ${template.job_type} checklist` : "New checklist"} icon={<ListChecks size={20} />} onClose={onClose}>
+    <Modal title={template ? t("Edit the {name} checklist", { name: template.job_type }) : t("New checklist")} icon={<ListChecks size={20} />} onClose={onClose}>
       <form className="form form-upgraded checklistEditor" onSubmit={save}>
         {error && <div className="error">{error}</div>}
         <div className="formGroup">
-          <label htmlFor="field-job_type">Job type</label>
-          <input id="field-job_type" value={jobType} onChange={(e) => setJobType(e.target.value)} placeholder="e.g. Repair" required />
+          <label htmlFor="field-job_type">{t("Job type")}</label>
+          <input id="field-job_type" value={jobType} onChange={(e) => setJobType(e.target.value)} placeholder={t("e.g. {example}", { example: t("Repair") })} required />
         </div>
         <div className="formGroup">
-          <span className="editorLabel">Items</span>
+          <span className="editorLabel">{t("Items")}</span>
           {items.map((item, index) => (
             <div className="checklistRow" key={index}>
               <input
-                aria-label={`Item ${index + 1}`}
+                aria-label={t("Item {number}", { number: index + 1 })}
                 value={item.label}
                 onChange={(e) => update(index, { label: e.target.value })}
-                placeholder="e.g. Isolate power"
+                placeholder={t("e.g. {example}", { example: t("Isolate power") })}
               />
               <label className="requiredToggle">
                 <input type="checkbox" checked={item.required} onChange={(e) => update(index, { required: e.target.checked })} />
-                Required
+                {t("Required")}
               </label>
               <button
                 type="button"
                 className="iconButton"
-                title="Remove item"
-                aria-label={`Remove item ${index + 1}`}
+                title={t("Remove item")}
+                aria-label={t("Remove item {number}", { number: index + 1 })}
                 onClick={() => setItems((rows) => rows.filter((_, i) => i !== index))}
               >
                 <Trash2 size={14} />
@@ -145,10 +153,10 @@ function ChecklistEditor({ template, onClose, onSaved }: { template: Template | 
             </div>
           ))}
           <button type="button" className="link" onClick={() => setItems((rows) => [...rows, { label: "", required: false }])}>
-            + Add item
+            {t("+ Add item")}
           </button>
         </div>
-        <button className="primary">Save checklist</button>
+        <button className="primary">{t("Save checklist")}</button>
       </form>
     </Modal>
   );

@@ -246,6 +246,7 @@
 
 /* ---------- The signing paper ---------- */
 .signPaper {
+  /* light-only: the customer signs in dark ink on white paper, in either theme */
   position: relative;
   height: 230px;
   border-radius: 18px;

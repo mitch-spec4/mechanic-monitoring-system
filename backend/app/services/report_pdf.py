@@ -15,12 +15,13 @@ from app.models.user import User
 from app.models.worksheet import JobChecklistItem, JobEvent, JobPart, WorkEntry
 from app.services.storage import storage
 from app.services.worksheet import format_quantity
+from app.i18n import N_, _, local_time
 
 INK = (23, 32, 51)
 MUTED = (104, 118, 138)
 ACCENT = (9, 105, 215)
 LINE = (225, 232, 240)
-PHOTO_LABELS = {"before": "Before", "after": "After", "other": "Photo"}
+PHOTO_LABELS = {"before": N_("Before"), "after": N_("After"), "other": N_("Photo")}
 # Images bigger than this aren't decoded for the report: a hostile upload could exhaust memory.
 MAX_PIXELS = 40_000_000
 
@@ -33,7 +34,7 @@ def clean(value):
 
 
 def fmt_date(value):
-    return value.strftime("%d %b %Y") if value else "-"
+    return local_time(value, with_time=False)
 
 
 class Report(FPDF):
@@ -50,7 +51,7 @@ class Report(FPDF):
         self.cell(0, 7, clean(self.company_name), new_x="LMARGIN", new_y="NEXT")
         self.set_font("Helvetica", "", 9)
         self.set_text_color(*MUTED)
-        self.cell(0, 5, clean(f"Service report  -  {self.reference}"), new_x="LMARGIN", new_y="NEXT")
+        self.cell(0, 5, clean(_("Service report") + f"  -  {self.reference}"), new_x="LMARGIN", new_y="NEXT")
         self.set_draw_color(*LINE)
         self.line(16, self.get_y() + 2, 194, self.get_y() + 2)
         self.ln(6)
@@ -59,7 +60,7 @@ class Report(FPDF):
         self.set_y(-12)
         self.set_font("Helvetica", "", 8)
         self.set_text_color(*MUTED)
-        self.cell(0, 5, f"Page {self.page_no()}/{{nb}}", align="R")
+        self.cell(0, 5, _("Page {number}", number=self.page_no()) + "/{nb}", align="R")
 
     def section(self, title):
         if self.get_y() > 250:
@@ -124,7 +125,7 @@ def build_report(job):
         JobEvent.query.filter_by(job_id=job.id, action="status", to_status="Completed").order_by(JobEvent.created_at.desc()).first()
     )
 
-    pdf = Report(company.name if company else "MechanicPro", f"Job #{job.id}")
+    pdf = Report(company.name if company else "MechanicPro", _("Job #{number}", number=job.id))
     pdf.alias_nb_pages()
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 17)
@@ -132,53 +133,54 @@ def build_report(job):
     pdf.ln(2)
     pdf.pairs(
         [
-            ("Customer", customer.name if customer else None),
-            ("Machine", f"{machine.name} ({machine.serial_no})" if machine else None),
-            ("Site", job.location),
-            ("Mechanic", mechanic.name if mechanic else None),
-            ("Job type", job.job_type or "General"),
-            ("Completed", fmt_date(completed.created_at) if completed else job.status),
+            (_("Customer"), customer.name if customer else None),
+            (_("Equipment"), f"{machine.name} ({machine.serial_no})" if machine else None),
+            (_("Site"), job.location),
+            (_("Technician"), mechanic.name if mechanic else None),
+            (_("Job type"), job.job_type or _("General")),
+            (_("Completed"), fmt_date(completed.created_at) if completed else _(job.status)),
         ]
     )
 
-    pdf.section("Problem reported")
+    pdf.section(_("Problem reported"))
     pdf.body(job.description)
 
     notes = [entry.work_done.strip() for entry in entries if (entry.work_done or "").strip()]
-    pdf.section("Work done")
-    pdf.body("\n".join(f"- {note}" for note in notes) if notes else "No work notes recorded.")
+    pdf.section(_("Work done"))
+    pdf.body("\n".join(f"- {note}" for note in notes) if notes else _("No work notes recorded."))
 
     if record and (record.solution or record.advice):
-        pdf.section("Summary")
+        pdf.section(_("Summary"))
         if record.solution:
             pdf.body(record.solution)
         if record.advice:
             pdf.ln(1)
-            pdf.body(f"Advice: {record.advice}", style="I")
+            pdf.body(_("Advice: {advice}", advice=record.advice), style="I")
 
-    pdf.section("Parts used")
+    pdf.section(_("Parts used"))
     if parts:
         for part in parts:
             pdf.body(f"{format_quantity(part.quantity)} x {part.name}")
     else:
-        pdf.body("No parts used.")
+        pdf.body(_("No parts used."))
 
     if checklist:
-        pdf.section("Checklist")
+        pdf.section(_("Checklist"))
         for item in checklist:
-            mark = "Done" if item.done else "Not done"
-            pdf.body(f"[{mark}] {item.label}{' (required)' if item.required else ''}")
+            mark = _("Done") if item.done else _("Not done")
+            required = " " + _("(required)") if item.required else ""
+            pdf.body(f"[{mark}] {item.label}{required}")
 
     photos = [f for f in files if f.kind in PHOTO_LABELS]
     videos = [f for f in files if f.kind == "video"]
     if photos:
-        pdf.section("Photos")
+        pdf.section(_("Photos"))
         add_photo_grid(pdf, photos)
     if videos:
-        pdf.section("Videos")
-        pdf.body(f"{len(videos)} video{'s' if len(videos) != 1 else ''} recorded. Open the job in MechanicPro to watch.")
+        pdf.section(_("Videos"))
+        pdf.body(_("Videos recorded: {count}. Open the job in MechanicPro to watch.", count=len(videos)))
 
-    pdf.section("Customer sign-off")
+    pdf.section(_("Customer sign-off"))
     signature = next((f for f in reversed(files) if f.kind == "signature"), None)
     if job.signed_at:
         if signature:
@@ -186,11 +188,11 @@ def build_report(job):
             if image:
                 width = 60
                 pdf.image(image, w=width, h=width * size[1] / size[0])
-        pdf.body(f"Signed by {job.signed_by_name} on {fmt_date(job.signed_at)}")
+        pdf.body(_("Signed by {name} on {date}", name=job.signed_by_name, date=fmt_date(job.signed_at)))
     elif job.no_signature_reason:
-        pdf.body(f"Not signed: {job.no_signature_reason}")
+        pdf.body(_("Not signed: {reason}", reason=job.no_signature_reason))
     else:
-        pdf.body("Not signed.")
+        pdf.body(_("Not signed."))
 
     return bytes(pdf.output())
 
@@ -212,7 +214,7 @@ def add_photo_grid(pdf, photos):
     for photo in photos:
         image, _size = stored_thumbnail(photo, 900)
         if image:
-            images.append((image, PHOTO_LABELS[photo.kind]))
+            images.append((image, _(PHOTO_LABELS[photo.kind])))
     for start in range(0, len(images), columns):
         if pdf.get_y() + height + 8 > pdf.h - pdf.b_margin:
             pdf.add_page()

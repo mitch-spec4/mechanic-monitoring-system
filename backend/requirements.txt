@@ -12,3 +12,4 @@ psycopg[binary]==3.3.6
 boto3==1.43.117
 fpdf2==2.8.9
 Pillow==13.0.0
+tzdata==2025.2

@@ -1,12 +1,15 @@
 import { useState } from "react";
-import { saveSession, signup } from "../services/api";
+import { saveSession, signup, type User } from "../services/api";
 import { go, money } from "../lib/route";
 import { usePricing, type Interval } from "../components/Plans";
 import { PeriodToggle, SiteNav } from "./Home";
 import { errorMessage } from "../lib/format";
+import LanguagePicker from "../components/LanguagePicker";
+import { t } from "../i18n";
 import "./Home.css";
 
-type Props = { query: URLSearchParams; onSignedIn: (user: any, checkoutUrl?: string) => void };
+type Props = { query: URLSearchParams; onSignedIn: (user: User, checkoutUrl?: string) => void };
+type Busy = "" | "creating" | "checkout";
 
 /** A new company and its owner. Every plan starts as a free trial; paying now skips it. */
 export default function Signup({ query, onSignedIn }: Props) {
@@ -14,7 +17,7 @@ export default function Signup({ query, onSignedIn }: Props) {
   const [plan, setPlan] = useState(query.get("plan") || "professional");
   const [interval, setPeriod] = useState<Interval>(query.get("interval") === "year" ? "year" : "month");
   const [form, setForm] = useState({ company_name: "", name: "", email: "", password: "" });
-  const [busy, setBusy] = useState("");
+  const [busy, setBusy] = useState<Busy>("");
   const [error, setError] = useState("");
   // A link to a plan that doesn't exist (or no longer does) falls back to Professional.
   const chosen = pricing?.plans.find((item) => item.key === plan) || pricing?.plans.find((item) => item.key === "professional") || pricing?.plans[0];
@@ -27,7 +30,7 @@ export default function Signup({ query, onSignedIn }: Props) {
   const submit = async (payNow: boolean) => {
     if (!chosen) return;
     setError("");
-    setBusy(payNow ? "Preparing checkout…" : "Creating your account…");
+    setBusy(payNow ? "checkout" : "creating");
     try {
       const data = await signup({ ...form, plan: chosen.key, interval, pay_now: payNow });
       saveSession(data.user);
@@ -43,7 +46,7 @@ export default function Signup({ query, onSignedIn }: Props) {
       <SiteNav>
         <div className="navActions">
           <button className="btn outline" onClick={() => go("/signin")}>
-            Log in
+            {t("Log in")}
           </button>
         </div>
       </SiteNav>
@@ -55,42 +58,42 @@ export default function Signup({ query, onSignedIn }: Props) {
             submit(false);
           }}
         >
-          <div className="badge">● {trialDays}-day free trial · no card needed</div>
-          <h1>Create your account</h1>
-          <p className="lead">Set up your company in a minute. You'll be its manager, and you can invite your team afterwards.</p>
+          <div className="badge">● {t("{days}-day free trial · no card needed", { days: trialDays })}</div>
+          <h1>{t("Create your account")}</h1>
+          <p className="lead">{t("Set up your company in a minute. You'll be its manager, and you can invite your team afterwards.")}</p>
           {error && (
             <div className="error" role="alert">
               {error}
             </div>
           )}
-          {failed && <div className="error">Plans couldn't be loaded. Refresh the page to try again.</div>}
+          {failed && <div className="error">{t("Plans couldn't be loaded. Refresh the page to try again.")}</div>}
           <label>
-            Company name
-            <input {...field("company_name")} required maxLength={150} placeholder="e.g. Rift Valley Power Services" />
+            {t("Company name")}
+            <input {...field("company_name")} required maxLength={150} placeholder={t("e.g. {example}", { example: "Rift Valley Power Services" })} />
           </label>
           <label>
-            Your name
+            {t("Your name")}
             <input {...field("name")} required maxLength={120} autoComplete="name" />
           </label>
           <label>
-            Work email
+            {t("Work email")}
             <input {...field("email")} type="email" required autoComplete="email" />
           </label>
           <label>
-            Password
-            <input {...field("password")} type="password" required minLength={8} autoComplete="new-password" placeholder="At least 8 characters" />
+            {t("Password")}
+            <input {...field("password")} type="password" required minLength={8} autoComplete="new-password" placeholder={t("At least 8 characters")} />
           </label>
           {pricing && (
             <>
               <fieldset className="planPicker">
-                <legend>Plan</legend>
+                <legend>{t("Plan")}</legend>
                 {pricing.plans.map((item) => (
                   <label key={item.key} className={chosen?.key === item.key ? "chosen" : ""}>
                     <input type="radio" name="plan" value={item.key} checked={chosen?.key === item.key} onChange={() => setPlan(item.key)} />
-                    <strong>{item.name}</strong>
-                    <span>Up to {item.mechanics} mechanics</span>
+                    <strong>{t(item.name)}</strong>
+                    <span>{t("Up to {count} technicians", { count: item.mechanics })}</span>
                     <em>
-                      {money(item.prices[interval], pricing.currency)} / {interval}
+                      {money(item.prices[interval], pricing.currency)} {interval === "year" ? t("/ year") : t("/ month")}
                     </em>
                   </label>
                 ))}
@@ -99,40 +102,41 @@ export default function Signup({ query, onSignedIn }: Props) {
             </>
           )}
           <button className="btn primary wide" disabled={!!busy || !chosen}>
-            {busy && busy.startsWith("Creating") ? busy : `Start ${trialDays}-day free trial →`}
+            {busy === "creating" ? t("Creating your account…") : `${t("Start {days}-day free trial", { days: trialDays })} →`}
           </button>
           {pricing?.payment_provider && (
             <button type="button" className="btn outline wide" disabled={!!busy} onClick={(event) => event.currentTarget.form?.reportValidity() && submit(true)}>
-              {busy && busy.startsWith("Preparing") ? busy : "Pay now and skip the trial"}
+              {busy === "checkout" ? t("Preparing checkout…") : t("Pay now and skip the trial")}
             </button>
           )}
           <p className="formSmall">
-            Already have an account?{" "}
+            {t("Already have an account?")}{" "}
             <button type="button" className="textLink" onClick={() => go("/signin")}>
-              Log in
+              {t("Log in")}
             </button>
           </p>
+          <LanguagePicker className="loginLanguage" />
         </form>
 
         {pricing && chosen && (
           <aside className="signupSummary">
-            <span className="summaryLabel">Your plan</span>
-            <h2>{chosen.name}</h2>
+            <span className="summaryLabel">{t("Your plan")}</span>
+            <h2>{t(chosen.name)}</h2>
             <p className="summaryPrice">
-              {money(chosen.prices[interval], pricing.currency)} <small>/ {interval}</small>
+              {money(chosen.prices[interval], pricing.currency)} <small>{interval === "year" ? t("/ year") : t("/ month")}</small>
             </p>
             <p className="summaryNote">
               {interval === "year"
-                ? `${12 - pricing.yearly_months} months free compared with paying monthly.`
-                : `Switch to yearly billing for ${12 - pricing.yearly_months} months free.`}
+                ? t("{count} months free compared with paying monthly.", { count: 12 - pricing.yearly_months })
+                : t("Switch to yearly billing for {count} months free.", { count: 12 - pricing.yearly_months })}
             </p>
             <ul>
-              <li>{pricing.trial_days}-day free trial, no card needed</li>
-              <li>Up to {chosen.mechanics} mechanics</li>
-              <li>{chosen.storage_gb} GB for photos, videos and signatures</li>
-              <li>Unlimited customers, machines and jobs</li>
+              <li>{t("{days}-day free trial, no card needed", { days: pricing.trial_days })}</li>
+              <li>{t("Up to {count} technicians", { count: chosen.mechanics })}</li>
+              <li>{t("{size} GB for photos, videos and signatures", { size: chosen.storage_gb })}</li>
+              <li>{t("Unlimited customers, equipment and jobs")}</li>
             </ul>
-            <p className="summaryPrivacy">Your company's data is only visible to the people you invite.</p>
+            <p className="summaryPrivacy">{t("Your company's data is only visible to the people you invite.")}</p>
           </aside>
         )}
       </main>

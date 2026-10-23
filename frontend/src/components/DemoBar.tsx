@@ -2,14 +2,15 @@ import { useState } from "react";
 import { FlaskConical } from "lucide-react";
 import { switchDemo } from "../services/api";
 import { errorMessage } from "../lib/format";
+import { mark, t } from "../i18n";
 import "./Onboarding.css";
 
 type Props = { user: any; onSwitched: (user: any) => void; onLeave: () => void };
 
 export const DEMO_ROLES = [
-  ["boss", "Boss"],
-  ["mechanic", "Mechanic"],
-  ["customer", "Customer"],
+  ["boss", mark("Boss")],
+  ["mechanic", mark("Technician")],
+  ["customer", mark("Customer")],
 ] as const;
 
 /** Shown across the top of a "Try the demo" company: how long it lasts, and whose eyes to see it through. */
@@ -29,22 +30,23 @@ export default function DemoBar({ user, onSwitched, onLeave }: Props) {
     }
   };
   return (
-    <section className="demoBar" aria-label="Demo company">
+    <section className="demoBar" aria-label={t("Demo company")}>
       <FlaskConical size={17} aria-hidden="true" />
       <p>
-        <b>Demo company.</b> <span className="demoWide">Your private copy with sample data, deleted</span>
-        <span className="demoNarrow">Deleted</span> in {hoursLeft} {hoursLeft === 1 ? "hour" : "hours"}.
+        <b>{t("Demo company.")}</b>{" "}
+        <span className="demoWide">{hoursLeft === 1 ? t("Your private copy with sample data, deleted in 1 hour.") : t("Your private copy with sample data, deleted in {count} hours.", { count: hoursLeft })}</span>
+        <span className="demoNarrow">{hoursLeft === 1 ? t("Deleted in 1 hour.") : t("Deleted in {count} hours.", { count: hoursLeft })}</span>
       </p>
-      <div className="demoRoles" role="group" aria-label="View the demo as">
+      <div className="demoRoles" role="group" aria-label={t("View the demo as")}>
         {DEMO_ROLES.map(([role, label]) => (
           <button key={role} aria-pressed={user.role === role} disabled={!!busy} onClick={() => user.role !== role && switchTo(role)}>
-            {busy === role ? "Opening…" : label}
+            {busy === role ? t("Opening…") : t(label)}
           </button>
         ))}
       </div>
       <button className="demoSignup" onClick={onLeave}>
-        <span className="demoWide">Start your free trial</span>
-        <span className="demoNarrow">Sign up</span>
+        <span className="demoWide">{t("Start your free trial")}</span>
+        <span className="demoNarrow">{t("Sign up")}</span>
       </button>
       {error && (
         <span className="demoError" role="alert">

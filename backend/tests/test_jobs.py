@@ -120,7 +120,7 @@ def test_assigning_mechanic_sets_assigned_and_notifies(client, data, auth):
     job = client.post("/api/jobs", headers=boss(auth), json={"title": "New", "description": "Work"}).get_json()["job"]
     response = client.patch(f"/api/jobs/{job['id']}", headers=boss(auth), json={"mechanic_id": data["mechanic2"]})
     assert response.get_json()["job"]["status"] == "Assigned"
-    assert Notification.query.filter_by(user_id=data["mechanic2"], title="New task assigned").count() == 1
+    assert Notification.query.filter_by(user_id=data["mechanic2"], title="New job assigned").count() == 1
     unassigned = client.patch(f"/api/jobs/{job['id']}", headers=boss(auth), json={"mechanic_id": None})
     assert unassigned.get_json()["job"]["status"] == "Pending"
 

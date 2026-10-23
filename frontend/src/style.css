@@ -1,6 +1,15 @@
 * {
   box-sizing: border-box;
 }
+:root {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+:root[data-theme="system"] {
+  color-scheme: light dark;
+}
 body {
   margin: 0;
   font-family: Inter, ui-sans-serif, system-ui, Arial;
@@ -752,7 +761,6 @@ header {
   background: #eaf3ff;
   border-radius: 10px;
   padding: 4px 7px;
-  text-transform: capitalize;
 }
 .dataStatus.completed {
   color: #198345;
@@ -782,7 +790,6 @@ header {
 .reportGrid span {
   font-size: 9px;
   color: #758398;
-  text-transform: capitalize;
 }
 .subEmpty {
   display: grid;
@@ -1052,8 +1059,11 @@ body {
 }
 .chartHeading {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: baseline;
   justify-content: space-between;
+  gap: 4px 12px;
+  width: 100%;
   margin-bottom: 18px;
 }
 .chartHeading h2 {
@@ -1354,4 +1364,112 @@ body {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* Cards that are whole buttons: no button chrome of their own. */
+.plainButton,
+.teamMember {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.teamMember {
+  width: 100%;
+  text-align: start;
+}
+
+/* ---------- Settings ---------- */
+.settingsStack {
+  display: grid;
+  gap: 18px;
+  max-width: 720px;
+}
+.settingsSection {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid #e1e8f0;
+  border-radius: 14px;
+  background: #fff;
+}
+.settingsSection h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+}
+.settingsSection > p {
+  margin: 0;
+}
+.settingsSection.changePassword {
+  max-width: none;
+  margin-top: 0;
+}
+.languagePicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.languagePicker select {
+  min-width: 150px;
+  padding: 8px 10px;
+  border: 1px solid #dce3eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #172033;
+}
+.loginLanguage {
+  justify-self: center;
+  margin-top: 6px;
+  color: #68768a;
+}
+.themeChoices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.themeChoices label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid #dce3eb;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+.themeChoices label.chosen {
+  border-color: #0969d7;
+  background: #eaf3ff;
+  color: #0969d7;
+}
+.themeChoices input {
+  accent-color: #0969d7;
+}
+
+/* "Skip to content": the first thing the keyboard reaches, shown only when focused. */
+.skipLink {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 1000;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: #0969d7;
+  color: #fff;
+  font-weight: 700;
+  transform: translateY(-150%);
+}
+.skipLink:focus-visible {
+  transform: none;
+}
+#content:focus {
+  outline: none;
 }

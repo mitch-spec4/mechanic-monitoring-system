@@ -9,6 +9,11 @@ class Company(db.Model):
     demo_expires_at = db.Column(db.DateTime, index=True)
     # When a manager closed the "Get set up" guide on the dashboard.
     setup_dismissed_at = db.Column(db.DateTime)
+    # Company settings. Times are shown in this time zone everywhere; currency and units are kept
+    # for features that show money and distances.
+    timezone = db.Column(db.String(64), nullable=False, default="Africa/Nairobi", server_default="Africa/Nairobi")
+    currency = db.Column(db.String(3), nullable=False, default="KES", server_default="KES")
+    units = db.Column(db.String(10), nullable=False, default="metric", server_default="metric")
 
     @property
     def is_demo(self):

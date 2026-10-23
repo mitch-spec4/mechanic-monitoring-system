@@ -12,6 +12,7 @@ Either way the app only hands out files after checking company and role (routes/
 """
 import os
 import re
+from app.i18n import _
 from pathlib import Path
 
 from flask import current_app
@@ -32,7 +33,7 @@ class LocalStorage:
     def _path(self, key):
         path = (self.root / key).resolve()
         if self.root not in path.parents:
-            raise StorageError("Invalid storage key")
+            raise StorageError(_("Invalid storage key"))
         return path
 
     def upload_target(self, key, content_type, size, max_bytes, file_id):
@@ -50,7 +51,7 @@ class LocalStorage:
                 if size > max_bytes:
                     out.close()
                     path.unlink(missing_ok=True)
-                    raise StorageError("File is too large")
+                    raise StorageError(_("File is too large"))
                 out.write(chunk)
         return size
 
@@ -160,4 +161,4 @@ def read_upload_token(token):
     try:
         return _serializer().loads(token, max_age=UPLOAD_SECONDS)
     except (BadSignature, SignatureExpired):
-        raise StorageError("This upload link is invalid or has expired") from None
+        raise StorageError(_("This upload link is invalid or has expired")) from None

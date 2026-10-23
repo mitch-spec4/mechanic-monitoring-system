@@ -145,7 +145,7 @@ def test_mechanic_limit_counts_open_invitations(client, auth, data):
     invite = lambda email, role="mechanic": client.post("/api/customers/invite", headers=boss(auth), json={"name": "New", "email": email, "role": role})
     assert invite("third@acme.test").status_code == 201
     refused = invite("fourth@acme.test")
-    assert refused.status_code == 409 and "up to 3 mechanics" in refused.get_json()["error"]
+    assert refused.status_code == 409 and "up to 3 technicians" in refused.get_json()["error"]
     # Customers aren't limited, and an expired invitation frees its place.
     assert invite("buyer@acme.test", "customer").status_code == 201
     Invitation.query.filter_by(email="third@acme.test").one().expires_at = utcnow() - timedelta(days=1)

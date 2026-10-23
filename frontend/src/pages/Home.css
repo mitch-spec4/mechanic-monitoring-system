@@ -1117,3 +1117,14 @@ body:has(.site) {
     transform: none;
   }
 }
+
+.site .footLanguage select {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+.site .footLanguage {
+  color: var(--muted);
+}

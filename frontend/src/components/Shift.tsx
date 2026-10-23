@@ -3,7 +3,10 @@ import { AlertTriangle, Clock, LogIn, LogOut, MapPin, ShieldCheck } from "lucide
 import Modal from "./Modal";
 import { clockIn, clockOut, jobs, sendLiveLocation, setLocationConsent, shiftStatus, updateJob } from "../services/api";
 import { distanceMetres, errorCode, Fix, getPosition, hasFix, locationHelp, toFix } from "../lib/location";
-import { errorMessage } from "../lib/format";
+import { errorMessage, formatTime } from "../lib/format";
+import { confirmAction } from "./Feedback";
+import { t } from "../i18n";
+import { Trans } from "../i18n/Trans";
 import { usePolling } from "../lib/usePolling";
 import "./Shift.css";
 
@@ -87,12 +90,12 @@ export function ShiftProvider({ children }: { children: any }) {
 
   const finishClockIn = async () => {
     setProblem("");
-    setBusy("Finding your location…");
+    setBusy(t("Finding your location…"));
     try {
       const position = await getPosition();
       if (!hasFix(position)) {
         if (position.location_error === "denied") setPermission("denied");
-        setProblem(`You can't clock in without sharing your location. ${locationHelp(position.location_error)}`);
+        setProblem(`${t("You can't clock in without sharing your location.")} ${locationHelp(position.location_error)}`);
         return;
       }
       setStatus(await clockIn(position));
@@ -120,9 +123,17 @@ export function ShiftProvider({ children }: { children: any }) {
   };
 
   const startClockOut = async () => {
-    if (activeJob && !confirm(`Clocking out pauses "${activeJob.title}" and stops its timer. Clock out?`)) return;
+    if (
+      activeJob &&
+      !(await confirmAction({
+        title: t("Clock out?"),
+        message: t("Clocking out pauses \u201c{title}\u201d and stops its timer.", { title: activeJob.title }),
+        confirmLabel: t("Clock out"),
+      }))
+    )
+      return;
     setProblem("");
-    setBusy("Clocking out…");
+    setBusy(t("Clocking out…"));
     try {
       // Clocking out never waits long on GPS or fails without it.
       const result = await clockOut(await getPosition(8000));
@@ -169,31 +180,31 @@ export async function changeJobStatus(jobId: number, status: string, role: strin
 
 function ConsentModal({ onAgree, onClose }: { onAgree: () => void; onClose: () => void }) {
   return (
-    <Modal title="Share your location while you work" icon={<MapPin size={20} />} onClose={onClose}>
+    <Modal title={t("Share your location while you work")} icon={<MapPin size={20} />} onClose={onClose}>
       <div className="consent">
-        <p>To clock in, MechanicPro needs your location. This is exactly what it records:</p>
+        <p>{t("To clock in, MechanicPro needs your location. This is exactly what it records:")}</p>
         <ul>
           <li>
-            <b>When you clock in and out</b>, and when you start, resume and complete a job.
+            <Trans text="{when}, and when you start, resume and complete a job." values={{ when: <b>{t("When you clock in and out")}</b> }} />
           </li>
           <li>
-            <b>While a job is in progress and this app is open</b>, about every 2 minutes.
+            <Trans text="{when}, about every 2 minutes." values={{ when: <b>{t("While a job is in progress and this app is open")}</b> }} />
           </li>
           <li>
-            <b>Never while you are clocked out.</b> A "Location on" sign shows whenever it is being shared.
+            <b>{t("Never while you are clocked out.")}</b> {t("A \u201cLocation on\u201d sign shows whenever it is being shared.")}
           </li>
         </ul>
         <p className="muted">
-          Only your manager can see your location; customers never can. Positions taken during a job are deleted after
-          30 days. Clock-in, clock-out and job stamps stay with your shift and job records. You can withdraw in Settings
-          whenever you are clocked out.
+          {t(
+            "Only your manager can see your location; customers never can. Positions taken during a job are deleted after 30 days. Clock-in, clock-out and job stamps stay with your shift and job records. You can withdraw in Settings whenever you are clocked out.",
+          )}
         </p>
         <div className="consentActions">
           <button className="secondary" onClick={onClose}>
-            Not now
+            {t("Not now")}
           </button>
           <button className="primary" onClick={onAgree}>
-            <ShieldCheck size={15} /> I agree, clock me in
+            <ShieldCheck size={15} /> {t("I agree, clock me in")}
           </button>
         </div>
       </div>
@@ -207,9 +218,9 @@ export function LocationIndicator() {
   if (!shift?.status?.shift) return null;
   const blocked = shift.permission === "denied";
   return (
-    <div className={`locationPill ${blocked ? "blocked" : ""}`} role="status" title={blocked ? "Your browser is blocking location" : "Your location is shared while you are clocked in"}>
+    <div className={`locationPill ${blocked ? "blocked" : ""}`} role="status" title={blocked ? t("Your browser is blocking location") : t("Your location is shared while you are clocked in")}>
       {blocked ? <AlertTriangle size={13} /> : <span className="locationDot" />}
-      {blocked ? "Location blocked" : "Location on"}
+      {blocked ? t("Location blocked") : t("Location on")}
     </div>
   );
 }
@@ -217,8 +228,7 @@ export function LocationIndicator() {
 function since(value: string, now: number) {
   const started = new Date(value.endsWith("Z") ? value : `${value}Z`);
   const minutes = Math.max(0, Math.floor((now - started.getTime()) / 60000));
-  const time = started.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  return { time, length: `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m` };
+  return { time: formatTime(value), length: `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m` };
 }
 
 /** The mechanic's clock in/out control on the dashboard. */
@@ -233,33 +243,33 @@ export function ClockCard() {
   const open = shift.status.shift;
   const elapsed = open ? since(open.clocked_in_at, now) : null;
   return (
-    <section className={`clockCard ${open ? "on" : ""}`} aria-label="Clock in and out">
+    <section className={`clockCard ${open ? "on" : ""}`} aria-label={t("Clock in and out")}>
       <span className="clockIcon">
         <Clock size={20} />
       </span>
       <div className="clockText">
         {open ? (
           <>
-            <strong>Clocked in since {elapsed!.time}</strong>
+            <strong>{t("Clocked in since {time}", { time: elapsed!.time })}</strong>
             <span>
-              {elapsed!.length} on shift
-              {shift.activeJob ? ` · Working on ${shift.activeJob.title}` : ""}
+              {t("{length} on shift", { length: elapsed!.length })}
+              {shift.activeJob ? ` · ${t("Working on {title}", { title: shift.activeJob.title })}` : ""}
             </span>
           </>
         ) : (
           <>
-            <strong>You're clocked out</strong>
-            <span>Clock in to start or resume work. Your location is shared only while you're clocked in.</span>
+            <strong>{t("You're clocked out")}</strong>
+            <span>{t("Clock in to start or resume work. Your location is shared only while you're clocked in.")}</span>
           </>
         )}
       </div>
       {open ? (
         <button className="secondary clockButton" onClick={shift.startClockOut} disabled={!!shift.busy}>
-          <LogOut size={15} /> {shift.busy || "Clock out"}
+          <LogOut size={15} /> {shift.busy || t("Clock out")}
         </button>
       ) : (
         <button className="primary clockButton" onClick={shift.startClockIn} disabled={!!shift.busy}>
-          <LogIn size={15} /> {shift.busy || "Clock in"}
+          <LogIn size={15} /> {shift.busy || t("Clock in")}
         </button>
       )}
       {shift.problem && (
@@ -267,7 +277,7 @@ export function ClockCard() {
           <AlertTriangle size={15} />
           <span>{shift.problem}</span>
           <button className="link" onClick={shift.dismissProblem}>
-            Dismiss
+            {t("Dismiss")}
           </button>
         </div>
       )}
@@ -292,20 +302,20 @@ export function LocationSettings() {
   return (
     <div className="locationSettings">
       <h3>
-        <MapPin size={15} /> Location sharing
+        <MapPin size={15} /> {t("Location sharing")}
       </h3>
       {error && <div className="error">{error}</div>}
       <p>
         {consent
-          ? "You have agreed to share your location while clocked in. Your manager sees it; customers never do."
-          : "You haven't agreed to location sharing. You'll be asked the next time you clock in."}
+          ? t("You have agreed to share your location while clocked in. Your manager sees it; customers never do.")
+          : t("You haven't agreed to location sharing. You'll be asked the next time you clock in.")}
       </p>
       {consent && (
-        <button className="secondary" onClick={withdraw} disabled={!!open} title={open ? "Clock out first" : undefined}>
-          Withdraw consent
+        <button className="secondary" onClick={withdraw} disabled={!!open} title={open ? t("Clock out first") : undefined}>
+          {t("Withdraw consent")}
         </button>
       )}
-      {consent && open && <small className="muted">Clock out first to withdraw. Without consent you can't clock in.</small>}
+      {consent && open && <small className="muted">{t("Clock out first to withdraw. Without consent you can't clock in.")}</small>}
     </div>
   );
 }

@@ -6,6 +6,7 @@ from app.models.service_record import ServiceRecord
 from app.services.notifications import notify, notify_bosses
 from app.utils.auth import current_user, roles
 from app.utils.validation import ValidationError, integer, json_body, text
+from app.i18n import N_, _
 
 bp = Blueprint("reviews", __name__)
 
@@ -49,9 +50,9 @@ def create_review():
         id=record_id, customer_id=user.customer_id, company_id=user.company_id
     ).first()
     if not record:
-        raise ValidationError("Service record not found", 404)
+        raise ValidationError(_("Service record not found"), 404)
     if Review.query.filter_by(service_record_id=record.id).first():
-        raise ValidationError("This service has already been reviewed", 409)
+        raise ValidationError(_("This service has already been reviewed"), 409)
     rating = read_rating(data)
 
     review = Review(
@@ -65,8 +66,8 @@ def create_review():
         advice=text(data, "advice"),
     )
     db.session.add(review)
-    notify(record.mechanic_id, "New customer review", f"You received a {rating}/5 review.", "review")
-    notify_bosses(user.company_id, "New customer review", f"A customer rated a completed service {rating}/5.", "review")
+    notify(record.mechanic_id, N_("New customer review"), N_("You received a {rating}/5 review."), "review", rating=rating)
+    notify_bosses(user.company_id, N_("New customer review"), N_("A customer rated a completed service {rating}/5."), "review", rating=rating)
     db.session.commit()
     return jsonify(id=review.id), 201
 

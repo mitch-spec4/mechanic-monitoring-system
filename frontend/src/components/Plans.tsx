@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
 import { plans as fetchPlans } from "../services/api";
 import { money } from "../lib/route";
+import { t } from "../i18n";
 
 export type Interval = "month" | "year";
 export type Plan = { key: string; name: string; mechanics: number; storage_gb: number; prices: Record<Interval, number> };
@@ -44,24 +45,24 @@ export function PlanCards({
         const featured = plan.key === "professional";
         return (
           <article key={plan.key} ref={plan.key === focus ? focused : undefined} className={`planCard ${featured ? "featured" : ""} ${plan.key === focus ? "focused" : ""}`}>
-            {featured && <span className="planBadge">Recommended</span>}
-            <h3>{plan.name}</h3>
+            {featured && <span className="planBadge">{t("Recommended")}</span>}
+            <h3>{t(plan.name)}</h3>
             <p className="planPrice">
               <strong>{money(price, pricing.currency)}</strong>
-              <span>/ {interval}</span>
+              <span>{interval === "year" ? t("/ year") : t("/ month")}</span>
             </p>
             <p className="planBilled">
-              {interval === "year" ? `${12 - pricing.yearly_months} months free compared with monthly` : "Billed monthly"}
+              {interval === "year" ? t("{count} months free compared with monthly", { count: 12 - pricing.yearly_months }) : t("Billed monthly")}
             </p>
             <ul>
               <li>
-                <Check size={15} /> Up to {plan.mechanics} mechanics
+                <Check size={15} /> {t("Up to {count} technicians", { count: plan.mechanics })}
               </li>
               <li>
-                <Check size={15} /> {plan.storage_gb} GB for photos and videos
+                <Check size={15} /> {t("{size} GB for photos and videos", { size: plan.storage_gb })}
               </li>
               <li>
-                <Check size={15} /> Unlimited customers, machines and jobs
+                <Check size={15} /> {t("Unlimited customers, equipment and jobs")}
               </li>
             </ul>
             <button className={featured ? "primary" : "secondary"} onClick={() => onChoose(plan.key)}>
@@ -76,13 +77,13 @@ export function PlanCards({
 
 export function IntervalSwitch({ value, onChange, freeMonths }: { value: Interval; onChange: (value: Interval) => void; freeMonths: number }) {
   return (
-    <div className="intervalSwitch" role="group" aria-label="Billing period" style={{ "--pos": value === "year" ? 1 : 0 } as React.CSSProperties}>
+    <div className="intervalSwitch" role="group" aria-label={t("Billing period")} style={{ "--pos": value === "year" ? 1 : 0 } as React.CSSProperties}>
       <span className="intervalThumb" aria-hidden="true" />
       <button type="button" aria-pressed={value === "month"} onClick={() => onChange("month")}>
-        Monthly
+        {t("Monthly")}
       </button>
       <button type="button" aria-pressed={value === "year"} onClick={() => onChange("year")}>
-        Yearly <em>{freeMonths} months free</em>
+        {t("Yearly")} <em>{t("{count} months free", { count: freeMonths })}</em>
       </button>
     </div>
   );

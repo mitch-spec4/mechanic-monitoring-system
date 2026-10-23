@@ -272,7 +272,11 @@ def check_schema(app):
 
 
 def register_error_handlers(app):
+    from app.i18n import N_, _
     from app.utils.validation import ValidationError
+
+    # Werkzeug's own error texts are long and English-only; the common ones get a short, translated text.
+    http_messages = {401: N_("Please sign in to continue."), 403: N_("Forbidden"), 404: N_("Not found.")}
 
     @app.errorhandler(ValidationError)
     def validation_error(error):
@@ -281,22 +285,23 @@ def register_error_handlers(app):
 
     @app.errorhandler(HTTPException)
     def http_error(error):
-        return jsonify(error=error.description), error.code
+        message = http_messages.get(error.code)
+        return jsonify(error=_(message) if message else error.description), error.code
 
     @app.errorhandler(Exception)
     def unexpected_error(error):
         db.session.rollback()
         app.logger.exception("Unhandled error")
-        return jsonify(error="Something went wrong. Please try again."), 500
+        return jsonify(error=_("Something went wrong. Please try again.")), 500
 
     @jwt.expired_token_loader
     def expired(_header, _payload):
-        return jsonify(error="Your session has expired. Please sign in again."), 401
+        return jsonify(error=_("Your session has expired. Please sign in again.")), 401
 
     @jwt.invalid_token_loader
     def invalid(reason):
-        return jsonify(error="Invalid session. Please sign in again."), 401
+        return jsonify(error=_("Invalid session. Please sign in again.")), 401
 
     @jwt.unauthorized_loader
     def missing(reason):
-        return jsonify(error="Please sign in to continue."), 401
+        return jsonify(error=_("Please sign in to continue.")), 401

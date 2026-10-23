@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { MailWarning } from "lucide-react";
 import { me, resendVerification } from "../services/api";
 import { errorMessage } from "../lib/format";
+import { t } from "../i18n";
 import "./Onboarding.css";
 
 type Props = { user: any; onVerified: (user: any) => void };
@@ -38,11 +39,11 @@ export default function VerifyBanner({ user, onVerified }: Props) {
     <div className="verifyBanner" role="status">
       <MailWarning size={17} />
       <span>
-        <b>Confirm your email.</b> {sent || `We sent a link to ${user.email}. Open it to start inviting your team and customers.`}
+        <b>{t("Confirm your email.")}</b> {sent || t("We sent a link to {email}. Open it to start inviting your team and customers.", { email: user.email })}
         {error && <em className="bannerError"> {error}</em>}
       </span>
       <button className="primary" onClick={resend} disabled={busy}>
-        {busy ? "Sending…" : "Resend link"}
+        {busy ? t("Sending…") : t("Resend link")}
       </button>
     </div>
   );

@@ -27,6 +27,7 @@ from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
 from app.utils.validation import ValidationError, choice, json_body, text
 from app.utils.validation import email as read_email
+from app.i18n import _, current_language
 
 bp = Blueprint("billing", __name__)
 
@@ -87,7 +88,7 @@ def email_in_use(email):
 def read_plan(data, required=False):
     plan = choice(data, "plan", tuple(PLANS), "Plan")
     if not plan and required:
-        raise ValidationError("Plan is required")
+        raise ValidationError(_("Plan is required"))
     return plan or "professional", choice(data, "interval", INTERVALS, "Billing period", default="month")
 
 
@@ -113,12 +114,12 @@ def signup():
     if email_in_use(email):
         raise ValidationError(EMAIL_TAKEN, 409)
     if pay_now and not provider():
-        raise ValidationError("Online payments aren't set up yet. Start with the free trial.", 409)
+        raise ValidationError(_("Online payments aren't set up yet. Start with the free trial."), 409)
 
     company = Company(name=company_name)
     db.session.add(company)
     db.session.flush()
-    boss = User(name=name, email=email, role="boss", company_id=company.id)
+    boss = User(name=name, email=email, role="boss", company_id=company.id, language=current_language())
     boss.set_password(password)
     db.session.add(boss)
     try:
@@ -193,10 +194,10 @@ def test_pay(reference):
     user = current_user()
     payment = Payment.query.filter_by(reference=reference, company_id=user.company_id, provider="test").first_or_404()
     if payment.status != "pending":
-        raise ValidationError("This checkout is already finished.", 409)
+        raise ValidationError(_("This checkout is already finished."), 409)
     outcome = choice(json_body(), "outcome", ("success", "declined"), "Outcome", default="success")
     if outcome == "declined":
-        raise ValidationError("The card was declined. No money was taken; try again.", 402)
+        raise ValidationError(_("The card was declined. No money was taken; try again."), 402)
     subscription = mark_paid(payment)
     db.session.commit()
     return jsonify(payment=payment_out(payment), subscription=subscription_out(subscription))

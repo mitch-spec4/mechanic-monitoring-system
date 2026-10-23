@@ -1,52 +1,61 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { go, money } from "../lib/route";
 import { usePricing, type Interval, type Plan, type Pricing } from "../components/Plans";
-import { startDemo } from "../services/api";
+import { startDemo, type User } from "../services/api";
 import { errorMessage } from "../lib/format";
+import LanguagePicker from "../components/LanguagePicker";
+import { mark, t } from "../i18n";
+import { Trans } from "../i18n/Trans";
 import "./Home.css";
 
 const SECTIONS = [
-  ["features", "Features"],
-  ["roles", "How it works"],
-  ["subscriptions", "Subscriptions"],
+  ["features", mark("Features")],
+  ["roles", mark("How it works")],
+  ["subscriptions", mark("Subscriptions")],
 ] as const;
 
 const FEATURES = [
-  ["📋", "Job management", "Create jobs, assign mechanics, track progress and keep job information together."],
-  ["🔧", "Machine history", "See previous repairs, replaced parts, solutions and service records for every machine."],
-  ["👨‍🔧", "Mechanic tracking", "Give mechanics their jobs, collect updates and know what work is complete."],
-  ["📦", "Parts tracking", "Record parts used during service and keep a replacement history for every machine."],
-  ["⭐", "Customer feedback", "Customers rate completed work, and their requests and updates stay with the job."],
-  ["📊", "Reports", "Follow jobs by status, customer ratings and the hours your team has worked."],
-  ["📸", "Photos & sign-off", "Before and after photos and videos on every job, and the customer signs on the mechanic's phone."],
-  ["📍", "Clock-in & team map", "Mechanics clock in on their phones, and you see who is on site, with their consent."],
-  ["📄", "PDF service reports", "Every finished job gets a PDF report with the work done, parts, photos and signature."],
+  ["📋", mark("Job management"), mark("Create jobs, assign technicians, track progress and keep job information together.")],
+  ["🔧", mark("Equipment history"), mark("See previous repairs, replaced parts, solutions and service records for every piece of equipment.")],
+  ["👨‍🔧", mark("Technician tracking"), mark("Give technicians their jobs, collect updates and know what work is complete.")],
+  ["📦", mark("Parts tracking"), mark("Record parts used during service and keep a replacement history for all your equipment.")],
+  ["⭐", mark("Customer feedback"), mark("Customers rate completed work, and their requests and updates stay with the job.")],
+  ["📊", mark("Reports"), mark("Follow jobs by status, customer ratings and the hours your team has worked.")],
+  ["📸", mark("Photos & sign-off"), mark("Before and after photos and videos on every job, and the customer signs on the technician's phone.")],
+  ["📍", mark("Clock-in & team map"), mark("Technicians clock in on their phones, and you see who is on site, with their consent.")],
+  ["📄", mark("PDF service reports"), mark("Every finished job gets a PDF report with the work done, parts, photos and signature.")],
 ];
 
 const ROLES = [
   {
     role: "boss",
-    label: "Boss",
+    label: mark("Boss"),
     icon: "👔",
-    title: "Boss / Manager",
-    lead: "Control the operation and keep jobs moving.",
-    points: ["Assign mechanics to jobs", "Monitor job progress", "Manage customers and their machines", "See who is on shift on the team map", "View reports and service history"],
+    title: mark("Boss / Manager"),
+    lead: mark("Control the operation and keep jobs moving."),
+    points: [
+      mark("Assign technicians to jobs"),
+      mark("Monitor job progress"),
+      mark("Manage customers and their equipment"),
+      mark("See who is on shift on the team map"),
+      mark("View reports and service history"),
+    ],
   },
   {
     role: "mechanic",
-    label: "Mechanic",
+    label: mark("Technician"),
     icon: "🧰",
-    title: "Mechanic",
-    lead: "Everything needed to complete a job.",
-    points: ["View assigned jobs", "Update work status", "Record parts used", "Add solutions and notes", "Add photos and get the customer's signature"],
+    title: mark("Technician"),
+    lead: mark("Everything needed to complete a job."),
+    points: [mark("View assigned jobs"), mark("Update work status"), mark("Record parts used"), mark("Add solutions and notes"), mark("Add photos and get the customer's signature")],
   },
   {
     role: "customer",
-    label: "Customer",
+    label: mark("Customer"),
     icon: "👤",
-    title: "Customer",
-    lead: "A simple portal for service customers.",
-    points: ["Request service", "Track service requests", "View machine history", "Download signed service reports", "Leave reviews"],
+    title: mark("Customer"),
+    lead: mark("A simple portal for service customers."),
+    points: [mark("Request service"), mark("Track service requests"), mark("View equipment history"), mark("Download signed service reports"), mark("Leave reviews")],
   },
 ];
 
@@ -54,54 +63,55 @@ const ROLES = [
  * aren't built yet and are shown as such. */
 const PLAN_COPY: Record<string, { desc: string; team: string; features: string[]; planned: string[]; best: string }> = {
   starter: {
-    desc: "Do the work. Keep everyday service jobs organized.",
-    team: "Small teams",
+    desc: mark("Do the work. Keep everyday service jobs organized."),
+    team: mark("Small teams"),
     features: [
-      "Job creation and assignment",
-      "Machine and customer records",
-      "Service history and repair notes",
-      "Parts, checklists and photos",
-      "Customer sign-off and PDF reports",
-      "Clock-in, team map and notifications",
+      mark("Job creation and assignment"),
+      mark("Equipment and customer records"),
+      mark("Service history and repair notes"),
+      mark("Parts, checklists and photos"),
+      mark("Customer sign-off and PDF reports"),
+      mark("Clock-in, team map and notifications"),
     ],
     planned: [],
-    best: "Small workshops needing a simple, fast workflow.",
+    best: mark("Small workshops needing a simple, fast workflow."),
   },
   professional: {
-    desc: "Organize the work across a growing team.",
-    team: "Growing teams",
-    features: ["Everything in Starter"],
-    planned: ["Custom statuses and fields", "Reminders and approvals", "Workload and job timelines", "More detailed dashboard analytics"],
-    best: "Teams ready for more structure and fewer manual follow-ups.",
+    desc: mark("Organize the work across a growing team."),
+    team: mark("Growing teams"),
+    features: [mark("Everything in Starter")],
+    planned: [mark("Custom statuses and fields"), mark("Reminders and approvals"), mark("Workload and job timelines"), mark("More detailed dashboard analytics")],
+    best: mark("Teams ready for more structure and fewer manual follow-ups."),
   },
   business: {
-    desc: "Run a larger operation, with room to grow.",
-    team: "Larger operations",
-    features: ["Everything in Professional"],
+    desc: mark("Run a larger operation, with room to grow."),
+    team: mark("Larger operations"),
+    features: [mark("Everything in Professional")],
     planned: [
-      "Branch, team and mechanic views",
-      "Bulk actions and saved views",
-      "Costing and operational analytics",
-      "Advanced roles and permissions",
-      "Escalations and assignment rules",
+      mark("Branch, team and technician views"),
+      mark("Bulk actions and saved views"),
+      mark("Costing and operational analytics"),
+      mark("Advanced roles and permissions"),
+      mark("Escalations and assignment rules"),
     ],
-    best: "Established service businesses with multiple teams or sites.",
+    best: mark("Established service businesses with multiple teams or sites."),
   },
 };
 
 const RECOMMENDED = "professional";
 
+// Cells are shown as they are, except the markers "Planned" and "Included", which get a badge.
 const COMPARE: [string, (plan: Plan) => string][] = [
-  ["Mechanics", (plan) => `Up to ${plan.mechanics}`],
-  ["Storage for photos, videos & signatures", (plan) => `${plan.storage_gb} GB`],
-  ["Jobs, customers & machines", () => "Unlimited"],
-  ["Mechanic app, checklists & parts", () => "Included"],
-  ["Photos, sign-off & PDF reports", () => "Included"],
-  ["Team map, shifts & reviews", () => "Included"],
-  ["Custom statuses & fields", (plan) => (plan.key === "starter" ? "—" : "Planned")],
-  ["Reminders & approvals", (plan) => (plan.key === "starter" ? "—" : "Planned")],
-  ["Integrations", (plan) => (plan.key === "starter" ? "—" : "Planned")],
-  ["Branches, roles & costing", (plan) => (plan.key === "business" ? "Planned" : "—")],
+  [mark("Technicians"), (plan) => t("Up to {count}", { count: plan.mechanics })],
+  [mark("Storage for photos, videos & signatures"), (plan) => `${plan.storage_gb} GB`],
+  [mark("Jobs, customers & equipment"), () => t("Unlimited")],
+  [mark("Technician app, checklists & parts"), () => "Included"],
+  [mark("Photos, sign-off & PDF reports"), () => "Included"],
+  [mark("Team map, shifts & reviews"), () => "Included"],
+  [mark("Custom statuses & fields"), (plan) => (plan.key === "starter" ? "—" : "Planned")],
+  [mark("Reminders & approvals"), (plan) => (plan.key === "starter" ? "—" : "Planned")],
+  [mark("Integrations"), (plan) => (plan.key === "starter" ? "—" : "Planned")],
+  [mark("Branches, roles & costing"), (plan) => (plan.key === "business" ? "Planned" : "—")],
 ];
 
 const scrollToSection = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -111,7 +121,7 @@ export function SiteNav({ children }: { children?: ReactNode }) {
   return (
     <div className="siteNav">
       <div className="container navRow">
-        <button className="siteLogo" onClick={() => go("/")} aria-label="MechanicPro home">
+        <button className="siteLogo" onClick={() => go("/")} aria-label={t("MechanicPro home")}>
           <span className="logoIcon" aria-hidden="true">
             🔧
           </span>
@@ -125,12 +135,12 @@ export function SiteNav({ children }: { children?: ReactNode }) {
 
 export function PeriodToggle({ value, onChange, freeMonths }: { value: Interval; onChange: (value: Interval) => void; freeMonths: number }) {
   return (
-    <div className="periodToggle" role="group" aria-label="Billing period">
+    <div className="periodToggle" role="group" aria-label={t("Billing period")}>
       <button type="button" aria-pressed={value === "month"} onClick={() => onChange("month")}>
-        Monthly
+        {t("Monthly")}
       </button>
       <button type="button" aria-pressed={value === "year"} onClick={() => onChange("year")}>
-        Yearly <span className="save">Save {freeMonths} months</span>
+        {t("Yearly")} <span className="save">{t("Save {count} months", { count: freeMonths })}</span>
       </button>
     </div>
   );
@@ -139,37 +149,37 @@ export function PeriodToggle({ value, onChange, freeMonths }: { value: Interval;
 /** An illustration of the manager's dashboard. */
 function DashboardPreview() {
   const jobs = [
-    ["Hydraulic pump inspection", "In progress", "progress"],
-    ["Engine service · CAT 320", "Assigned", "assigned"],
-    ["Generator maintenance", "Completed", "done"],
+    [t("Hydraulic pump inspection"), t("In progress"), "progress"],
+    [t("Engine service · CAT 320"), t("Assigned"), "assigned"],
+    [t("Generator maintenance"), t("Completed"), "done"],
   ];
   return (
     <div className="preview" aria-hidden="true">
       <div className="previewInner">
         <div className="dots">
-          ● &nbsp; ● &nbsp; ●<span className="sample">Sample data</span>
+          ● &nbsp; ● &nbsp; ●<span className="sample">{t("Sample data")}</span>
         </div>
         <div className="dash">
           <div className="side">
-            <div className="current">▣ Dashboard</div>
-            <div>◉ Jobs</div>
-            <div>⚙ Machines</div>
-            <div>♙ Mechanics</div>
-            <div>▤ Service history</div>
+            <div className="current">▣ {t("Dashboard")}</div>
+            <div>◉ {t("Jobs")}</div>
+            <div>⚙ {t("Equipment")}</div>
+            <div>♙ {t("Technicians")}</div>
+            <div>▤ {t("Service history")}</div>
           </div>
           <div className="dashMain">
-            <h3>Good morning, Manager 👋</h3>
+            <h3>{t("Good morning, Manager")} 👋</h3>
             <div className="pvStats">
               <div>
-                <small>ACTIVE JOBS</small>
+                <small>{t("Active jobs").toUpperCase()}</small>
                 <b>18</b>
               </div>
               <div>
-                <small>COMPLETED</small>
+                <small>{t("Completed").toUpperCase()}</small>
                 <b>126</b>
               </div>
               <div>
-                <small>MECHANICS</small>
+                <small>{t("Technicians").toUpperCase()}</small>
                 <b>12</b>
               </div>
             </div>
@@ -196,43 +206,43 @@ function PlanCard({ plan, pricing, interval }: { plan: Plan; pricing: Pricing; i
   const yearlySaving = plan.prices.month * 12 - plan.prices.year;
   return (
     <article className={`plan ${recommended ? "popular" : ""}`}>
-      {recommended && <span className="tag">Recommended</span>}
-      <h3>{plan.name}</h3>
-      <p className="desc">{copy.desc}</p>
+      {recommended && <span className="tag">{t("Recommended")}</span>}
+      <h3>{t(plan.name)}</h3>
+      <p className="desc">{copy.desc && t(copy.desc)}</p>
       <div className="price">
-        {money(plan.prices[interval], pricing.currency)} <small>/ {interval}</small>
+        {money(plan.prices[interval], pricing.currency)} <small>{interval === "year" ? t("/ year") : t("/ month")}</small>
       </div>
       <div className="yearNote">
         {interval === "year"
-          ? `Up to ${plan.mechanics} mechanics · Save ${money(yearlySaving, pricing.currency)} a year`
-          : `${copy.team} · Up to ${plan.mechanics} mechanics`}
+          ? t("Up to {count} technicians · Save {amount} a year", { count: plan.mechanics, amount: money(yearlySaving, pricing.currency) })
+          : `${copy.team && t(copy.team)} · ${t("Up to {count} technicians", { count: plan.mechanics })}`}
       </div>
       <button className={`btn ${recommended ? "primary" : "outline"}`} onClick={() => go(`/signup?plan=${plan.key}&interval=${interval}`)}>
-        Choose {plan.name}
+        {t("Choose {plan}", { plan: t(plan.name) })}
       </button>
       <ul>
         {copy.features.map((item) => (
-          <li key={item}>{item}</li>
+          <li key={item}>{t(item)}</li>
         ))}
         {copy.planned.map((item) => (
           <li key={item} className="planned">
-            {item} <em>Planned</em>
+            {t(item)} <em>{t("Planned")}</em>
           </li>
         ))}
       </ul>
-      <h4>Customers & jobs</h4>
-      <p className="detail">Unlimited customers, machines and jobs.</p>
-      <h4>Storage</h4>
-      <p className="detail">{plan.storage_gb} GB for photos, videos and signatures.</p>
-      <h4>Best for</h4>
-      <p className="detail">{copy.best}</p>
+      <h4>{t("Customers & jobs")}</h4>
+      <p className="detail">{t("Unlimited customers, equipment and jobs.")}</p>
+      <h4>{t("Storage")}</h4>
+      <p className="detail">{t("{size} GB for photos, videos and signatures.", { size: plan.storage_gb })}</p>
+      <h4>{t("Best for")}</h4>
+      <p className="detail">{copy.best && t(copy.best)}</p>
     </article>
   );
 }
 
 function CompareCell({ value }: { value: string }) {
-  if (value === "Planned") return <em className="pill">Planned</em>;
-  if (value === "Included") return <span className="yes">✓ Included</span>;
+  if (value === "Planned") return <em className="pill">{t("Planned")}</em>;
+  if (value === "Included") return <span className="yes">✓ {t("Included")}</span>;
   return <>{value}</>;
 }
 
@@ -241,20 +251,18 @@ function PlanSwitcher({ plans, interval }: { plans: Plan[]; interval: Interval }
   const [choice, setChoice] = useState(RECOMMENDED);
   return (
     <div className="switcher">
-      <h3>Already using MechanicPro?</h3>
-      <p>
-        Change your plan from Billing in your account. Renewing the plan you have adds time after it ends; a different plan starts the day you pay.
-      </p>
+      <h3>{t("Already using MechanicPro?")}</h3>
+      <p>{t("Change your plan from Billing in your account. Renewing the plan you have adds time after it ends; a different plan starts the day you pay.")}</p>
       <div className="switchRow">
-        <select aria-label="Choose a subscription plan" value={choice} onChange={(event) => setChoice(event.target.value)}>
+        <select aria-label={t("Choose a subscription plan")} value={choice} onChange={(event) => setChoice(event.target.value)}>
           {plans.map((plan) => (
             <option key={plan.key} value={plan.key}>
-              {plan.name}
+              {t(plan.name)}
             </option>
           ))}
         </select>
         <button className="btn primary" onClick={() => go(`/signin?next=billing&plan=${choice}&interval=${interval}`)}>
-          Continue to Billing
+          {t("Continue to Billing")}
         </button>
       </div>
     </div>
@@ -262,7 +270,7 @@ function PlanSwitcher({ plans, interval }: { plans: Plan[]; interval: Interval }
 }
 
 /** "Try the demo": opens a private copy of the demo company as the chosen person. */
-function useDemo(onDemo: (user: any) => void) {
+function useDemo(onDemo: (user: User) => void) {
   const [opening, setOpening] = useState("");
   const [error, setError] = useState("");
   const open = async (role: string) => {
@@ -288,13 +296,14 @@ function DemoChooser({ demo, onClose }: { demo: ReturnType<typeof useDemo>; onCl
   return (
     <div className="demoOverlay" onClick={(event) => event.target === event.currentTarget && onClose()}>
       <div className="demoDialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-        <button className="demoClose" aria-label="Close" onClick={onClose}>
+        <button className="demoClose" aria-label={t("Close")} onClick={onClose}>
           ×
         </button>
-        <h2 id={titleId}>Try MechanicPro with sample data</h2>
+        <h2 id={titleId}>{t("Try MechanicPro with sample data")}</h2>
         <p>
-          You get your own private copy of a service company, with jobs, mechanics and customers. Nothing you do affects anyone else, and it's deleted
-          after 24 hours. You can switch between the three views at any time.
+          {t(
+            "You get your own private copy of a service company, with jobs, technicians and customers. Nothing you do affects anyone else, and it's deleted after 24 hours. You can switch between the three views at any time.",
+          )}
         </p>
         {demo.error && (
           <div className="error" role="alert">
@@ -307,8 +316,8 @@ function DemoChooser({ demo, onClose }: { demo: ReturnType<typeof useDemo>; onCl
               <span className="ico" aria-hidden="true">
                 {icon}
               </span>
-              <b>{demo.opening === role ? "Opening the demo…" : `Try as ${label}`}</b>
-              <span>{lead}</span>
+              <b>{demo.opening === role ? t("Opening the demo…") : t("Try as {role}", { role: t(label) })}</b>
+              <span>{t(lead)}</span>
             </button>
           ))}
         </div>
@@ -318,7 +327,7 @@ function DemoChooser({ demo, onClose }: { demo: ReturnType<typeof useDemo>; onCl
 }
 
 /** The public homepage: what MechanicPro does, for whom, and what it costs. */
-export default function Home({ onDemo }: { onDemo: (user: any) => void }) {
+export default function Home({ onDemo }: { onDemo: (user: User) => void }) {
   const [pricing, failed] = usePricing();
   const [interval, setPeriod] = useState<Interval>("month");
   const [choosing, setChoosing] = useState(false);
@@ -327,39 +336,39 @@ export default function Home({ onDemo }: { onDemo: (user: any) => void }) {
   return (
     <div className="site home">
       <SiteNav>
-        <nav className="navLinks" aria-label="Sections">
+        <nav className="navLinks" aria-label={t("Sections")}>
           {SECTIONS.map(([id, label]) => (
             <button key={id} onClick={() => scrollToSection(id)}>
-              {label}
+              {t(label)}
             </button>
           ))}
         </nav>
         <div className="navActions">
           <button className="btn outline" onClick={() => go("/signin")}>
-            Log in
+            {t("Log in")}
           </button>
           <button className="btn primary" onClick={() => go("/signup")}>
-            Get started
+            {t("Get started")}
           </button>
         </div>
       </SiteNav>
 
       <section className="hero">
         <div className="container">
-          <div className="badge">● Field service management made simple</div>
+          <div className="badge">● {t("Field service management made simple")}</div>
           <h1>
-            Run your service team from <span className="gradient">one place.</span>
+            <Trans text="Run your service team from {highlight}" values={{ highlight: <span className="gradient">{t("one place.")}</span> }} />
           </h1>
-          <p>Manage jobs, mechanics, machines, parts, service history and customers without drowning in paperwork.</p>
+          <p>{t("Manage jobs, technicians, equipment, parts, service history and customers without drowning in paperwork.")}</p>
           <div className="heroButtons">
             <button className="btn primary" onClick={() => go("/signup")}>
-              Start now →
+              {t("Start now")} →
             </button>
             <button className="btn outline" onClick={() => setChoosing(true)}>
-              Try the demo
+              {t("Try the demo")}
             </button>
             <button className="btn outline" onClick={() => scrollToSection("features")}>
-              Explore features
+              {t("Explore features")}
             </button>
           </div>
           <DashboardPreview />
@@ -369,8 +378,8 @@ export default function Home({ onDemo }: { onDemo: (user: any) => void }) {
       <section id="features" className="siteSection">
         <div className="container">
           <div className="head">
-            <h2>Everything your service operation needs.</h2>
-            <p>Keep the whole service lifecycle connected, from the first request to the final report.</p>
+            <h2>{t("Everything your service operation needs.")}</h2>
+            <p>{t("Keep the whole service lifecycle connected, from the first request to the final report.")}</p>
           </div>
           <div className="featureGrid">
             {FEATURES.map(([icon, title, text]) => (
@@ -378,8 +387,8 @@ export default function Home({ onDemo }: { onDemo: (user: any) => void }) {
                 <div className="ico" aria-hidden="true">
                   {icon}
                 </div>
-                <h3>{title}</h3>
-                <p>{text}</p>
+                <h3>{t(title)}</h3>
+                <p>{t(text)}</p>
               </article>
             ))}
           </div>
@@ -389,8 +398,8 @@ export default function Home({ onDemo }: { onDemo: (user: any) => void }) {
       <section id="roles" className="siteSection">
         <div className="container">
           <div className="head">
-            <h2>One workflow. Three powerful views.</h2>
-            <p>Everyone gets the information they need without exposing what they don't.</p>
+            <h2>{t("One workflow. Three powerful views.")}</h2>
+            <p>{t("Everyone gets the information they need without exposing what they don't.")}</p>
           </div>
           <div className="roleGrid">
             {ROLES.map(({ role, label, icon, title, lead, points }) => (
@@ -398,15 +407,15 @@ export default function Home({ onDemo }: { onDemo: (user: any) => void }) {
                 <div className="ico" aria-hidden="true">
                   {icon}
                 </div>
-                <h3>{title}</h3>
-                <p>{lead}</p>
+                <h3>{t(title)}</h3>
+                <p>{t(lead)}</p>
                 <ul>
                   {points.map((point) => (
-                    <li key={point}>{point}</li>
+                    <li key={point}>{t(point)}</li>
                   ))}
                 </ul>
                 <button className="roleTry" disabled={!!demo.opening} onClick={() => demo.open(role)}>
-                  {demo.opening === role ? "Opening the demo…" : `Try it as ${label} →`}
+                  {demo.opening === role ? t("Opening the demo…") : `${t("Try it as {role}", { role: t(label) })} →`}
                 </button>
               </article>
             ))}
@@ -422,8 +431,8 @@ export default function Home({ onDemo }: { onDemo: (user: any) => void }) {
       <section id="subscriptions" className="siteSection">
         <div className="container">
           <div className="head">
-            <h2>Choose the level that fits your operation.</h2>
-            <p>Every plan includes everything that works today. Bigger plans add mechanics and storage now, with more control and automation on the way.</p>
+            <h2>{t("Choose the level that fits your operation.")}</h2>
+            <p>{t("Every plan includes everything that works today. Bigger plans add technicians and storage now, with more control and automation on the way.")}</p>
           </div>
           {pricing ? (
             <>
@@ -437,16 +446,16 @@ export default function Home({ onDemo }: { onDemo: (user: any) => void }) {
                 <table className="compare">
                   <thead>
                     <tr>
-                      <th>Capability</th>
+                      <th>{t("Capability")}</th>
                       {pricing.plans.map((plan) => (
-                        <th key={plan.key}>{plan.name}</th>
+                        <th key={plan.key}>{t(plan.name)}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {COMPARE.map(([label, value]) => (
                       <tr key={label}>
-                        <td>{label}</td>
+                        <td>{t(label)}</td>
                         {pricing.plans.map((plan) => (
                           <td key={plan.key}>
                             <CompareCell value={value(plan)} />
@@ -459,14 +468,16 @@ export default function Home({ onDemo }: { onDemo: (user: any) => void }) {
               </div>
               <PlanSwitcher plans={pricing.plans} interval={interval} />
               <p className="pricingNote">
-                Prices in Kenyan shillings. Every plan starts with a {trialDays}-day free trial, no card needed. When a trial ends nothing is deleted, and
-                jobs in progress can still be finished. Planned features are on the way and not available yet.
-                {pricing.payment_provider === "test" && " Payments on this server are in test mode: no real money is taken."}
-                {!pricing.payment_provider && " Online payment isn't switched on yet, so every company starts on the free trial."}
+                {t(
+                  "Prices in Kenyan shillings. Every plan starts with a {days}-day free trial, no card needed. When a trial ends nothing is deleted, and jobs in progress can still be finished. Planned features are on the way and not available yet.",
+                  { days: trialDays },
+                )}
+                {pricing.payment_provider === "test" && ` ${t("Payments on this server are in test mode: no real money is taken.")}`}
+                {!pricing.payment_provider && ` ${t("Online payment isn't switched on yet, so every company starts on the free trial.")}`}
               </p>
             </>
           ) : (
-            <p className="pricingNote">{failed ? "Prices couldn't be loaded. Refresh the page to try again." : "Loading plans…"}</p>
+            <p className="pricingNote">{failed ? t("Prices couldn't be loaded. Refresh the page to try again.") : t("Loading plans…")}</p>
           )}
         </div>
       </section>
@@ -474,10 +485,10 @@ export default function Home({ onDemo }: { onDemo: (user: any) => void }) {
       <section className="siteSection ctaSection">
         <div className="container">
           <div className="cta">
-            <h2>Stop managing service work in spreadsheets.</h2>
-            <p>Bring your jobs, mechanics, machines and customers into one organized system.</p>
+            <h2>{t("Stop managing service work in spreadsheets.")}</h2>
+            <p>{t("Bring your jobs, technicians, equipment and customers into one organized system.")}</p>
             <button className="btn primary" onClick={() => go("/signup")}>
-              Create your account →
+              {t("Create your account")} →
             </button>
           </div>
         </div>
@@ -487,8 +498,11 @@ export default function Home({ onDemo }: { onDemo: (user: any) => void }) {
 
       <footer className="siteFooter">
         <div className="container foot">
-          <span>© {new Date().getFullYear()} MechanicPro. Field service management.</span>
-          <span>Built for service teams.</span>
+          <span>
+            © {new Date().getFullYear()} MechanicPro. {t("Field service management.")}
+          </span>
+          <LanguagePicker className="footLanguage" />
+          <span>{t("Built for service teams.")}</span>
         </div>
       </footer>
     </div>

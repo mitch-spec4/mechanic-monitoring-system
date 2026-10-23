@@ -24,6 +24,7 @@ from app.services.worksheet import (
 )
 from app.utils.auth import current_user, roles
 from app.utils.validation import ValidationError, choice, integer, iso_date, json_body, text
+from app.i18n import N_, _
 
 bp = Blueprint("jobs", __name__)
 
@@ -72,16 +73,16 @@ def out(job):
 def find_machine(company_id, machine_id, customer_id=None):
     machine = Machine.query.filter_by(id=machine_id, company_id=company_id).first()
     if not machine:
-        raise ValidationError("Machine not found", 404)
+        raise ValidationError(_("Equipment not found"), 404)
     if customer_id and machine.customer_id != customer_id:
-        raise ValidationError("Machine does not belong to the selected customer")
+        raise ValidationError(_("This equipment does not belong to the selected customer"))
     return machine
 
 
 def find_mechanic(company_id, mechanic_id):
     mechanic = User.query.filter_by(id=mechanic_id, company_id=company_id, role="mechanic").first()
     if not mechanic:
-        raise ValidationError("Mechanic not found", 404)
+        raise ValidationError(_("Technician not found"), 404)
     return mechanic
 
 
@@ -101,19 +102,19 @@ def list_jobs():
 @roles("boss")
 def create_job():
     user = current_user()
-    require_active(user.company_id, "add new jobs")
+    require_active(user.company_id, _("add new jobs"))
     data = json_body()
     title = text(data, "title", required=True, max_length=200)
     description = text(data, "description", required=True)
     priority = choice(data, "priority", PRIORITIES, default=DEFAULT_PRIORITY)
-    mechanic_id = integer(data, "mechanic_id", "Mechanic")
+    mechanic_id = integer(data, "mechanic_id", "Technician")
     customer_id = integer(data, "customer_id", "Customer")
-    machine_id = integer(data, "machine_id", "Machine")
+    machine_id = integer(data, "machine_id", "Equipment")
 
     if mechanic_id:
         find_mechanic(user.company_id, mechanic_id)
     if customer_id and not Customer.query.filter_by(id=customer_id, company_id=user.company_id).first():
-        raise ValidationError("Customer not found", 404)
+        raise ValidationError(_("Customer not found"), 404)
     machine = find_machine(user.company_id, machine_id, customer_id) if machine_id else None
     if machine:
         customer_id = machine.customer_id
@@ -137,7 +138,7 @@ def create_job():
     if job.mechanic_id:
         mechanic = db.session.get(User, job.mechanic_id)
         record_event(job, user, "assigned", note=f"Assigned to {mechanic.name}")
-        notify(job.mechanic_id, "New task assigned", f"{job.title} was assigned to you.", "job")
+        notify(job.mechanic_id, N_("New job assigned"), N_("{title} was assigned to you."), "job", title=job.title)
     db.session.commit()
     return jsonify(job=out(job)), 201
 
@@ -152,28 +153,28 @@ def update_job(jid):
 
     if user.role == "mechanic":
         if job.mechanic_id != user.id:
-            return jsonify(error="Forbidden"), 403
+            return jsonify(error=_("Forbidden")), 403
         if set(data) - ({"status"} | LOCATION_FIELDS | SIGNATURE_FIELDS) or "status" not in data:
-            return jsonify(error="Mechanics can only update job status"), 403
+            return jsonify(error=_("Technicians can only update job status")), 403
 
     if user.role == "boss":
         edited = edit_details(job, data)
         if edited:
             record_event(job, user, "updated", note="Changed " + ", ".join(edited))
         if "mechanic_id" in data:
-            assign_mechanic(job, integer(data, "mechanic_id", "Mechanic"), user)
+            assign_mechanic(job, integer(data, "mechanic_id", "Technician"), user)
 
     if "status" in data:
         new_status = data["status"]
         if new_status not in TRANSITIONS:
-            raise ValidationError("Invalid status")
+            raise ValidationError(_("Invalid status"))
         if new_status != job.status:
             if new_status not in TRANSITIONS[job.status]:
-                raise ValidationError(f"A job that is {job.status} cannot be moved to {new_status}", 409)
+                raise ValidationError(_("A job that is {status} cannot be moved to {new_status}", status=_(job.status), new_status=_(new_status)), 409)
             if user.role == "mechanic" and (job.status, new_status) not in MECHANIC_TRANSITIONS:
-                raise ValidationError("Mechanics cannot decline or cancel jobs", 403)
+                raise ValidationError(_("Technicians cannot decline or cancel jobs"), 403)
             if new_status == "Assigned" and not job.mechanic_id:
-                raise ValidationError("Assign a mechanic first", 409)
+                raise ValidationError(_("Assign a technician first"), 409)
             if new_status == "In Progress":
                 require_clocked_in(job, user)
             sign_off = None
@@ -181,14 +182,14 @@ def update_job(jid):
                 problems = completion_problems(job)
                 sign_off = read_signature(data)
                 if not sign_off:
-                    problems.append(SIGNATURE_PROBLEM)
+                    problems.append(_(SIGNATURE_PROBLEM))
                 if problems:
                     raise ValidationError(
-                        "Can't complete yet: " + "; ".join(problems) + ".",
+                        _("Can't complete yet: {problems}.", problems="; ".join(problems)),
                         409,
                         blockers=problems,
                         # Only the customer's sign-off is missing: the app opens the signature pad.
-                        needs_signature=problems == [SIGNATURE_PROBLEM],
+                        needs_signature=problems == [_(SIGNATURE_PROBLEM)],
                     )
             change_status(job, user, new_status)
             if sign_off:
@@ -197,9 +198,9 @@ def update_job(jid):
                 stamp_job(user, job, STAMPED[new_status], data)
 
     if old_status != job.status and user.role == "mechanic":
-        notify_bosses(job.company_id, "Job status updated", f"{job.title} is now {job.status}.", "status")
+        notify_bosses(job.company_id, N_("Job status updated"), N_("{title} is now {status}."), "status", ("status",), title=job.title, status=job.status)
     if old_status != job.status and job.status == "Cancelled" and job.mechanic_id:
-        notify(job.mechanic_id, "Job cancelled", f"{job.title} was cancelled by your manager.", "job")
+        notify(job.mechanic_id, N_("Job cancelled"), N_("{title} was cancelled by your manager."), "job", title=job.title)
     db.session.commit()
     return jsonify(job=out(job))
 
@@ -223,9 +224,9 @@ def edit_details(job, data):
     if "due_date" in data:
         job.due_date = iso_date(data, "due_date", "Due date")
     if "machine_id" in data:
-        machine_id = integer(data, "machine_id", "Machine")
+        machine_id = integer(data, "machine_id", "Equipment")
         if job.status in FINISHED_STATUSES and machine_id != job.machine_id:
-            raise ValidationError("The machine on a finished job cannot be changed", 409)
+            raise ValidationError(_("The equipment on a finished job cannot be changed"), 409)
         machine = find_machine(job.company_id, machine_id, job.customer_id) if machine_id else None
         job.machine_id = machine.id if machine else None
         if machine:
@@ -255,22 +256,22 @@ def require_clocked_in(job, user):
     mechanic = db.session.get(User, job.mechanic_id) if job.mechanic_id else None
     if mechanic and not open_shift(mechanic):
         if user.id == mechanic.id:
-            raise ValidationError("Clock in before starting work", 409)
-        raise ValidationError(f"{mechanic.name} isn't clocked in, so this job can't be started", 409)
+            raise ValidationError(_("Clock in before starting work"), 409)
+        raise ValidationError(_("{name} isn't clocked in, so this job can't be started", name=mechanic.name), 409)
 
 
 def assign_mechanic(job, mechanic_id, user):
     if mechanic_id == job.mechanic_id:
         return
     if job.status not in REASSIGNABLE:
-        raise ValidationError(f"A job that is {job.status} cannot be reassigned", 409)
+        raise ValidationError(_("A job that is {status} cannot be reassigned", status=_(job.status)), 409)
     old_status = job.status
     if mechanic_id:
         mechanic = find_mechanic(job.company_id, mechanic_id)
         job.mechanic_id = mechanic_id
         job.status = "Assigned"
         record_event(job, user, "assigned", from_status=old_status, to_status=job.status, note=f"Assigned to {mechanic.name}")
-        notify(mechanic_id, "New task assigned", f"{job.title} was assigned to you.", "job")
+        notify(mechanic_id, N_("New job assigned"), N_("{title} was assigned to you."), "job", title=job.title)
     else:
         job.mechanic_id = None
         job.status = "Pending"
@@ -287,7 +288,7 @@ def delete_job(jid):
     job = Job.query.filter_by(id=jid, company_id=current_user().company_id).first_or_404()
     # A paused job that was reassigned is "Assigned" again, but its recorded work must stay.
     if job.status not in DELETABLE or has_recorded_work(job):
-        return jsonify(error="Only jobs that have not started can be deleted. Cancel this job instead."), 409
+        return jsonify(error=_("Only jobs that have not started can be deleted. Cancel this job instead.")), 409
     delete_job_children(job)
     db.session.delete(job)
     db.session.commit()

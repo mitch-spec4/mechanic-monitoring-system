@@ -12,6 +12,7 @@ from app.services.storage import StorageError, read_upload_token, storage
 from app.services.worksheet import record_event
 from app.utils.auth import current_user, roles
 from app.utils.validation import ValidationError, choice, integer, json_body, text
+from app.i18n import N_, _
 
 bp = Blueprint("media", __name__)
 
@@ -20,7 +21,7 @@ UPLOAD_KINDS = PHOTO_KINDS + ("video",)
 PHOTO_TYPES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 VIDEO_TYPES = {"video/mp4": ".mp4", "video/quicktime": ".mov", "video/webm": ".webm", "video/3gpp": ".3gp"}
 UPLOAD_STATUSES = ("In Progress", "Paused")
-KIND_LABEL = {"before": "before photo", "after": "after photo", "other": "photo", "video": "video"}
+KIND_LABEL = {"before": N_("before photo"), "after": N_("after photo"), "other": N_("photo"), "video": N_("video")}
 
 
 def max_bytes(kind):
@@ -41,7 +42,7 @@ def uploadable_job(jid):
     """Only the assigned mechanic adds media, and only while work is under way."""
     job = load_job(jid)
     if job.status not in UPLOAD_STATUSES:
-        raise ValidationError("Add photos and videos while the job is in progress or paused.", 409)
+        raise ValidationError(_("Add photos and videos while the job is in progress or paused."), 409)
     return job
 
 
@@ -54,15 +55,15 @@ def request_upload(jid):
     data = json_body()
     kind = choice(data, "kind", UPLOAD_KINDS, "Kind")
     if not kind:
-        raise ValidationError("Kind is required")
+        raise ValidationError(_("Kind is required"))
     content_type = text(data, "content_type", "File type", required=True, max_length=80).lower()
     allowed = VIDEO_TYPES if kind == "video" else PHOTO_TYPES
     if content_type not in allowed:
-        raise ValidationError(f"Unsupported file type for a {KIND_LABEL[kind]}: {content_type}", 415)
+        raise ValidationError(_("This type of file can't be added as a {kind}: {content_type}", kind=_(KIND_LABEL[kind]), content_type=content_type), 415)
     size = integer(data, "size", "Size", required=True, minimum=1)
     limit = max_bytes(kind)
     if size > limit:
-        raise ValidationError(f"This {KIND_LABEL[kind]} is too large; the limit is {limit // (1024 * 1024)} MB.", 413)
+        raise ValidationError(_("This {kind} is too large; the limit is {size} MB.", kind=_(KIND_LABEL[kind]), size=limit // (1024 * 1024)), 413)
     check_storage(job.company_id, size)
     record = JobFile(
         company_id=job.company_id,
@@ -90,9 +91,9 @@ def local_upload(token):
         raise ValidationError(str(error), 403) from None
     record = db.session.get(JobFile, claims["file"])
     if not record or record.status != "pending" or record.storage_key != claims["key"]:
-        raise ValidationError("Upload not found", 404)
+        raise ValidationError(_("Upload not found"), 404)
     if (request.content_length or 0) > claims["max"]:
-        raise ValidationError("File is too large", 413)
+        raise ValidationError(_("File is too large"), 413)
     try:
         storage().save_stream(record.storage_key, request.stream, claims["max"])
     except StorageError as error:
@@ -111,12 +112,12 @@ def confirm_upload(fid):
         return jsonify(job=job_detail(job, user))
     size = storage().size(record.storage_key)
     if not size:
-        raise ValidationError("The upload didn't arrive. Please try again.", 409)
+        raise ValidationError(_("The upload didn't arrive. Please try again."), 409)
     if size > max_bytes(record.kind):
         storage().delete(record.storage_key)
         db.session.delete(record)
         db.session.commit()
-        raise ValidationError("The file is larger than the limit", 413)
+        raise ValidationError(_("The file is larger than the limit"), 413)
     try:
         # Checked again here: uploads started together all passed the check when they were reserved.
         check_storage(record.company_id, size, lock=True)
@@ -138,7 +139,7 @@ def delete_file(fid):
     user = current_user()
     record = JobFile.query.filter_by(id=fid, uploaded_by=user.id, company_id=user.company_id).first_or_404()
     if record.kind == "signature":
-        raise ValidationError("Signatures can't be deleted", 409)
+        raise ValidationError(_("Signatures can't be deleted"), 409)
     job = uploadable_job(record.job_id)
     if record.status == "ready":
         record_event(job, user, "file_removed", note=f"Removed a {KIND_LABEL[record.kind]}")
@@ -162,7 +163,7 @@ def get_file(fid):
         return redirect(url, code=302)
     path = storage().local_path(record.storage_key)
     if not path.is_file():
-        raise ValidationError("This file is no longer available", 404)
+        raise ValidationError(_("This file is no longer available"), 404)
     response = send_file(
         path,
         mimetype=record.content_type,
@@ -183,7 +184,7 @@ def job_report(jid):
     """The customer-facing PDF report of a completed job."""
     job = load_job(jid)
     if job.status != "Completed":
-        raise ValidationError("The report is available once the job is completed.", 409)
+        raise ValidationError(_("The report is available once the job is completed."), 409)
     pdf = build_report(job)
     attachment = "attachment" if request.args.get("download") == "1" else "inline"
     return Response(

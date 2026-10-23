@@ -1,3 +1,5 @@
+import { language, t } from "../i18n";
+
 // Same-origin "/api" by default: Vite proxies it to the backend in development, and in production
 // the API should be served from the same site so the session cookies are sent.
 const BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
@@ -8,6 +10,21 @@ export const DATA_CHANGED_EVENT = "mechanicpro:data-changed";
 
 // The session itself lives in httpOnly cookies that scripts cannot read. Only the public
 // profile is kept here so the app knows who is signed in after a reload.
+/** The signed-in person, as the API sends it. */
+export type User = {
+  id: number;
+  name: string;
+  email: string;
+  role: "boss" | "mechanic" | "customer";
+  company_id: number;
+  customer_id: number | null;
+  email_verified: boolean;
+  demo_until: string | null;
+  language: string;
+  timezone: string;
+  units: string;
+};
+
 export function saveSession(user: unknown) {
   localStorage.setItem("user", JSON.stringify(user));
 }
@@ -56,6 +73,10 @@ function send(path: string, options: RequestInit) {
   if (options.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   const method = (options.method || "GET").toUpperCase();
   if (method !== "GET") headers.set("X-CSRF-TOKEN", readCookie("csrf_access_token"));
+  // Error messages and anything the server writes come back in the reader's language. Firefox keeps
+  // its own Accept-Language, so the app's choice also goes in X-Language, which the server reads first.
+  headers.set("Accept-Language", language());
+  headers.set("X-Language", language());
   return fetch(`${BASE}${path.startsWith("/") ? path : `/${path}`}`, { ...options, headers, credentials: "include" });
 }
 
@@ -74,7 +95,7 @@ export async function api(path: string, options: RequestInit = {}, announce = tr
   }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new ApiError(data.error || data.message || data.msg || `Request failed (${response.status})`, response.status, data);
+    throw new ApiError(data.error || data.message || data.msg || t("Request failed ({status})", { status: response.status }), response.status, data);
   }
   if (announce && (options.method || "GET").toUpperCase() !== "GET") window.dispatchEvent(new Event(DATA_CHANGED_EVENT));
   return data;
@@ -93,6 +114,12 @@ export const forgotPassword = (email: string) => post("/auth/forgot-password", {
 export const verifyEmail = (token: string) => post("/auth/verify-email", { token });
 export const resendVerification = () => post("/auth/resend-verification", {});
 export const me = () => api("/users/me");
+export const saveLanguage = (language: string) => patch("/users/me", { language });
+
+// Company settings (managers): time zone, currency and units
+export type CompanySettings = { timezone: string; currency: string; units: string };
+export const companySettings = () => api("/company/settings");
+export const saveCompanySettings = (settings: Partial<CompanySettings>) => patch("/company/settings", settings);
 
 // "Try the demo": a private demo company, seen as the boss, a mechanic or a customer
 export const startDemo = (role: string) => post("/demo", { role });
@@ -179,7 +206,7 @@ export type UploadTarget = { method: string; url: string; headers: Record<string
 
 /** Send a file to its signed upload link: the storage bucket, or this app in local mode. */
 export async function sendUpload(target: UploadTarget, file: Blob) {
-  const failed = "The upload failed. Check your connection and try again.";
+  const failed = t("The upload failed. Check your connection and try again.");
   const response = await fetch(apiUrl(target.url), { method: target.method, headers: target.headers, body: file }).catch(() => {
     throw new ApiError(failed, 0, {});
   });
@@ -191,6 +218,6 @@ export async function sendUpload(target: UploadTarget, file: Blob) {
 
 export async function downloadReport(path: string) {
   const response = await fetch(apiUrl(path), { credentials: "include" });
-  if (!response.ok) throw new ApiError("Couldn't create the report. Please try again.", response.status, {});
+  if (!response.ok) throw new ApiError(t("Couldn't create the report. Please try again."), response.status, {});
   return response.blob();
 }
