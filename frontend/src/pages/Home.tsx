@@ -1,6 +1,8 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { go, money } from "../lib/route";
 import { usePricing, type Interval, type Plan, type Pricing } from "../components/Plans";
+import { startDemo } from "../services/api";
+import { errorMessage } from "../lib/format";
 import "./Home.css";
 
 const SECTIONS = [
@@ -23,18 +25,24 @@ const FEATURES = [
 
 const ROLES = [
   {
+    role: "boss",
+    label: "Boss",
     icon: "👔",
     title: "Boss / Manager",
     lead: "Control the operation and keep jobs moving.",
     points: ["Assign mechanics to jobs", "Monitor job progress", "Manage customers and their machines", "See who is on shift on the team map", "View reports and service history"],
   },
   {
+    role: "mechanic",
+    label: "Mechanic",
     icon: "🧰",
     title: "Mechanic",
     lead: "Everything needed to complete a job.",
     points: ["View assigned jobs", "Update work status", "Record parts used", "Add solutions and notes", "Add photos and get the customer's signature"],
   },
   {
+    role: "customer",
+    label: "Customer",
     icon: "👤",
     title: "Customer",
     lead: "A simple portal for service customers.",
@@ -253,10 +261,68 @@ function PlanSwitcher({ plans, interval }: { plans: Plan[]; interval: Interval }
   );
 }
 
+/** "Try the demo": opens a private copy of the demo company as the chosen person. */
+function useDemo(onDemo: (user: any) => void) {
+  const [opening, setOpening] = useState("");
+  const [error, setError] = useState("");
+  const open = async (role: string) => {
+    setError("");
+    setOpening(role);
+    try {
+      onDemo((await startDemo(role)).user);
+    } catch (problem) {
+      setError(errorMessage(problem));
+      setOpening("");
+    }
+  };
+  return { opening, error, open };
+}
+
+function DemoChooser({ demo, onClose }: { demo: ReturnType<typeof useDemo>; onClose: () => void }) {
+  const titleId = useId();
+  useEffect(() => {
+    const close = (event: KeyboardEvent) => event.key === "Escape" && onClose();
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, []);
+  return (
+    <div className="demoOverlay" onClick={(event) => event.target === event.currentTarget && onClose()}>
+      <div className="demoDialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <button className="demoClose" aria-label="Close" onClick={onClose}>
+          ×
+        </button>
+        <h2 id={titleId}>Try MechanicPro with sample data</h2>
+        <p>
+          You get your own private copy of a service company, with jobs, mechanics and customers. Nothing you do affects anyone else, and it's deleted
+          after 24 hours. You can switch between the three views at any time.
+        </p>
+        {demo.error && (
+          <div className="error" role="alert">
+            {demo.error}
+          </div>
+        )}
+        <div className="demoChoices">
+          {ROLES.map(({ role, label, icon, lead }) => (
+            <button key={role} className="demoChoice" disabled={!!demo.opening} onClick={() => demo.open(role)}>
+              <span className="ico" aria-hidden="true">
+                {icon}
+              </span>
+              <b>{demo.opening === role ? "Opening the demo…" : `Try as ${label}`}</b>
+              <span>{lead}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** The public homepage: what MechanicPro does, for whom, and what it costs. */
-export default function Home() {
+export default function Home({ onDemo }: { onDemo: (user: any) => void }) {
   const [pricing, failed] = usePricing();
   const [interval, setPeriod] = useState<Interval>("month");
+  const [choosing, setChoosing] = useState(false);
+  const demo = useDemo(onDemo);
   const trialDays = pricing?.trial_days ?? 14;
   return (
     <div className="site home">
@@ -288,6 +354,9 @@ export default function Home() {
           <div className="heroButtons">
             <button className="btn primary" onClick={() => go("/signup")}>
               Start now →
+            </button>
+            <button className="btn outline" onClick={() => setChoosing(true)}>
+              Try the demo
             </button>
             <button className="btn outline" onClick={() => scrollToSection("features")}>
               Explore features
@@ -324,7 +393,7 @@ export default function Home() {
             <p>Everyone gets the information they need without exposing what they don't.</p>
           </div>
           <div className="roleGrid">
-            {ROLES.map(({ icon, title, lead, points }) => (
+            {ROLES.map(({ role, label, icon, title, lead, points }) => (
               <article className="role" key={title}>
                 <div className="ico" aria-hidden="true">
                   {icon}
@@ -336,9 +405,17 @@ export default function Home() {
                     <li key={point}>{point}</li>
                   ))}
                 </ul>
+                <button className="roleTry" disabled={!!demo.opening} onClick={() => demo.open(role)}>
+                  {demo.opening === role ? "Opening the demo…" : `Try it as ${label} →`}
+                </button>
               </article>
             ))}
           </div>
+          {demo.error && !choosing && (
+            <div className="error" role="alert">
+              {demo.error}
+            </div>
+          )}
         </div>
       </section>
 
@@ -405,6 +482,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {choosing && <DemoChooser demo={demo} onClose={() => setChoosing(false)} />}
 
       <footer className="siteFooter">
         <div className="container foot">

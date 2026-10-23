@@ -12,7 +12,8 @@ from app.models.service_record import ServiceRecord
 from app.models.user import User
 from app.models.location import Shift
 from app.models.worksheet import JobEvent
-from app.routes.auth import hash_code
+from app.routes.auth import hash_code, user_payload
+from app.services.accounts import send_verification
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
 from app.utils.validation import ValidationError, json_body, text
@@ -43,8 +44,7 @@ def mechanics():
 @bp.get("/me")
 @roles("boss", "mechanic", "customer")
 def me():
-    user = current_user()
-    return jsonify(user={**out(user), "company_id": user.company_id, "customer_id": user.customer_id})
+    return jsonify(user=user_payload(current_user()))
 
 
 @bp.patch("/<int:uid>")
@@ -54,12 +54,17 @@ def update_user(uid):
     data = json_body()
     if "name" in data:
         user.name = text(data, "name", "Name", required=True, max_length=120)
+    changed_email = False
     if "email" in data:
         email = read_email(data)
         if User.query.filter(User.email == email, User.id != uid).first():
             raise ValidationError("That email address cannot be used", 409)
-        user.email = email
+        if email != user.email:
+            # The new address isn't proven until its owner opens a link sent to it.
+            user.email, user.email_verified_at, changed_email = email, None, True
     db.session.commit()
+    if changed_email and user.role == "boss":
+        send_verification(user)
     return jsonify(ok=True, user=out(user))
 
 

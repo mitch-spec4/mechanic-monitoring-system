@@ -71,7 +71,11 @@ Open http://localhost:5173. The frontend calls `/api` on its own address, and Vi
 
 `seed.py` refuses to run when `APP_ENV` is anything other than `development` or `test`, so these accounts can't end up in production.
 
-New mechanics and customers join by invitation. The manager creates an invitation code under **Customers** or **Mechanics**. The person then uses **Have an invitation code?** on the sign-in page. Codes work once, are tied to one email address, and expire after 7 days.
+**Try the demo.** The homepage's **Try the demo** button (and **Try it as…** on each role card) gives every visitor a private copy of the same demo company, built by `backend/app/services/demo.py`. A bar along the bottom switches between the boss, a mechanic and a customer. Copies have no usable passwords (the button is the only way in), never send email and never take real payments, and are deleted 24 hours after they're made: whenever someone starts a new one, and by the daily clean-up below. One visitor (IP address) can start 10 an hour, and at most 300 exist at once. Unlike `seed.py`, this is safe in production.
+
+**New companies.** Signing up from the homepage sends the new manager an email to confirm their address (the link works for 48 hours). Until they open it, a banner offers to send it again, and inviting people is refused, so an unconfirmed account can't make the app email strangers. A **Get set up** guide on the dashboard walks them through confirming the email, inviting a customer, adding a machine, inviting a mechanic and creating a job; each step ticks itself off, and the guide can be closed. Accounts that existed before email confirmation count as confirmed.
+
+New mechanics and customers join by invitation. The manager invites them under **Customers** or **Mechanics**: the invitation is emailed with a link that fills in the form, and the code is also shown to share another way (for example on WhatsApp). The person can also use **Have an invitation code?** on the sign-in page. Codes work once, are tied to one email address, and expire after 7 days.
 
 **Worksheets and checklists.** Managers create a checklist for each job type under **Checklists** (the demo data includes Repair, Inspection and Preventive maintenance) and pick the job type when creating a job. When the mechanic presses **Start work**, the checklist is copied onto the job and the timer starts; **Pause** and **Resume** stop and restart it. Open a job's **Worksheet** to add work notes, parts used, checklist ticks and the customer's service summary. **Complete** is refused until work is described and every required checklist item is ticked; completing fills in the service record the customer can review. Click any job title to see its full worksheet and history.
 
@@ -81,9 +85,9 @@ New mechanics and customers join by invitation. The manager creates an invitatio
 
 **Testing location on a real phone.** Phones only share location with secure (https) pages. With the backend running, start the frontend with `npm run dev:phone` instead of `npm run dev`. Then open the `https://<your computer's IP>:5173` address it prints, on a phone on the same Wi-Fi. The certificate is self-signed, so the phone warns once: choose to continue. Also try it with location blocked for the site, and outdoors.
 
-If someone forgets their password, the manager clicks **Reset password** next to them under **Mechanics** or **Customers**. The person enters that one-time code under **Forgot password?** on the sign-in page; it expires after 24 hours. Anyone can change their own password under **Settings**. Changing or resetting a password signs that account out everywhere else.
+**Forgot password?** on the sign-in page emails a link to choose a new password. It works once, for 1 hour, and opening it also confirms the email address. The answer on screen is the same whether or not the address has an account. For someone who can't get to their email, the manager can still click **Reset password** next to them under **Mechanics** or **Customers**; the person enters that one-time code under **Forgot password? → Have a reset code from your manager?** It expires after 24 hours. Anyone can change their own password under **Settings**. Changing or resetting a password signs that account out everywhere else.
 
-Until email delivery is added, both kinds of code are shared with **Copy code** or **Email this code**, which opens your own mail app with the message filled in.
+**Emails while developing.** In development nothing is sent: each email is written to the backend's log (look for `Email not sent (EMAIL_BACKEND=log)`), links included. Open the link from there to confirm an email or reset a password. See [Email](#email) for sending real emails.
 
 ## Checks
 
@@ -141,8 +145,17 @@ All backend settings live in `backend/.env` (see `backend/.env.example`).
 | `MAX_PHOTO_MB` / `MAX_VIDEO_MB` | `10` / `50` | Largest photo and video accepted |
 | `MAX_VIDEO_SECONDS` | `60` | Longest video the phone will upload |
 | `BILLING_PROVIDER` | `test` | Leave unset: `none` (free trials only). `test` is refused in production. See [Plans and payments](#plans-and-payments) |
+| `APP_URL` | the first `CORS_ORIGINS` entry | **Required**: your site's `https://` address. Links in emails point here |
+| `EMAIL_BACKEND` | `log` (emails are written to the log) | `smtp` (the default, and required). See [Email](#email) |
+| `EMAIL_FROM` | `MechanicPro <no-reply@mechanicpro.test>` | **Required**, e.g. `MechanicPro <no-reply@yourdomain.com>`, on a domain your provider has verified |
+| `SMTP_HOST` / `SMTP_PORT` | / `587` | **Required** host; port from your provider |
+| `SMTP_USERNAME` / `SMTP_PASSWORD` | | From your provider (often an API key as the password) |
+| `SMTP_SECURITY` | `starttls` | `starttls` (port 587), `ssl` (port 465) or `none` |
+| `EMAIL_RATE_LIMIT` | `1 per minute;5 per hour` | Verification and password-reset emails to one address |
+| `DEMO_RATE_LIMIT` | `10 per hour` | "Try the demo" copies one IP address can start |
+| `CRON_SECRET` | | A long random value that turns on `/api/cron/daily` for a scheduler. See [Daily clean-up](#daily-clean-up) |
 
-Live positions taken during jobs are deleted after 30 days. The app removes old ones whenever new positions arrive; in production, also run `flask --app run.py purge-locations` once a day (for example from cron).
+Live positions taken during jobs are deleted after 30 days. The app removes old ones whenever new positions arrive; in production, also run the [daily clean-up](#daily-clean-up).
 
 Generate secrets with:
 
@@ -150,7 +163,7 @@ Generate secrets with:
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-The backend **fails closed**. If `APP_ENV` is not `development` or `test`, it refuses to start unless the secrets, database URL and CORS origins are all set properly. `postgres://` and `postgresql://` URLs are converted to the bundled `psycopg` driver automatically.
+The backend **fails closed**. If `APP_ENV` is not `development` or `test`, it refuses to start unless the secrets, database URL, CORS origins, `APP_URL` and email settings are all set properly. `postgres://` and `postgresql://` URLs are converted to the bundled `psycopg` driver automatically.
 
 Frontend setting (`frontend/.env.local`, or the build environment):
 
@@ -158,6 +171,31 @@ Frontend setting (`frontend/.env.local`, or the build environment):
 | --- | --- |
 | `VITE_API_BASE_URL` | Optional. Defaults to `/api` on the same site. Set it only when the API is on another subdomain of the same site, e.g. `https://api.example.com/api` |
 | `VITE_PROXY_TARGET` | Development only: where Vite forwards `/api` (default `http://127.0.0.1:5000`) |
+
+## Email
+
+The app sends three kinds of email: confirming a new manager's address, password-reset links, and invitations. Billing receipts and renewal reminders will use the same interface, in `backend/app/services/email.py`, chosen by `EMAIL_BACKEND`:
+
+- **`log`** (development): nothing is sent; each email is written to the backend's log.
+- **`smtp`** (production): sent through your email provider's SMTP server. Every major provider offers SMTP, so switching provider only means changing these settings.
+
+To set up sending (you can wait until launch):
+
+1. Create an account with an email provider, for example Resend or Postmark.
+2. Verify your domain with them (they give you DNS records to add), so emails from `no-reply@yourdomain.com` aren't marked as spam.
+3. Copy their SMTP settings into the environment. For Resend: `SMTP_HOST=smtp.resend.com`, `SMTP_PORT=587`, `SMTP_USERNAME=resend`, `SMTP_PASSWORD=<your API key>`. For Postmark: `SMTP_HOST=smtp.postmarkapp.com`, `SMTP_PORT=587`, and your server API token as both username and password. Check your provider's SMTP page for the current values.
+4. Set `EMAIL_FROM` and `APP_URL`, then sign up a test company and check the confirmation email arrives.
+
+If sending fails, the request still succeeds and the error is logged: signup carries on, and the manager can resend the confirmation from the banner. Accounts in demo companies never send email.
+
+## Daily clean-up
+
+Once a day, three things should be cleared away: demo companies whose 24 hours are up, uploads that were started but never finished, and live positions older than 30 days. Either:
+
+- call `GET /api/cron/daily` with the header `Authorization: Bearer <CRON_SECRET>` from your host's scheduler (Vercel Cron sends exactly this header when `CRON_SECRET` is set), or
+- run `flask --app run.py purge-demos`, `purge-uploads` and `purge-locations` from cron.
+
+Without a `CRON_SECRET`, the URL doesn't exist.
 
 ## File storage
 
@@ -187,7 +225,7 @@ Setting up a bucket:
 
    For B2, add a CORS rule for the same origin that allows the `s3_put` and `s3_get` operations and the `Content-Type` header. Without the rule, uploads fail in the browser with a network error.
 
-Uploads that are started but never finished (the app was closed, the signal dropped) are removed by `flask --app run.py purge-uploads`, after a day. Run it daily in production.
+Uploads that are started but never finished (the app was closed, the signal dropped) are removed after a day by the [daily clean-up](#daily-clean-up).
 
 Photos in a format the phone's browser can't open (for example HEIC in most browsers other than Safari) are refused on the phone with a message to choose a JPEG.
 
@@ -215,7 +253,8 @@ To try it locally: open http://localhost:5173, choose a plan, and sign up with a
 ## Production notes (until the deployment guide is written)
 
 - Run `flask --app run.py db upgrade` on every deploy. Never run `seed.py`.
-- Run `flask --app run.py purge-locations` and `flask --app run.py purge-uploads` daily.
+- Run the [daily clean-up](#daily-clean-up).
+- Set up [email](#email) before launch: the app won't start in production without it.
 - Use `STORAGE_BACKEND=s3` unless the app runs on one server with a lasting disk.
 - Map tiles come from the free OpenStreetMap servers, which are not meant for heavy commercial use. Switch to a paid tile provider before launch.
 - Serve the backend with a production WSGI server (for example gunicorn), not `flask run`.

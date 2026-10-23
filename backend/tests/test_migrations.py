@@ -58,6 +58,9 @@ def test_upgrading_a_database_that_already_has_data(tmp_path):
     assert db.execute("pragma foreign_key_check").fetchall() == []
     # Companies from before plans existed get the largest plan with no end date.
     assert db.execute("select company_id, plan, status, current_period_end from subscription").fetchall() == [(1, "business", "active", None)]
+    # People from before email verification count as confirmed, and the setup guide is for new companies only.
+    assert db.execute("select email_verified_at is not null from user").fetchall() == [(1,)]
+    assert db.execute("select setup_dismissed_at is not null, demo_expires_at from company").fetchall() == [(1, None)]
 
 
 def test_migrations_roll_back_and_forward(tmp_path):
@@ -73,7 +76,7 @@ def test_migrations_roll_back_and_forward(tmp_path):
         upgrade(directory=migrations)
         downgrade(directory=migrations, revision="base")
         upgrade(directory=migrations)
-    assert sqlite3.connect(path).execute("select version_num from alembic_version").fetchone() == ("0006_professional_plan",)
+    assert sqlite3.connect(path).execute("select version_num from alembic_version").fetchone() == ("0007_email_demo_setup",)
 
 
 def test_the_old_team_plan_becomes_professional(tmp_path):

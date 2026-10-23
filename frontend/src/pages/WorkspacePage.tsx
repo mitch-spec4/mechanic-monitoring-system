@@ -41,10 +41,11 @@ import ShiftsView from "../components/ShiftsView";
 import TeamMap from "../components/TeamMap";
 import { LocationSettings } from "../components/Shift";
 import InviteForm from "../components/InviteForm";
+import VerifyBanner from "../components/VerifyBanner";
 import ResetPassword from "../components/ResetPassword";
 import { errorMessage, formatBytes, formatDate } from "../lib/format";
 
-type Props = { title: string; user: any; onOpenJob?: (id: number) => void; onOpenCustomer?: (id: number) => void };
+type Props = { title: string; user: any; onOpenJob?: (id: number) => void; onOpenCustomer?: (id: number) => void; onUserChanged?: (user: any) => void };
 type Resource = {
   label: string;
   icon: any;
@@ -114,7 +115,7 @@ const resources: Record<string, Resource> = {
   "My Shifts": { label: "My shifts", icon: Clock },
 };
 
-export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer }: Props) {
+export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, onUserChanged = () => {} }: Props) {
   const resource = resources[title] || resources.Profile;
   const Icon = resource.icon;
   const [items, setItems] = useState<any[]>([]);
@@ -198,6 +199,9 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer }
           {user.name} · {user.email}
         </span>
       </div>
+      {isBoss && user.email_verified === false && (title === "Customers" || title === "Mechanics") && (
+        <VerifyBanner user={user} onVerified={onUserChanged} />
+      )}
       {summary ? (
         <ReportSummary summary={summary} />
       ) : !resource.load || resource.key === "company" ? null : (

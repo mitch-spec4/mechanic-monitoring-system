@@ -11,6 +11,7 @@ from app.models.user import User
 from app.routes.auth import new_password, signed_in_response
 from app.routes.worksheet import iso
 from app.services import rate_limit
+from app.services.accounts import send_verification
 from app.services.billing import (
     create_payment,
     mark_paid,
@@ -133,6 +134,8 @@ def signup():
         db.session.flush()
         extra["checkout_url"] = checkout.checkout_url(payment)
     db.session.commit()
+    # Signing up doesn't wait on the email: if it fails, the boss can resend it from the banner.
+    send_verification(boss)
     return signed_in_response(boss, 201, **extra)
 
 

@@ -1,6 +1,8 @@
 /* The boss's Billing page and the trial banner on the dashboard. */
 .billingPage {
   display: grid;
+  /* One column that may shrink below its content, so phones never scroll sideways. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   padding: 24px;
   max-width: 1160px;
@@ -120,7 +122,7 @@
 }
 .planGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr));
   gap: 20px;
   align-items: stretch;
 }
@@ -284,7 +286,8 @@
   background: #dcfce7;
 }
 
-.planBanner {
+.planBanner,
+.verifyBanner {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -297,10 +300,12 @@
   background: #eaf3ff;
   border: 1px solid #c9ddf6;
 }
-.planBanner > svg {
+.planBanner > svg,
+.verifyBanner > svg {
   color: #0969d7;
 }
-.planBanner span {
+.planBanner span,
+.verifyBanner > span {
   flex: 1;
   min-width: 200px;
 }
@@ -312,7 +317,7 @@
 .planBanner.ended > svg {
   color: #dc2626;
 }
-.appShell .planBanner .primary {
+.appShell :is(.planBanner, .verifyBanner) .primary {
   width: auto;
   padding: 9px 14px;
 }
