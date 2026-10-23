@@ -25,6 +25,7 @@ from app.services.worksheet import (
 from app.utils.auth import current_user, roles
 from app.utils.validation import ValidationError, choice, integer, iso_date, json_body, text
 from app.i18n import N_, _
+from app.services import audit
 
 bp = Blueprint("jobs", __name__)
 
@@ -290,6 +291,7 @@ def delete_job(jid):
     if job.status not in DELETABLE or has_recorded_work(job):
         return jsonify(error=_("Only jobs that have not started can be deleted. Cancel this job instead.")), 409
     delete_job_children(job)
+    audit.record("job_deleted", user=current_user(), detail=job.title)
     db.session.delete(job)
     db.session.commit()
     return jsonify(ok=True)

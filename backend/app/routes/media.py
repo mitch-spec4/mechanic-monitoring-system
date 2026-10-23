@@ -7,6 +7,7 @@ from app import db
 from app.models.media import JobFile
 from app.routes.worksheet import job_detail, load_job
 from app.services.billing import check_storage
+from app.services.data_export import file_for_link
 from app.services.report_pdf import build_report
 from app.services.storage import StorageError, read_upload_token, storage
 from app.services.worksheet import record_event
@@ -156,7 +157,19 @@ def get_file(fid):
     user = current_user()
     record = JobFile.query.filter_by(id=fid, company_id=user.company_id, status="ready").first_or_404()
     load_job(record.job_id)
-    attachment = request.args.get("download") == "1"
+    return serve_file(record, attachment=request.args.get("download") == "1")
+
+
+@bp.get("/files/export/<token>")
+def exported_file(token):
+    """A file listed in a company's data export. The signed link is the permission, for 7 days."""
+    record = file_for_link(token)
+    if not record:
+        raise ValidationError(_("This download link has expired. Export the data again for new links."), 404)
+    return serve_file(record, attachment=True)
+
+
+def serve_file(record, attachment):
     name = record.original_name or f"{record.kind}-{record.id}"
     url = storage().download_url(record.storage_key, name, record.content_type, attachment)
     if url:

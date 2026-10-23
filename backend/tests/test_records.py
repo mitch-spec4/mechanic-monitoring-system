@@ -106,10 +106,10 @@ def test_customer_with_history_cannot_be_deleted(client, data, auth):
 
 def test_customer_without_history_is_deleted_with_login(client, data, auth):
     code = client.post("/api/customers/invite", headers=boss(auth), json={"name": "Brief", "email": "brief@x.test"}).get_json()["code"]
-    client.post("/api/auth/accept-invitation", json={"code": code, "name": "Brief", "email": "brief@x.test", "password": "long-enough"})
+    client.post("/api/auth/accept-invitation", json={"code": code, "name": "Brief", "email": "brief@x.test", "password": "long-enough", "accept_terms": True})
     customer_id = next(c["id"] for c in client.get("/api/customers", headers=boss(auth)).get_json()["customers"] if c["email"] == "brief@x.test")
     assert client.delete(f"/api/customers/{customer_id}", headers=boss(auth)).status_code == 200
-    assert client.post("/api/auth/login", json={"email": "brief@x.test", "password": "long-enough"}).status_code == 401
+    assert client.post("/api/auth/login", json={"email": "brief@x.test", "password": "long-enough", "accept_terms": True}).status_code == 401
 
 
 def test_mechanic_with_history_cannot_be_deleted(client, data, auth):

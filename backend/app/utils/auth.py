@@ -5,14 +5,18 @@ from flask_jwt_extended import get_jwt, get_jwt_identity, verify_jwt_in_request
 
 from app import db
 from app.models.user import User
+from app.services import two_factor
 from app.i18n import _
 
 
-def roles(*allowed):
+def roles(*allowed, before_two_factor=False):
     """Require a valid access token for a user who still exists with one of the allowed roles.
 
     The user is re-read from the database on every request, so deleted accounts, role or
     company changes, and password changes take effect immediately instead of when the token expires.
+
+    Someone who still has to set up two-step sign-in can only reach routes marked
+    before_two_factor (their profile, the setup itself, signing out).
     """
 
     def deco(fn):
@@ -31,6 +35,8 @@ def roles(*allowed):
                 return jsonify(error=_("Your account has changed. Please sign in again.")), 401
             if user.role not in allowed:
                 return jsonify(error=_("Forbidden")), 403
+            if not before_two_factor and two_factor.needs_setup(user):
+                return jsonify(error=_("Set up two-step sign-in to continue."), two_factor_setup=True), 403
             g.user = user
             return fn(*args, **kwargs)
 

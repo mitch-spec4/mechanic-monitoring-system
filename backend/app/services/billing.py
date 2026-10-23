@@ -20,6 +20,7 @@ from app.services.plans import CURRENCY, GB, PLANS, TRIAL_DAYS, add_period, pric
 from app.utils.time import utcnow
 from app.utils.validation import ValidationError
 from app.i18n import _
+from app.services import audit
 
 PROVIDERS = ("test", "none")
 
@@ -111,6 +112,7 @@ def mark_paid(payment):
     subscription.plan, subscription.interval, subscription.status = payment.plan, payment.interval, "active"
     subscription.current_period_end = add_period(start, payment.interval)
     payment.status, payment.paid_at = "paid", now
+    audit.record("plan_paid", company_id=payment.company_id, detail=f"{PLANS[payment.plan]['name']} / {payment.interval}")
     return subscription
 
 

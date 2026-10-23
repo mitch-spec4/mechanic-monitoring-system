@@ -17,6 +17,12 @@ class ValidationError(Exception):
         self.extra = extra
 
 
+def agreed_to_terms(data):
+    """The "I agree to the privacy policy and terms" box at signup and when joining a company."""
+    if data.get("accept_terms") is not True:
+        raise ValidationError(_("Please agree to the privacy policy and terms to continue."))
+
+
 def default_label(field):
     """"due_date" -> "Due date", the label used when a caller doesn't name the field."""
     return field.replace("_", " ").capitalize()
