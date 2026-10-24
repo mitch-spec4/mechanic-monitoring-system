@@ -49,8 +49,11 @@
 .planStatus.problem {
   background: linear-gradient(135deg, #93370d, #dc6803);
 }
+.planStatus {
+  flex-wrap: wrap;
+}
 .planStatus > div:not(.planStatusActions) {
-  flex: 1;
+  flex: 1 1 260px;
   min-width: 0;
 }
 .planStatus .planFacts {
@@ -415,6 +418,17 @@
 @media (max-width: 760px) {
   .billingPage {
     padding: 14px;
+  }
+  /* The buttons go under the plan's details, full width. */
+  .planStatusIcon {
+    display: none;
+  }
+  .planStatusActions {
+    flex-basis: 100%;
+  }
+  .appShell .planStatusActions .secondary {
+    flex: 1 1 140px;
+    justify-content: center;
   }
   .meters {
     grid-template-columns: minmax(0, 1fr);
