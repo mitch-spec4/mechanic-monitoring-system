@@ -3,6 +3,7 @@ from flask import Blueprint, jsonify
 from app import db
 from app.models.constants import DEFAULT_PRIORITY, PRIORITIES
 from app.models.customer import Customer
+from app.models.equipment import Site
 from app.models.job import Job
 from app.models.location import LocationPoint
 from app.models.machine import Machine
@@ -12,6 +13,7 @@ from app.models.user import User
 from app.models.worksheet import WorkEntry
 from app.services.billing import require_active
 from app.services.booking import tell_customer, visit_moved
+from app.services.equipment import plan_job_moved, site_label
 from app.services.location import shift_at, stamp_job
 from app.services.notifications import notify, notify_bosses
 from app.services.signature import SIGNATURE_FIELDS, SIGNATURE_PROBLEM, apply_signature, read_signature
@@ -132,6 +134,8 @@ def create_job():
     machine = find_machine(user.company_id, machine_id, customer_id) if machine_id else None
     if machine:
         customer_id = machine.customer_id
+    # The equipment's site, unless another place is given.
+    location = text(data, "location", max_length=200) or (site_label(db.session.get(Site, machine.site_id)) if machine and machine.site_id else None)
 
     job = Job(
         company_id=user.company_id,
@@ -139,7 +143,7 @@ def create_job():
         description=description,
         priority=priority,
         job_type=text(data, "job_type", "Job type", max_length=80),
-        location=text(data, "location", max_length=200),
+        location=location,
         due_date=iso_date(data, "due_date", "Due date"),
         customer_id=customer_id,
         machine_id=machine.id if machine else None,
@@ -274,6 +278,8 @@ def change_status(job, user, new_status):
         fill_service_record(job)
     # A visit a customer booked: their request moves on, and they're told.
     visit_moved(job, old_status, new_status)
+    # Planned maintenance: the plan's next due date moves on.
+    plan_job_moved(job, new_status, happened_at())
 
 
 ON_THE_WAY_STATUSES = {"Assigned", "Accepted"}

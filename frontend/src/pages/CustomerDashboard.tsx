@@ -23,9 +23,9 @@ const RATINGS: [number, string][] = [
   [1, mark("Poor")],
 ];
 
-type Props = { u: User; onOpenJob: (id: number) => void; onOpenRequest: (id: number) => void; onOpenMessages: () => void };
+type Props = { u: User; onOpenJob: (id: number) => void; onOpenRequest: (id: number) => void; onOpenMachine: (id: number) => void; onOpenMessages: () => void };
 
-export default function CustomerDashboard({ u, onOpenJob, onOpenRequest, onOpenMessages }: Props) {
+export default function CustomerDashboard({ u, onOpenJob, onOpenRequest, onOpenMachine, onOpenMessages }: Props) {
   const [jobList, setJobList] = useState<Job[]>([]);
   const [equipment, setEquipment] = useState<Machine[]>([]);
   const [records, setRecords] = useState<ServiceRecord[]>([]);
@@ -137,7 +137,9 @@ export default function CustomerDashboard({ u, onOpenJob, onOpenRequest, onOpenM
           {equipment.map((x) => (
             <div className="machine" key={x.id}>
               <div>
-                <b>{x.name}</b>
+                <button className="titleLink" onClick={() => onOpenMachine(x.id)}>
+                  <b>{x.name}</b>
+                </button>
                 <span>{t("{model} · Serial {serial}", { model: x.model || t("Model not recorded"), serial: x.serial_no })}</span>
               </div>
               <span className={`machineStatus ${statusClass(x.status)}`}>{t(x.status)}</span>

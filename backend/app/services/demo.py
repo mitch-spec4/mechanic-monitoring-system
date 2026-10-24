@@ -1,5 +1,6 @@
-"""The demo company, DK Engineering: a Nairobi service business with mechanics, customers, machines
-and jobs at every stage, with worksheets, shifts, a signed-off job, reviews and requests.
+"""The demo company, DK Engineering: a Nairobi service business with mechanics, customers, their
+sites and machines, maintenance plans, and jobs at every stage, with worksheets, shifts, a
+signed-off job, reviews and requests.
 
 It's built in two ways from the same code:
 - seed.py loads it once for local development, with a shared password on every account;
@@ -27,12 +28,14 @@ from app.models import (
     JobPart,
     LocationPoint,
     Machine,
+    MaintenancePlan,
     Notification,
     Payment,
     Review,
     ServiceRecord,
     ServiceRequest,
     Shift,
+    Site,
     Subscription,
     User,
     WorkEntry,
@@ -84,8 +87,17 @@ def populate(company, tag=None, password=None):
         person(name, customer.email, "customer", customer)
         return customer
 
-    def machine(name, model, serial_no, owner, status="Operational"):
-        record = Machine(name=name, model=model, serial_no=serial_no, customer_id=owner.id, company_id=company.id, status=status)
+    def site(owner, name, address):
+        record = Site(company_id=company.id, customer_id=owner.id, name=name, address=address)
+        db.session.add(record)
+        db.session.flush()
+        return record
+
+    def machine(name, model, serial_no, owner, place, kind, maker, installed_years_ago, status="Operational"):
+        record = Machine(
+            name=name, model=model, serial_no=serial_no, customer_id=owner.id, company_id=company.id, status=status,
+            site_id=place.id, equipment_type=kind, manufacturer=maker, installed_on=today - timedelta(days=365 * installed_years_ago),
+        )
         db.session.add(record)
         db.session.flush()
         return record
@@ -99,12 +111,32 @@ def populate(company, tag=None, password=None):
     kenya = customer_with_login("Kenya Motors", "kenya", "+254 723 456 789")
     xyz = customer_with_login("XYZ Factory", "xyz", "+254 734 567 890")
 
-    generator = machine("Generator G-102", "CAT XQ200", "G102-88421", abc)
-    excavator = machine("Excavator EX-01", "Komatsu PC210", "EX01-55218", abc, "Under Maintenance")
-    compressor = machine("Compressor C-55", "Atlas Copco GA30", "C55-77890", kenya)
-    pump = machine("Hydraulic Pump H-21", "Parker PVP", "H21-44012", kenya, "Under Repair")
-    conveyor = machine("Conveyor Line CL-4", "Dorner 2200", "CL4-99120", xyz)
-    mixer = machine("Industrial Mixer MX-08", "Hobart H600", "MX08-11987", xyz)
+    abc_plant = site(abc, "Industrial Area plant", "Enterprise Road, Industrial Area")
+    abc_yard = site(abc, "Athi River yard", "Namanga Road, Athi River")
+    kenya_workshop = site(kenya, "Thika Road workshop", "Thika Road, Kasarani")
+    xyz_factory = site(xyz, "Nairobi South factory", "Likoni Road, Nairobi South")
+
+    generator = machine("Generator G-102", "CAT XQ200", "G102-88421", abc, abc_plant, "Generator", "Caterpillar", 4)
+    excavator = machine("Excavator EX-01", "Komatsu PC210", "EX01-55218", abc, abc_yard, "Excavator", "Komatsu", 6, "Under Maintenance")
+    compressor = machine("Compressor C-55", "Atlas Copco GA30", "C55-77890", kenya, kenya_workshop, "Compressor", "Atlas Copco", 3)
+    pump = machine("Hydraulic Pump H-21", "Parker PVP", "H21-44012", kenya, kenya_workshop, "Pump", "Parker", 5, "Under Repair")
+    conveyor = machine("Conveyor Line CL-4", "Dorner 2200", "CL4-99120", xyz, xyz_factory, "Conveyor", "Dorner", 2)
+    mixer = machine("Industrial Mixer MX-08", "Hobart H600", "MX08-11987", xyz, xyz_factory, "Mixer", "Hobart", 7)
+
+    # Planned maintenance: the generator's oil change comes due in four days (its job is created by
+    # the daily run, or by "Create the job now"); the compressor's half-year service is weeks away.
+    db.session.add_all(
+        [
+            MaintenancePlan(
+                company_id=company.id, machine_id=generator.id, title="Oil and filter change", job_type="Preventive maintenance",
+                every=3, unit="months", next_due=today + timedelta(days=4), last_done=today - timedelta(days=88),
+            ),
+            MaintenancePlan(
+                company_id=company.id, machine_id=compressor.id, title="Full service", job_type="Preventive maintenance",
+                every=6, unit="months", next_due=today + timedelta(days=40), last_done=today - timedelta(days=142),
+            ),
+        ]
+    )
 
     for job_type, items in CHECKLISTS.items():
         template = ChecklistTemplate(company_id=company.id, job_type=job_type)

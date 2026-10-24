@@ -1,0 +1,226 @@
+/* A piece of equipment's page. The frame and cards are the job page's; the history list is the customer page's. */
+.appMain .equipmentPage .equipmentEdit {
+  justify-self: start;
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.equipmentPage .jobHeroTop .machineStatus {
+  font-size: 11px;
+}
+.repeatFaultBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #f3b4b4;
+  background: #fff1f1;
+  color: #8f1d14;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.repeatFaultBanner svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+/* Maintenance plans */
+.planList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.planRow {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid #e1e8f0;
+  background: #fff;
+}
+.planRow.overdue {
+  border-color: #f3b4b4;
+  box-shadow: inset 4px 0 0 #dc2626;
+}
+.planRow.due {
+  border-color: #f6d79b;
+  box-shadow: inset 4px 0 0 #f0a020;
+}
+.planRow.paused {
+  background: #f8fafc;
+}
+.planHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.planHead > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.planHead small {
+  color: #68768a;
+  font-size: 12px;
+}
+.planState {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #15803d;
+  background: #e7f7ec;
+}
+.planState.due {
+  color: #8a5300;
+  background: #fff4dc;
+}
+.planState.overdue {
+  color: #8f1d14;
+  background: #fff1f1;
+}
+.planState.paused {
+  color: #5b6b80;
+  background: #eef2f7;
+}
+.planDates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0;
+}
+.planDates dt {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8592a6;
+}
+.planDates dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+.planJob {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+/* Documents */
+.docList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.docList li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  font-size: 13px;
+}
+.docList li > svg {
+  color: var(--accent);
+}
+.docList li > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.docList li > div a {
+  overflow: hidden;
+  font-weight: 700;
+  color: #172033;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.docList small {
+  color: #68768a;
+  font-size: 12px;
+}
+
+/* Faults and jobs */
+.faultList,
+.equipmentJobs {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.faultList li {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff7f7;
+  font-size: 13px;
+}
+.faultList li > div {
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+}
+.faultList span {
+  color: #68768a;
+}
+.faultList .link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  font-size: 12px;
+}
+.equipmentJobs li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  font-size: 13px;
+}
+.equipmentJobs li > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.equipmentJobs small {
+  color: #68768a;
+  font-size: 12px;
+}
+
+@media (min-width: 900px) {
+  .equipmentPage .jobGrid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .equipmentPage .jobCard.wide {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 560px) {
+  .faultList li {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}

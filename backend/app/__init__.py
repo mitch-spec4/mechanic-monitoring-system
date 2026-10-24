@@ -136,6 +136,7 @@ def build_config():
         "S3_SECRET_ACCESS_KEY": os.getenv("S3_SECRET_ACCESS_KEY", ""),
         "MAX_PHOTO_MB": int(os.getenv("MAX_PHOTO_MB", "10")),
         "MAX_VIDEO_MB": int(os.getenv("MAX_VIDEO_MB", "50")),
+        "MAX_DOCUMENT_MB": int(os.getenv("MAX_DOCUMENT_MB", "25")),
         "MAX_VIDEO_SECONDS": int(os.getenv("MAX_VIDEO_SECONDS", "60")),
         # Taking payment for plans: "test" (a pretend card page, development only) or "none"
         # (free trials only) until a real provider is connected. See SETUP.md.
@@ -188,6 +189,7 @@ def create_app(overrides=None):
     from app.routes.company import bp as company
     from app.routes.customers import bp as customers
     from app.routes.demo import bp as demo
+    from app.routes.equipment import bp as equipment
     from app.routes.jobs import bp as jobs
     from app.routes.maintenance import bp as maintenance
     from app.routes.legal import bp as legal
@@ -219,6 +221,7 @@ def create_app(overrides=None):
     app.register_blueprint(users, url_prefix="/api/users")
     app.register_blueprint(reports, url_prefix="/api/reports")
     app.register_blueprint(media, url_prefix="/api")
+    app.register_blueprint(equipment, url_prefix="/api")
     app.register_blueprint(shifts, url_prefix="/api/shifts")
     app.register_blueprint(location, url_prefix="/api/location")
     app.register_blueprint(billing, url_prefix="/api")
@@ -295,6 +298,15 @@ def create_app(overrides=None):
             f"Sent {sent['visit_reminders']} visit reminder(s), {sent['repair_reminders']} repair reminder(s) "
             f"and {sent['follow_ups']} follow-up(s)."
         )
+
+    @app.cli.command("send-service-due")
+    def send_service_due():
+        """Planned maintenance coming due: its job, and the reminders (run daily)."""
+        from app.services.equipment import send_due_reminders
+
+        sent = send_due_reminders()
+        db.session.commit()
+        print(f"Created {sent['maintenance_jobs']} maintenance job(s) and sent {sent['service_due_reminders']} service-due reminder(s).")
 
     @app.cli.command("purge-activity")
     def purge_activity():

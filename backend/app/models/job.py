@@ -27,6 +27,8 @@ class Job(db.Model):
     scheduled_end = db.Column(db.DateTime)
     on_the_way_at = db.Column(db.DateTime)
     reminder_sent_at = db.Column(db.DateTime)
+    # Made by a maintenance plan: completing it moves the plan's next due date on.
+    plan_id = db.Column(db.Integer, db.ForeignKey("maintenance_plan.id"), nullable=True, index=True)
     # Customer sign-off at completion: a signature (stored as a JobFile of kind "signature")
     # with the signer's name, or the reason nobody could sign.
     signed_by_name = db.Column(db.String(120))

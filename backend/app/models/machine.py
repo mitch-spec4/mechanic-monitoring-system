@@ -11,3 +11,9 @@ class Machine(db.Model):
     customer_id = db.Column(db.Integer, db.ForeignKey("customer.id"), nullable=False, index=True)
     company_id = db.Column(db.Integer, db.ForeignKey("company.id"), nullable=False, index=True)
     status = db.Column(db.String(40), nullable=False, default="Operational")
+    # What kind of equipment it is (Generator, Pump...), who made it, where it is and since when.
+    equipment_type = db.Column(db.String(80), index=True)
+    manufacturer = db.Column(db.String(100))
+    site_id = db.Column(db.Integer, db.ForeignKey("site.id"), nullable=True, index=True)
+    installed_on = db.Column(db.Date)
+    notes = db.Column(db.Text)

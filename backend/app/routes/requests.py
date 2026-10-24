@@ -7,6 +7,7 @@ from app import db
 from app.models.company import Company
 from app.models.constants import CLOSED_REQUEST_STATUSES, DEFAULT_PRIORITY, MANUAL_REQUEST_STATUSES, PRIORITIES
 from app.models.customer import Customer
+from app.models.equipment import Site
 from app.models.job import Job
 from app.models.machine import Machine
 from app.models.media import JobFile
@@ -16,6 +17,7 @@ from app.models.user import User
 from app.routes.jobs import assign_mechanic, change_status
 from app.services import booking
 from app.services.billing import state, subscription_for
+from app.services.equipment import site_label
 from app.services.notifications import notify, notify_bosses
 from app.services.worksheet import record_event
 from app.utils.auth import current_user, roles
@@ -157,6 +159,12 @@ def request_slots(rid):
     )
 
 
+def visit_site(service_request):
+    """Where the visit is: the equipment's site."""
+    machine = db.session.get(Machine, service_request.machine_id)
+    return site_label(db.session.get(Site, machine.site_id)) if machine and machine.site_id else None
+
+
 def booking_time(data):
     value = data.get("start")
     if value in (None, ""):
@@ -209,6 +217,7 @@ def book(rid):
             priority=service_request.priority,
             job_type="Inspection" if visit == "inspection" else "Repair",
             due_date=booking.visit_day(company, slot.start),
+            location=visit_site(service_request),
             customer_id=service_request.customer_id,
             machine_id=service_request.machine_id,
             status="Pending",

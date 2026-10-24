@@ -209,3 +209,76 @@
     gap: 2px;
   }
 }
+
+/* A customer's sites, and the extras on an equipment card. */
+.siteList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.siteList li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  font-size: 13px;
+}
+.siteList li > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.siteList .siteAddress {
+  color: #68768a;
+}
+.appShell .siteList .listAction {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.machineCardHead .machineSite {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.repeatFault {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  margin: 0;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid #f3b4b4;
+  background: #fff1f1;
+  color: #8f1d14;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+@media (max-width: 560px) {
+  .siteList li {
+    grid-template-columns: 1fr auto;
+  }
+  .siteList .jobBadge {
+    grid-row: 2;
+    justify-self: start;
+  }
+}
+.machineFilters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+.appShell .machineFilters select {
+  width: auto;
+  min-height: 34px;
+  padding: 4px 10px;
+}

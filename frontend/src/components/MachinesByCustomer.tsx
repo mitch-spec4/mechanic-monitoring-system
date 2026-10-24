@@ -13,17 +13,21 @@ type Props = {
   query: string;
   onOpenJob?: (id: number) => void;
   onOpenCustomer?: (id: number) => void;
+  onOpenMachine?: (id: number) => void;
   onChanged: () => void;
 };
 
-/** Managers: all equipment under its customer, with a filter for the pieces needing work. */
-export default function MachinesByCustomer({ machines, customers, query, onOpenJob, onOpenCustomer, onChanged }: Props) {
+/** Managers: all equipment under its customer, with filters for the pieces needing work and by type. */
+export default function MachinesByCustomer({ machines, customers, query, onOpenJob, onOpenCustomer, onOpenMachine, onChanged }: Props) {
   const [onlyNeedsWork, setOnlyNeedsWork] = useState(false);
+  const [type, setType] = useState("");
   const [creatingFor, setCreatingFor] = useState<Machine | null>(null);
   const [editing, setEditing] = useState<Machine | null>(null);
   const needle = query.toLowerCase();
+  const types = [...new Set(machines.map((machine) => machine.equipment_type).filter((value): value is string => Boolean(value)))].sort();
   const visible = machines.filter(
-    (machine) => (!onlyNeedsWork || machine.needs_work) && JSON.stringify(machine).toLowerCase().includes(needle),
+    (machine) =>
+      (!onlyNeedsWork || machine.needs_work) && (!type || machine.equipment_type === type) && JSON.stringify(machine).toLowerCase().includes(needle),
   );
   const needing = machines.filter((machine) => machine.needs_work).length;
   const groups = customers
@@ -46,16 +50,31 @@ export default function MachinesByCustomer({ machines, customers, query, onOpenJ
         <span>
           {t("{count} pieces of equipment", { count: machines.length })} · <b className="needsWorkText">{t("{count} need work", { count: needing })}</b>
         </span>
-        <label>
-          <input type="checkbox" checked={onlyNeedsWork} onChange={(e) => setOnlyNeedsWork(e.target.checked)} />
-          {t("Needs work only")}
-        </label>
+        <div className="machineFilters">
+          {types.length > 0 && (
+            <label>
+              {t("Type")}
+              <select value={type} onChange={(e) => setType(e.target.value)}>
+                <option value="">{t("All types")}</option>
+                {types.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label>
+            <input type="checkbox" checked={onlyNeedsWork} onChange={(e) => setOnlyNeedsWork(e.target.checked)} />
+            {t("Needs work only")}
+          </label>
+        </div>
       </div>
       {groups.length === 0 && (
         <EmptyState
           icon={<Wrench size={26} />}
-          title={onlyNeedsWork ? t("No equipment needs work") : t("No equipment found")}
-          text={onlyNeedsWork ? t("All equipment is operational, with no open jobs or requests.") : t("Try a different search.")}
+          title={onlyNeedsWork && !type ? t("No equipment needs work") : t("No equipment found")}
+          text={onlyNeedsWork && !type ? t("All equipment is operational, with no open jobs or requests.") : t("Try a different search.")}
         />
       )}
       {groups.map(({ customer, machines: own }) => (
@@ -77,6 +96,7 @@ export default function MachinesByCustomer({ machines, customers, query, onOpenJ
                   key={machine.id}
                   machine={machine}
                   onOpenJob={onOpenJob || (() => {})}
+                  onOpenMachine={onOpenMachine}
                   onCreateJob={() => setCreatingFor(machine)}
                   onEdit={() => setEditing(machine)}
                 />

@@ -30,6 +30,7 @@ type Props = {
   user: User;
   onBack: () => void;
   onOpenJob: (id: number) => void;
+  onOpenMachine: (id: number) => void;
   /** The chat with the company (a customer), or with this customer (a manager). */
   onOpenMessages: (customerId?: number) => void;
 };
@@ -44,7 +45,7 @@ const NOT_STARTED = ["Pending", "Assigned", "Accepted"];
  * One service request, for the customer who sent it and for the managers: where it is, the visits
  * (with "on the way", the findings and the photos), and the times free to book the next visit.
  */
-export default function RequestPage({ requestId, user, onBack, onOpenJob, onOpenMessages }: Props) {
+export default function RequestPage({ requestId, user, onBack, onOpenJob, onOpenMachine, onOpenMessages }: Props) {
   const [request, setRequest] = useState<RequestDetail | null>(null);
   const [error, setError] = useState("");
   const load = () =>
@@ -81,7 +82,17 @@ export default function RequestPage({ requestId, user, onBack, onOpenJob, onOpen
           <div>
             <dt>{t("Equipment")}</dt>
             <dd>
-              <Wrench size={13} /> {request.machine ? `${request.machine.name} · ${request.machine.serial_no}` : t("Not set")}
+              <Wrench size={13} />{" "}
+              {request.machine ? (
+                <>
+                  <button className="titleLink" onClick={() => onOpenMachine(request.machine!.id)}>
+                    {request.machine.name}
+                  </button>{" "}
+                  · {request.machine.serial_no}
+                </>
+              ) : (
+                t("Not set")
+              )}
             </dd>
           </div>
           {isBoss && request.customer && (

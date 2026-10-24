@@ -2,12 +2,25 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Plus, Wrench } from "lucide-react";
 import Modal from "./Modal";
 import Field from "./Field";
-import { createMachine, customers, updateMachine } from "../services/api";
-import type { Customer, Machine } from "../services/types";
+import { createMachine, customers, sites as loadSites, updateMachine } from "../services/api";
+import type { Customer, Machine, Site } from "../services/types";
 import { errorMessage } from "../lib/format";
 import { EQUIPMENT_STATUSES } from "../lib/labels";
-import { t } from "../i18n";
+import { mark, t } from "../i18n";
 
+// Offered while typing a type; any other can be typed.
+const TYPE_SUGGESTIONS = [
+  mark("Generator"),
+  mark("Pump"),
+  mark("Compressor"),
+  mark("Conveyor"),
+  mark("Mixer"),
+  mark("Excavator"),
+  mark("Boiler"),
+  mark("Forklift"),
+  mark("Air conditioner"),
+  mark("Vehicle"),
+];
 
 const formData = (event: FormEvent<HTMLFormElement>) => Object.fromEntries(new FormData(event.currentTarget));
 
@@ -25,8 +38,58 @@ function StatusSelect({ value = "Operational" }: { value?: string }) {
   );
 }
 
+/** Type, manufacturer, the customer's site, when it was installed, and notes. */
+function DetailFields({ customerId, machine }: { customerId?: number; machine?: Machine }) {
+  const [siteList, setSiteList] = useState<Site[]>([]);
+  useEffect(() => {
+    if (!customerId) {
+      setSiteList([]);
+      return;
+    }
+    loadSites(customerId)
+      .then((data) => setSiteList(data.sites))
+      .catch(() => setSiteList([]));
+  }, [customerId]);
+  return (
+    <>
+      <div className="row">
+        <Field label={t("Type")} optional>
+          <input id="field-equipment_type" name="equipment_type" list="equipment-types" defaultValue={machine?.equipment_type || ""} placeholder={t("e.g. {example}", { example: t("Generator") })} />
+        </Field>
+        <Field label={t("Manufacturer")} optional>
+          <input id="field-manufacturer" name="manufacturer" defaultValue={machine?.manufacturer || ""} placeholder={t("e.g. {example}", { example: "Caterpillar" })} />
+        </Field>
+      </div>
+      <datalist id="equipment-types">
+        {TYPE_SUGGESTIONS.map((type) => (
+          <option key={type} value={t(type)} />
+        ))}
+      </datalist>
+      <div className="row">
+        <Field label={t("Site")} optional hint={siteList.length ? undefined : t("Add the customer's sites on their page.")}>
+          <select id="field-site_id" name="site_id" defaultValue={machine?.site_id ? String(machine.site_id) : ""} key={siteList.length}>
+            <option value="">{t("No site")}</option>
+            {siteList.map((site) => (
+              <option key={site.id} value={site.id}>
+                {site.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label={t("Installed on")} optional>
+          <input id="field-installed_on" name="installed_on" type="date" defaultValue={machine?.installed_on || ""} />
+        </Field>
+      </div>
+      <Field label={t("Notes")} optional>
+        <textarea id="field-notes" name="notes" defaultValue={machine?.notes || ""} placeholder={t("e.g. {example}", { example: t("Fuel tank 500 L, key with the site guard") })} />
+      </Field>
+    </>
+  );
+}
+
 export function AddMachine({ customerId, onClose, onAdded }: { customerId?: number; onClose: () => void; onAdded: () => void }) {
   const [customerList, setCustomerList] = useState<Customer[]>([]);
+  const [chosen, setChosen] = useState<number | undefined>(customerId);
   const [formError, setFormError] = useState("");
   useEffect(() => {
     customers()
@@ -48,7 +111,14 @@ export function AddMachine({ customerId, onClose, onAdded }: { customerId?: numb
       <form className="form form-upgraded" onSubmit={submit}>
         {formError && <div className="error">{formError}</div>}
         <Field label={t("Customer")}>
-          <select id="field-customer_id" name="customer_id" defaultValue={customerId ? String(customerId) : ""} key={customerList.length} required>
+          <select
+            id="field-customer_id"
+            name="customer_id"
+            defaultValue={customerId ? String(customerId) : ""}
+            key={customerList.length}
+            onChange={(event) => setChosen(Number(event.target.value) || undefined)}
+            required
+          >
             <option value="">{t("Select customer")}</option>
             {customerList.map((customer) => (
               <option key={customer.id} value={customer.id}>
@@ -67,6 +137,7 @@ export function AddMachine({ customerId, onClose, onAdded }: { customerId?: numb
           <input id="field-serial_no" name="serial_no" placeholder={t("Serial number")} required />
         </Field>
         <StatusSelect />
+        <DetailFields customerId={chosen} />
         <button className="primary">
           <Plus size={15} /> {t("Add equipment")}
         </button>
@@ -116,6 +187,7 @@ export function EditMachine({ machine, onClose, onSaved }: { machine: Machine; o
         <input id="field-serial_no" name="serial_no" defaultValue={machine.serial_no} required />
       </Field>
       <StatusSelect value={machine.status} />
+      <DetailFields customerId={machine.customer_id} machine={machine} />
     </EditForm>
   );
 }

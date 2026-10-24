@@ -45,6 +45,13 @@ def test_each_visitor_gets_a_private_copy_of_the_demo_company(app, data):
     jobs = first.get("/api/jobs").get_json()["jobs"]
     assert len(jobs) == 8 and {job["status"] for job in jobs} >= {"In Progress", "Completed", "Paused", "Pending"}
     assert len(first.get("/api/customers").get_json()["customers"]) == 3
+    # Equipment has its sites and types, two maintenance plans, and the mixer a repeat fault.
+    assert len(first.get("/api/sites").get_json()["sites"]) == 4
+    machines = {row["name"]: row for row in first.get("/api/machines").get_json()["machines"]}
+    assert machines["Generator G-102"]["equipment_type"] == "Generator" and machines["Generator G-102"]["site_id"]
+    assert {name for name, row in machines.items() if row["repeat_faults"] >= 2} == {"Industrial Mixer MX-08"}
+    generator = first.get(f"/api/machines/{machines['Generator G-102']['id']}").get_json()["machine"]
+    assert [(plan["title"], plan["state"]) for plan in generator["plans"]] == [("Oil and filter change", "due")]
     # A change in one copy never shows up in another, or in a real company.
     first.delete(f"/api/jobs/{next(job['id'] for job in jobs if job['status'] == 'Pending')}", headers=csrf(first))
     assert len(first.get("/api/jobs").get_json()["jobs"]) == 7
@@ -183,6 +190,7 @@ def test_the_daily_url_needs_the_cron_secret(app, client, data):
         "old_offline_changes": 0,
         "deleted_companies": 0,
         "reminders": {"visit_reminders": 0, "repair_reminders": 0, "follow_ups": 0},
+        "maintenance": {"maintenance_jobs": 0, "service_due_reminders": 0},
     }
 
 

@@ -113,7 +113,7 @@ def local_upload(token):
 def confirm_upload(fid):
     """Step 3: check the upload arrived and is within limits, then show it on the job."""
     user = current_user()
-    record = JobFile.query.filter_by(id=fid, uploaded_by=user.id, company_id=user.company_id).first_or_404()
+    record = JobFile.query.filter(JobFile.id == fid, JobFile.uploaded_by == user.id, JobFile.company_id == user.company_id, JobFile.job_id.isnot(None)).first_or_404()
     job = worksheet_job(record.job_id, uploads=True)
     if record.status == "ready":
         return jsonify(job=job_detail(job, user))
@@ -144,7 +144,7 @@ def confirm_upload(fid):
 @roles("mechanic")
 def delete_file(fid):
     user = current_user()
-    record = JobFile.query.filter_by(id=fid, uploaded_by=user.id, company_id=user.company_id).first_or_404()
+    record = JobFile.query.filter(JobFile.id == fid, JobFile.uploaded_by == user.id, JobFile.company_id == user.company_id, JobFile.job_id.isnot(None)).first_or_404()
     if record.kind == "signature":
         raise ValidationError(_("Signatures can't be deleted"), 409)
     job = worksheet_job(record.job_id, uploads=True)
@@ -159,9 +159,17 @@ def delete_file(fid):
 @bp.get("/files/<int:fid>")
 @roles("boss", "mechanic", "customer")
 def get_file(fid):
-    """Hand out a file only to someone who can see its job (company and role checked by load_job)."""
+    """Hand out a file only to someone who can see its job (company and role checked by load_job),
+    or its equipment."""
     user = current_user()
     record = JobFile.query.filter_by(id=fid, company_id=user.company_id, status="ready").first_or_404()
+    if record.machine_id:
+        # An equipment document: whoever can see the equipment. Only photos open in the browser;
+        # other documents download.
+        from app.routes.equipment import visible_machine
+
+        visible_machine(record.machine_id)
+        return serve_file(record, attachment=request.args.get("download") == "1" or not record.content_type.startswith("image/"))
     load_job(record.job_id)
     return serve_file(record, attachment=request.args.get("download") == "1")
 

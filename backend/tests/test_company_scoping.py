@@ -11,6 +11,8 @@ import pytest
 
 from app import create_app, db
 from app.models import (
+    MaintenancePlan,
+    Site,
     ChecklistTemplate,
     ChecklistTemplateItem,
     Customer,
@@ -62,7 +64,12 @@ def acme_records(data):
     payment = Payment(
         company_id=acme, user_id=data["boss"], plan="starter", interval="month", amount_cents=150000, currency="KES", provider="test", reference="pay_acme_1"
     )
-    db.session.add_all([item, entry, part, request, notification, review, file, payment])
+    site = Site(company_id=acme, customer_id=data["acme_customer"], name="Main plant")
+    plan = MaintenancePlan(company_id=acme, machine_id=data["machine"], title="Oil change", every=3, unit="months", next_due=utcnow().date())
+    document = JobFile(
+        company_id=acme, machine_id=data["machine"], uploaded_by=data["boss"], kind="document", content_type="application/pdf", storage_key="acme/manual.pdf", status="ready"
+    )
+    db.session.add_all([item, entry, part, request, notification, review, file, payment, site, plan, document])
     db.session.commit()
     return {
         "tid": template.id,
@@ -79,6 +86,9 @@ def acme_records(data):
         "sid": shift.id,
         "uid": data["mechanic"],
         "reference": payment.reference,
+        "site": site.id,
+        "plan": plan.id,
+        "document": document.id,
     }
 
 
@@ -117,6 +127,17 @@ def attempts(ids):
         ("PUT", f"/api/jobs/{jid}/record", {"problem": "Stolen"}),
         ("GET", f"/api/jobs/{jid}/report.pdf", None),
         ("PATCH", f"/api/machines/{ids['mid']}", {"name": "Stolen"}),
+        ("GET", f"/api/machines/{ids['mid']}", None),
+        ("POST", f"/api/machines/{ids['mid']}/documents", {"content_type": "application/pdf", "size": 10, "name": "x.pdf"}),
+        ("POST", f"/api/machines/{ids['mid']}/documents/{ids['document']}/confirm", {}),
+        ("DELETE", f"/api/machines/{ids['mid']}/documents/{ids['document']}", None),
+        ("GET", f"/api/files/{ids['document']}", None),
+        ("POST", f"/api/machines/{ids['mid']}/plans", {"title": "Stolen", "every": 1, "unit": "days", "next_due": "2026-12-01"}),
+        ("PATCH", f"/api/plans/{ids['plan']}", {"title": "Stolen"}),
+        ("DELETE", f"/api/plans/{ids['plan']}", None),
+        ("POST", f"/api/plans/{ids['plan']}/job", {}),
+        ("PATCH", f"/api/sites/{ids['site']}", {"name": "Stolen"}),
+        ("DELETE", f"/api/sites/{ids['site']}", None),
         ("DELETE", f"/api/machines/{ids['mid']}", None),
         ("DELETE", f"/api/notifications/{ids['nid']}", None),
         ("PATCH", f"/api/notifications/{ids['nid']}/read", {}),
@@ -158,6 +179,9 @@ def test_people_from_another_company_can_reach_none_of_its_records(client, data,
     assert db.session.get(User, acme_records["uid"]).name == "Mech One"
     assert db.session.get(JobPart, acme_records["pid"]) is not None
     assert db.session.get(Notification, acme_records["nid"]).is_read is False
+    assert db.session.get(Site, acme_records["site"]).name == "Main plant"
+    assert db.session.get(MaintenancePlan, acme_records["plan"]).title == "Oil change"
+    assert db.session.get(JobFile, acme_records["document"]) is not None
 
 
 def test_every_id_route_is_covered(app, data, acme_records):
