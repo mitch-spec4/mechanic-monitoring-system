@@ -36,6 +36,19 @@ import {
   updateCustomer,
   type User,
 } from "../services/api";
+import type {
+  Company,
+  CustomerSummary,
+  EquipmentSummary,
+  Job,
+  Machine,
+  Mechanic,
+  Notification,
+  Report,
+  Review,
+  ServiceRecord,
+  ServiceRequest,
+} from "../services/types";
 import ChecklistManager from "../components/ChecklistManager";
 import MachinesByCustomer from "../components/MachinesByCustomer";
 import { machineSummary } from "./BossDashboard";
@@ -53,71 +66,112 @@ import { ROLE_NAMES } from "../components/Sidebar";
 import { errorMessage, formatBytes, formatDate } from "../lib/format";
 import { mark, t } from "../i18n";
 import { EmptyState, Loading } from "../components/States";
+import Field from "../components/Field";
 
-type Props = { title: string; user: User; onOpenJob?: (id: number) => void; onOpenCustomer?: (id: number) => void; onUserChanged?: (user: User) => void };
+type Props = {
+  title: string;
+  user: User;
+  onOpenJob?: (id: number) => void;
+  onOpenCustomer?: (id: number) => void;
+  onUserChanged?: (user: User) => void;
+};
 type Icon = LucideIcon;
-// Rows differ by page (jobs, customers, reviews...), so they're read loosely.
-type Row = Record<string, any>;
+/** One row on a list page: each page lists one kind of record. */
+type ListItem = Job | CustomerSummary | Mechanic | Machine | ServiceRecord | Review | Notification | ServiceRequest;
 type Resource = {
   /** The list's name, shown translated. */
   label: string;
   /** One line under the page title. */
   description: string;
   icon: Icon;
-  load?: () => Promise<any>;
-  key?: string;
-  filter?: (item: Row) => boolean;
+  /** The page's list, loaded when it opens. */
+  list?: () => Promise<ListItem[]>;
   /** What "Add" says on pages where managers can add to the list. */
   addLabel?: string;
 };
 
-const isActiveJob = (job: Row) => !["Completed", "Cancelled"].includes(job.status);
-const JOB_PAGES = ["My Jobs", "Assigned Jobs", "Jobs / Requests"];
+const isActiveJob = (job: Job) => !["Completed", "Cancelled"].includes(job.status);
+const jobList = () => jobs().then((data) => data.jobs);
 
 // Keys are the page names the sidebar uses (in English); labels and descriptions are shown translated.
 const resources: Record<string, Resource> = {
-  "Jobs / Requests": { label: mark("Jobs / requests"), description: mark("Every job across your team."), icon: ClipboardList, load: jobs, key: "jobs" },
-  "My Jobs": { label: mark("Jobs"), description: mark("Assigned work, status, priority, and scheduled visits."), icon: ClipboardList, load: jobs, key: "jobs" },
+  "Jobs / Requests": {
+    label: mark("Jobs / requests"),
+    description: mark("Every job across your team."),
+    icon: ClipboardList,
+    list: jobList,
+  },
+  "My Jobs": {
+    label: mark("Jobs"),
+    description: mark("Assigned work, status, priority, and scheduled visits."),
+    icon: ClipboardList,
+    list: jobList,
+  },
   "Assigned Jobs": {
     label: mark("Assigned jobs"),
     description: mark("Jobs assigned to you that are not finished yet."),
     icon: ClipboardList,
-    load: jobs,
-    key: "jobs",
-    filter: isActiveJob,
+    list: () => jobList().then((rows) => rows.filter(isActiveJob)),
   },
   Customers: {
     label: mark("Customers"),
     description: mark("Customers connected to your service company."),
     icon: Users,
-    load: customers,
-    key: "customers",
+    list: () => customers().then((data) => data.customers),
     addLabel: mark("Add customer"),
   },
   Technicians: {
     label: mark("Technicians"),
     description: mark("The technicians on your service team."),
     icon: Users,
-    load: mechanics,
-    key: "mechanics",
+    list: () => mechanics().then((data) => data.mechanics),
     addLabel: mark("Add technician"),
   },
   Equipment: {
     label: mark("Equipment"),
     description: mark("Tracked equipment and current operating status."),
     icon: Wrench,
-    load: machines,
-    key: "machines",
+    list: () => machines().then((data) => data.machines),
     addLabel: mark("Add equipment"),
   },
-  "Service Records": { label: mark("Service records"), description: mark("A searchable history of completed service work."), icon: FileText, load: services, key: "records" },
-  "Service History": { label: mark("Service history"), description: mark("Every service visit recorded on your equipment."), icon: FileText, load: services, key: "records" },
-  Reviews: { label: mark("Reviews"), description: mark("Ratings and feedback visible according to your role."), icon: Star, load: reviews, key: "reviews" },
-  Notifications: { label: mark("Notifications"), description: mark("Updates about your jobs, requests, and reviews."), icon: Bell, load: notifications, key: "notifications" },
-  "My Equipment": { label: mark("My equipment"), description: mark("Equipment registered to your account."), icon: Wrench, load: machines, key: "machines" },
-  "Service Requests": { label: mark("Service requests"), description: mark("Service you have requested and its current status."), icon: ClipboardList, load: requests, key: "requests" },
-  "My Company": { label: mark("My company"), description: mark("The service company that looks after your equipment."), icon: Users, load: company, key: "company" },
-  Reports: { label: mark("Reports"), description: mark("Operational performance for the data you are allowed to see."), icon: BarChart3, load: reports, key: "report" },
+  "Service Records": {
+    label: mark("Service records"),
+    description: mark("A searchable history of completed service work."),
+    icon: FileText,
+    list: () => services().then((data) => data.records),
+  },
+  "Service History": {
+    label: mark("Service history"),
+    description: mark("Every service visit recorded on your equipment."),
+    icon: FileText,
+    list: () => services().then((data) => data.records),
+  },
+  Reviews: {
+    label: mark("Reviews"),
+    description: mark("Ratings and feedback visible according to your role."),
+    icon: Star,
+    list: () => reviews().then((data) => data.reviews),
+  },
+  Notifications: {
+    label: mark("Notifications"),
+    description: mark("Updates about your jobs, requests, and reviews."),
+    icon: Bell,
+    list: () => notifications().then((data) => data.notifications),
+  },
+  "My Equipment": {
+    label: mark("My equipment"),
+    description: mark("Equipment registered to your account."),
+    icon: Wrench,
+    list: () => machines().then((data) => data.machines),
+  },
+  "Service Requests": {
+    label: mark("Service requests"),
+    description: mark("Service you have requested and its current status."),
+    icon: ClipboardList,
+    list: () => requests().then((data) => data.requests),
+  },
+  "My Company": { label: mark("My company"), description: mark("The service company that looks after your equipment."), icon: Users },
+  Reports: { label: mark("Reports"), description: mark("Operational performance for the data you are allowed to see."), icon: BarChart3 },
   Messages: { label: mark("Messages"), description: mark("Company conversations and job communication."), icon: MessageSquare },
   Settings: { label: mark("Settings"), description: mark("Your language, account and company settings."), icon: Cog },
   Profile: { label: mark("Profile"), description: mark("Your account details and access."), icon: UserRound },
@@ -136,17 +190,17 @@ const resources: Record<string, Resource> = {
 export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, onUserChanged = () => {} }: Props) {
   const resource = resources[title] || resources.Profile;
   const Icon = resource.icon;
-  const [items, setItems] = useState<Row[]>([]);
-  const [summary, setSummary] = useState<Row | null>(null);
+  const [items, setItems] = useState<ListItem[]>([]);
+  const [summary, setSummary] = useState<Report | null>(null);
   const [query, setQuery] = useState("");
-  const [companyInfo, setCompanyInfo] = useState<Row | null>(null);
+  const [companyInfo, setCompanyInfo] = useState<Company | null>(null);
   const [error, setError] = useState("");
   const [adding, setAdding] = useState(false);
-  const [editing, setEditing] = useState<Row | null>(null);
+  const [editing, setEditing] = useState<ListItem | null>(null);
   const [resetting, setResetting] = useState<{ id: number; name: string } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   // The Equipment page groups equipment under its customer.
-  const [customerList, setCustomerList] = useState<Row[]>([]);
+  const [customerList, setCustomerList] = useState<CustomerSummary[]>([]);
   const isBoss = user.role === "boss";
 
   useEffect(() => {
@@ -156,26 +210,24 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
     setError("");
     setAdding(false);
     setQuery("");
-    if (!resource.load) return;
-    resource
-      .load()
-      .then((data) => {
-        if (resource.key === "report") setSummary(data);
-        else if (resource.key === "company") setCompanyInfo(data.company);
-        else {
-          const rows = data[resource.key!] || [];
-          setItems(resource.filter ? rows.filter(resource.filter) : rows);
-        }
-      })
-      .catch((problem) => setError(errorMessage(problem)));
+    const failed = (problem: unknown) => setError(errorMessage(problem));
+    resource.list?.().then(setItems).catch(failed);
+    if (title === "Reports") reports().then(setSummary).catch(failed);
+    if (title === "My Company") {
+      company()
+        .then((data) => setCompanyInfo(data.company))
+        .catch(failed);
+    }
     if (title === "Equipment" && isBoss) {
       customers()
         .then((data) => setCustomerList(data.customers))
-        .catch((problem) => setError(errorMessage(problem)));
+        .catch(failed);
     }
   }, [title, reloadKey]);
 
   const filtered = items.filter((item) => JSON.stringify(item).toLowerCase().includes(query.toLowerCase()));
+  // Managers see each piece of equipment with what makes it need work.
+  const equipment = items.filter((item): item is EquipmentSummary => "serial_no" in item && item.work !== undefined);
   const canAdd = isBoss && !!resource.addLabel;
   const added = () => {
     setAdding(false);
@@ -198,23 +250,25 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
       toast(errorMessage(problem), "error");
     }
   };
-  const rowActions = (item: Row) => {
+  const rowActions = (item: ListItem) => {
     if (!isBoss) return null;
-    const resetId = title === "Technicians" ? item.id : title === "Customers" ? item.user_id : null;
+    // Customers and technicians can be helped back in: a customer through their sign-in account.
+    const person = "machine_count" in item ? { ...item, id: item.user_id } : "two_factor_enabled" in item ? item : null;
+    const resetId = person?.id;
     return (
       <>
-        {(title === "Equipment" || title === "Customers") && (
+        {("serial_no" in item || "machine_count" in item) && (
           <button className="listAction" onClick={() => setEditing(item)}>
             {t("Edit")}
           </button>
         )}
-        {resetId && (
-          <button className="listAction" onClick={() => setResetting({ id: resetId, name: item.name })}>
+        {person && resetId && (
+          <button className="listAction" onClick={() => setResetting({ id: resetId, name: person.name })}>
             {t("Reset password")}
           </button>
         )}
-        {resetId && item.two_factor_enabled && (
-          <button className="listAction" onClick={() => resetSecondStep(resetId, item.name)}>
+        {person && resetId && person.two_factor_enabled && (
+          <button className="listAction" onClick={() => resetSecondStep(resetId, person.name)}>
             {t("Reset two-step sign-in")}
           </button>
         )}
@@ -243,23 +297,38 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
       case "My Shifts":
         return <ShiftsView user={user} />;
       case "Messages":
-        return <EmptyState icon={<MessageSquare size={26} />} title={t("Messaging is not connected")} text={t("Conversation storage and permissions will appear here when the messaging service is enabled.")} />;
+        return (
+          <EmptyState
+            icon={<MessageSquare size={26} />}
+            title={t("Messaging is not connected")}
+            text={t("Conversation storage and permissions will appear here when the messaging service is enabled.")}
+          />
+        );
       case "Activity":
         return <ActivityLog />;
       case "Settings":
       case "Profile":
         return <SettingsPanel user={user} onUserChanged={onUserChanged} />;
     }
-    if (title === "Equipment" && isBoss && items.length) {
-      return <MachinesByCustomer machines={items} customers={customerList} query={query} onOpenJob={onOpenJob} onOpenCustomer={onOpenCustomer} onChanged={added} />;
+    if (title === "Equipment" && isBoss && equipment.length) {
+      return (
+        <MachinesByCustomer
+          machines={equipment}
+          customers={customerList}
+          query={query}
+          onOpenJob={onOpenJob}
+          onOpenCustomer={onOpenCustomer}
+          onChanged={added}
+        />
+      );
     }
     if (!filtered.length) {
       return <EmptyState icon={<Icon size={26} />} title={t("Nothing here yet")} text={t("New records will appear here as your team uses the workspace.")} />;
     }
     return (
       <div className="subPageList">
-        {(title === "Customers" ? sortByNeedsWork(filtered) : filtered).map((item, index) => (
-          <ResourceRow key={item.id || index} item={item} title={title} Icon={Icon} actions={rowActions(item)} onOpenJob={onOpenJob} onOpenCustomer={onOpenCustomer} />
+        {(title === "Customers" ? sortByNeedsWork(filtered) : filtered).map((item) => (
+          <ResourceRow key={item.id} item={item} Icon={Icon} actions={rowActions(item)} onOpenJob={onOpenJob} onOpenCustomer={onOpenCustomer} />
         ))}
       </div>
     );
@@ -269,7 +338,7 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
     <main className="subPage">
       <div className="subPageHeading">
         <div>
-          <span className="eyebrow">MECHANIC PRO / {t(ROLE_NAMES[user.role] ?? user.role).toUpperCase()}</span>
+          <span className="eyebrow">MECHANIC PRO / {t(ROLE_NAMES[user.role]).toUpperCase()}</span>
           <h1>{t(title)}</h1>
           <p>{t(resource.description)}</p>
         </div>
@@ -280,7 +349,7 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
       {isBoss && user.email_verified === false && (title === "Customers" || title === "Technicians") && <VerifyBanner user={user} onVerified={onUserChanged} />}
       {summary ? (
         <ReportSummary summary={summary} />
-      ) : !resource.load || resource.key === "company" ? null : (
+      ) : !resource.list ? null : (
         <div className="subPageStats">
           <div>
             <Icon size={20} />
@@ -323,14 +392,14 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
       {adding && (title === "Customers" || title === "Technicians") && (
         <InviteForm role={title === "Customers" ? "customer" : "mechanic"} onClose={() => setAdding(false)} onDone={added} />
       )}
-      {editing && title === "Equipment" && <EditMachine machine={editing as any} onClose={() => setEditing(null)} onSaved={added} />}
-      {editing && title === "Customers" && <EditCustomer customer={editing} onClose={() => setEditing(null)} onSaved={added} />}
+      {editing && "serial_no" in editing && <EditMachine machine={editing} onClose={() => setEditing(null)} onSaved={added} />}
+      {editing && "machine_count" in editing && <EditCustomer customer={editing} onClose={() => setEditing(null)} onSaved={added} />}
       {resetting && <ResetPassword userId={resetting.id} name={resetting.name} onClose={() => setResetting(null)} />}
     </main>
   );
 }
 
-function EditCustomer({ customer, onClose, onSaved }: { customer: Row; onClose: () => void; onSaved: () => void }) {
+function EditCustomer({ customer, onClose, onSaved }: { customer: CustomerSummary; onClose: () => void; onSaved: () => void }) {
   return (
     <EditForm
       title={t("Edit customer")}
@@ -340,23 +409,20 @@ function EditCustomer({ customer, onClose, onSaved }: { customer: Row; onClose: 
         onSaved();
       }}
     >
-      <div className="formGroup">
-        <label htmlFor="field-name">{t("Company or organisation name")}</label>
+      <Field label={t("Company or organisation name")}>
         <input id="field-name" name="name" defaultValue={customer.name} required />
-      </div>
-      <div className="formGroup">
-        <label htmlFor="field-email">{t("Contact email")}</label>
+      </Field>
+      <Field label={t("Contact email")}>
         <input id="field-email" name="email" type="email" defaultValue={customer.email} required />
-      </div>
-      <div className="formGroup">
-        <label htmlFor="field-phone">{t("Phone")}</label>
+      </Field>
+      <Field label={t("Phone")}>
         <input id="field-phone" name="phone" defaultValue={customer.phone || ""} />
-      </div>
+      </Field>
     </EditForm>
   );
 }
 
-function CompanyView({ company }: { company: Row }) {
+function CompanyView({ company }: { company: Company }) {
   return (
     <div className="settingsView">
       <div>
@@ -367,7 +433,7 @@ function CompanyView({ company }: { company: Row }) {
         <span>{t("Location")}</span>
         <strong>{company.location || t("Not recorded")}</strong>
       </div>
-      {company.contacts.map((contact: { name: string; email: string }) => (
+      {company.contacts.map((contact) => (
         <div key={contact.email}>
           <span>{t("Manager")}</span>
           <strong>
@@ -379,28 +445,33 @@ function CompanyView({ company }: { company: Row }) {
   );
 }
 
-const sortByNeedsWork = (rows: Row[]) => [...rows].sort((a, b) => Number(b.needs_work_count > 0) - Number(a.needs_work_count > 0));
+const needsWork = (row: ListItem) => "needs_work_count" in row && row.needs_work_count > 0;
+const sortByNeedsWork = (rows: ListItem[]) => [...rows].sort((a, b) => Number(needsWork(b)) - Number(needsWork(a)));
 
-type RowProps = { item: Row; title: string; Icon: Icon; actions: ReactNode; onOpenJob?: (id: number) => void; onOpenCustomer?: (id: number) => void };
+/** What a row says: a heading, a line under it, and a status or badge. Jobs, and service
+ *  records that belong to a job, open the job's worksheet. */
+type Description = { heading: string; detail: string; status?: string; badge?: string; jobId?: number | null };
 
-function ResourceRow({ item, title, Icon, actions, onOpenJob, onOpenCustomer }: RowProps) {
-  const isJob = JOB_PAGES.includes(title);
-  const isCustomer = title === "Customers" && onOpenCustomer;
-  // Jobs, and service records that belong to a job, open the job's worksheet.
-  const jobId = isJob ? item.id : item.job_id;
-  const heading = item.title || item.name || item.service_type || item.subject || t("Untitled");
-  const detail = isJob
-    ? [t(item.priority || "Medium"), item.location || t("No site"), item.due_date ? t("Due {date}", { date: formatDate(item.due_date) }) : ""].filter(Boolean).join(" · ")
-    : item.email || item.message || item.work_done || item.description || item.comment || item.model || t("No additional details");
-  const badge = item.status
-    ? t(item.status)
-    : title === "Reviews"
-      ? `${item.rating}/5`
-      : title === "Notifications"
-        ? item.is_read
-          ? t("Read")
-          : t("New")
-        : t("Active");
+function describe(item: ListItem): Description {
+  if ("is_read" in item) return { heading: item.title, detail: item.message, badge: item.is_read ? t("Read") : t("New") };
+  if ("rating" in item) return { heading: item.comment || t("No written comment was provided."), detail: formatDate(item.created_at), badge: `${item.rating}/5` };
+  if ("service_type" in item) return { heading: item.service_type, detail: item.work_done || t("No additional details"), jobId: item.job_id };
+  if ("subject" in item) return { heading: item.subject, detail: item.description, status: item.status };
+  if ("serial_no" in item) return { heading: item.name, detail: item.model || t("No additional details"), status: item.status };
+  if ("priority" in item) {
+    const due = item.due_date ? t("Due {date}", { date: formatDate(item.due_date) }) : "";
+    const detail = [t(item.priority || "Medium"), item.location || t("No site"), due].filter(Boolean).join(" · ");
+    return { heading: item.title, detail, status: item.status, jobId: item.id };
+  }
+  // Customers and technicians.
+  return { heading: item.name, detail: item.email };
+}
+
+type RowProps = { item: ListItem; Icon: Icon; actions: ReactNode; onOpenJob?: (id: number) => void; onOpenCustomer?: (id: number) => void };
+
+function ResourceRow({ item, Icon, actions, onOpenJob, onOpenCustomer }: RowProps) {
+  const { heading, detail, status, badge, jobId } = describe(item);
+  const customer = onOpenCustomer && "machine_count" in item ? item : null;
   return (
     <article>
       <span className="listIcon">
@@ -411,8 +482,8 @@ function ResourceRow({ item, title, Icon, actions, onOpenJob, onOpenCustomer }: 
           <button className="titleLink" onClick={() => onOpenJob(jobId)}>
             <strong>{heading}</strong>
           </button>
-        ) : isCustomer ? (
-          <button className="titleLink" onClick={() => onOpenCustomer(item.id)}>
+        ) : customer && onOpenCustomer ? (
+          <button className="titleLink" onClick={() => onOpenCustomer(customer.id)}>
             <strong>{heading}</strong>
           </button>
         ) : (
@@ -420,15 +491,15 @@ function ResourceRow({ item, title, Icon, actions, onOpenJob, onOpenCustomer }: 
         )}
         <small>
           {detail}
-          {isCustomer && (
+          {customer && (
             <>
               {" · "}
-              <span className={item.needs_work_count ? "needsWorkText" : ""}>{machineSummary(item)}</span>
+              <span className={customer.needs_work_count ? "needsWorkText" : ""}>{machineSummary(customer)}</span>
             </>
           )}
         </small>
       </div>
-      <span className={`dataStatus ${String(item.status || "Active").replace(/ /g, "").toLowerCase()}`}>{badge}</span>
+      <span className={`dataStatus ${String(status || "Active").replace(/ /g, "").toLowerCase()}`}>{status ? t(status) : (badge ?? t("Active"))}</span>
       {actions}
     </article>
   );
@@ -446,12 +517,9 @@ const REPORT_LABELS: Record<string, string> = {
 };
 const SEGMENT_COLORS = { pending: "#f59e0b", progress: "#3b82f6", completed: "#10b981", rest: "#e5e7eb" };
 
-function ReportSummary({ summary }: { summary: Row }) {
-  const jobSummary = summary.jobs || {};
-  const pending = jobSummary.pending || 0;
-  const inProgress = jobSummary.in_progress || 0;
-  const completed = jobSummary.completed || 0;
-  const cancelled = jobSummary.cancelled || 0;
+function ReportSummary({ summary }: { summary: Report }) {
+  const jobSummary = summary.jobs;
+  const { pending, in_progress: inProgress, completed, cancelled } = jobSummary;
   const chartItems = [
     [t("Pending"), pending, "pending"],
     [t("In progress"), inProgress, "progress"],
@@ -464,11 +532,17 @@ function ReportSummary({ summary }: { summary: Row }) {
   const angle1 = share(pending);
   const angle2 = angle1 + share(inProgress);
   const angle3 = angle2 + share(completed);
-  const gradient = `conic-gradient(${SEGMENT_COLORS.pending} ${angle1}deg, ${SEGMENT_COLORS.progress} ${angle1}deg ${angle2}deg, ${SEGMENT_COLORS.completed} ${angle2}deg ${angle3}deg, ${SEGMENT_COLORS.rest} ${angle3}deg 360deg)`;
+  const slices = [
+    `${SEGMENT_COLORS.pending} ${angle1}deg`,
+    `${SEGMENT_COLORS.progress} ${angle1}deg ${angle2}deg`,
+    `${SEGMENT_COLORS.completed} ${angle2}deg ${angle3}deg`,
+    `${SEGMENT_COLORS.rest} ${angle3}deg 360deg`,
+  ];
+  const gradient = `conic-gradient(${slices.join(", ")})`;
   const numbers: Record<string, string | number> = {
     ...jobSummary,
-    rating: summary.rating == null ? "-" : Number(summary.rating).toFixed(1),
-    ...(summary.totals?.storage_bytes != null ? { storage_used: formatBytes(summary.totals.storage_bytes) } : {}),
+    rating: summary.rating == null ? "-" : summary.rating.toFixed(1),
+    ...(summary.totals.storage_bytes != null ? { storage_used: formatBytes(summary.totals.storage_bytes) } : {}),
   };
 
   return (

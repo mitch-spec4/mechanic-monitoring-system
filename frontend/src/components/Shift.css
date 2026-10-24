@@ -70,7 +70,7 @@
 .locationPill {
   position: fixed;
   top: 22px;
-  right: 210px;
+  inset-inline-end: 210px;
   z-index: 40;
   display: inline-flex;
   align-items: center;
@@ -135,7 +135,7 @@
   display: grid;
   gap: 8px;
   margin: 0;
-  padding-left: 18px;
+  padding-inline-start: 18px;
 }
 .consentActions {
   display: flex;
@@ -185,7 +185,7 @@
   .locationPill {
     top: auto;
     bottom: 14px;
-    right: 14px;
+    inset-inline-end: 14px;
     padding: 8px 13px;
     font-size: 12px;
     box-shadow: 0 8px 24px #17203326;

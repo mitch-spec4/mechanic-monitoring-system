@@ -2,7 +2,7 @@
 .toasts {
   position: fixed;
   z-index: 70;
-  left: 50%;
+  left: 50%; /* physical: centred, the same in both directions */
   bottom: 22px;
   display: grid;
   gap: 8px;
@@ -14,7 +14,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 11px 12px 11px 14px;
+  padding-block: 11px;
+  padding-inline: 14px 12px;
   border-radius: 12px;
   color: #fff;
   background: #0f1d33;

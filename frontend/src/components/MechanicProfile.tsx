@@ -1,21 +1,20 @@
 import { useEffect, useState } from "react";
 import { X, Star, CheckCircle2, Clock, Wrench } from "lucide-react";
 import { jobs, reviews } from "../services/api";
+import type { Job, Mechanic, Review } from "../services/types";
 import { t } from "../i18n";
 
-type Props = { mechanic: any; onClose: () => void };
+type Props = { mechanic: Mechanic; onClose: () => void };
 
 export default function MechanicProfile({ mechanic, onClose }: Props) {
-  const [jobsData, setJobsData] = useState<any[]>([]);
-  const [reviewsData, setReviewsData] = useState<any[]>([]);
+  const [jobsData, setJobsData] = useState<Job[]>([]);
+  const [reviewsData, setReviewsData] = useState<Review[]>([]);
 
   useEffect(() => {
     Promise.all([jobs(), reviews()])
       .then(([j, r]) => {
-        const mechanicJobs = j.jobs.filter((x: any) => x.mechanic_id === mechanic.id);
-        const mechanicReviews = r.reviews.filter((x: any) => x.mechanic_id === mechanic.id);
-        setJobsData(mechanicJobs);
-        setReviewsData(mechanicReviews);
+        setJobsData(j.jobs.filter((job) => job.mechanic_id === mechanic.id));
+        setReviewsData(r.reviews.filter((review) => review.mechanic_id === mechanic.id));
       })
       .catch(() => {});
   }, [mechanic.id]);

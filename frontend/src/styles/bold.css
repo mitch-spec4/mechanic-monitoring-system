@@ -129,7 +129,8 @@ body {
   align-items: center;
   gap: 7px;
   width: fit-content;
-  padding: 5px 11px 5px 9px;
+  padding-block: 5px;
+  padding-inline: 9px 11px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 11%, var(--surface));
   border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
@@ -154,7 +155,7 @@ body {
     radial-gradient(240px 260px at 0% 0%, color-mix(in srgb, var(--accent) 45%, transparent), transparent 70%),
     radial-gradient(260px 300px at 100% 100%, color-mix(in srgb, var(--accent-2) 32%, transparent), transparent 70%),
     var(--accent-deep);
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  border-inline-end: 1px solid rgba(255, 255, 255, 0.06);
   box-shadow: 8px 0 30px -18px rgba(0, 0, 0, 0.6);
 }
 .appShell .sidebarBrand {
@@ -203,7 +204,7 @@ body {
   /* light-only: the sidebar is dark in both themes */
   content: "";
   position: absolute;
-  left: -7px;
+  inset-inline-start: -7px;
   top: 22%;
   bottom: 22%;
   width: 4px;
@@ -227,10 +228,10 @@ body {
     width: 200px;
   }
   .appShell .appMain {
-    margin-left: 200px;
+    margin-inline-start: 200px;
   }
   .appShell .demoBar {
-    left: 200px;
+    inset-inline-start: 200px;
   }
 }
 
@@ -316,13 +317,13 @@ body {
 .appShell :is(.appMain .welcome, .dashHeading)::before {
   width: 260px;
   height: 260px;
-  right: -60px;
+  inset-inline-end: -60px;
   top: -120px;
 }
 .appShell :is(.appMain .welcome, .dashHeading)::after {
   width: 160px;
   height: 160px;
-  right: 140px;
+  inset-inline-end: 140px;
   bottom: -110px;
   background: radial-gradient(circle, rgba(255, 255, 255, 0.12), transparent 70%);
 }
@@ -367,7 +368,7 @@ body {
 
 /* ---------- Cards ---------- */
 /* Plain white cards only; the job header, clock card and plan banner keep their own colours. */
-.appShell :is(.panel, .dashPanel, .pendingPanel, .subPagePanel, .chartPanel, .settingsSection, .billingCard, .jobCard) {
+.appShell :is(.panel, .dashPanel, .pendingPanel, .todayPanel, .subPagePanel, .chartPanel, .settingsSection, .billingCard, .jobCard) {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -496,7 +497,8 @@ body {
 .appShell .subPageStats > div {
   grid-template-columns: 40px minmax(0, 1fr);
   column-gap: 14px;
-  padding: 16px 20px 16px 16px;
+  padding-block: 16px;
+  padding-inline: 16px 20px;
   min-width: 190px;
 }
 .appShell .appMain .stat > svg {
@@ -578,7 +580,8 @@ body {
   align-items: center;
   gap: 6px;
   width: fit-content;
-  padding: 4px 10px 4px 8px;
+  padding-block: 4px;
+  padding-inline: 8px 10px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--st) 30%, transparent);
   background: color-mix(in srgb, var(--st) 13%, var(--surface));
@@ -698,7 +701,8 @@ body {
 }
 /* The search box draws the border; its input sits inside without one. */
 .appShell .searchBox {
-  padding: 2px 6px 2px 14px;
+  padding-block: 2px;
+  padding-inline: 14px 6px;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
   background: var(--surface);

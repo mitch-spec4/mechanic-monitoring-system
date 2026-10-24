@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { FlaskConical } from "lucide-react";
-import { switchDemo } from "../services/api";
+import { switchDemo, type User } from "../services/api";
 import { errorMessage } from "../lib/format";
 import { mark, t } from "../i18n";
 import "./Onboarding.css";
 
-type Props = { user: any; onSwitched: (user: any) => void; onLeave: () => void };
+type Props = { user: User; onSwitched: (user: User) => void; onLeave: () => void };
 
 export const DEMO_ROLES = [
   ["boss", mark("Boss")],
@@ -34,7 +34,11 @@ export default function DemoBar({ user, onSwitched, onLeave }: Props) {
       <FlaskConical size={17} aria-hidden="true" />
       <p>
         <b>{t("Demo company.")}</b>{" "}
-        <span className="demoWide">{hoursLeft === 1 ? t("Your private copy with sample data, deleted in 1 hour.") : t("Your private copy with sample data, deleted in {count} hours.", { count: hoursLeft })}</span>
+        <span className="demoWide">
+          {hoursLeft === 1
+            ? t("Your private copy with sample data, deleted in 1 hour.")
+            : t("Your private copy with sample data, deleted in {count} hours.", { count: hoursLeft })}
+        </span>
         <span className="demoNarrow">{hoursLeft === 1 ? t("Deleted in 1 hour.") : t("Deleted in {count} hours.", { count: hoursLeft })}</span>
       </p>
       <div className="demoRoles" role="group" aria-label={t("View the demo as")}>

@@ -6,6 +6,7 @@ import { SiteNav } from "../pages/Home";
 import { Trans } from "../i18n/Trans";
 import { t } from "../i18n";
 import "../pages/Home.css";
+import { BackArrow } from "./Arrows";
 
 /** The required "I agree" box at signup and when joining a company. The links open in a new tab,
  *  so a half-filled form isn't lost. */
@@ -94,7 +95,7 @@ export function LegalPage({ name }: { name: "privacy" | "terms" }) {
       <SiteNav>
         <div className="navActions">
           <button className="btn outline" onClick={() => go("/")}>
-            ← {t("Back to the homepage")}
+            <BackArrow /> {t("Back to the homepage")}
           </button>
         </div>
       </SiteNav>

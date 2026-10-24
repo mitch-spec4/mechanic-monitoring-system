@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { MailWarning } from "lucide-react";
-import { me, resendVerification } from "../services/api";
+import { me, resendVerification, type User } from "../services/api";
 import { errorMessage } from "../lib/format";
 import { t } from "../i18n";
 import "./Onboarding.css";
 
-type Props = { user: any; onVerified: (user: any) => void };
+type Props = { user: User; onVerified: (user: User) => void };
 
 /** Until the boss opens the link in the verification email, inviting people is switched off. */
 export default function VerifyBanner({ user, onVerified }: Props) {

@@ -118,10 +118,11 @@ def signup():
     if pay_now and not provider():
         raise ValidationError(_("Online payments aren't set up yet. Start with the free trial."), 409)
 
-    company = Company(name=company_name)
+    # The company starts in the language its owner signed up in.
+    company = Company(name=company_name, language=current_language())
     db.session.add(company)
     db.session.flush()
-    boss = User(name=name, email=email, role="boss", company_id=company.id, language=current_language())
+    boss = User(name=name, email=email, role="boss", company_id=company.id, language=company.language)
     boss.set_password(password)
     record_agreement(boss)
     db.session.add(boss)

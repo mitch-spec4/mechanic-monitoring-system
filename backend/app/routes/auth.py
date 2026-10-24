@@ -25,7 +25,7 @@ from app.utils.time import utcnow
 from app.services.legal import record_agreement
 from app.utils.validation import ValidationError, agreed_to_terms, json_body, text
 from app.utils.validation import email as read_email
-from app.i18n import _, current_language
+from app.i18n import LANGUAGES, _
 
 bp = Blueprint("auth", __name__)
 MIN_PASSWORD_LENGTH = 8
@@ -266,7 +266,8 @@ def accept_invitation():
         role=invitation.role,
         company_id=invitation.company_id,
         customer_id=customer_id,
-        language=current_language(),
+        # The company's language, unless the person picked one on the join page.
+        language=data["language"] if data.get("language") in LANGUAGES else db.session.get(Company, invitation.company_id).language,
     )
     user.set_password(password)
     record_agreement(user)

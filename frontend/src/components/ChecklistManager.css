@@ -56,12 +56,12 @@
   display: grid;
   gap: 6px;
   margin: 0;
-  padding-left: 18px;
+  padding-inline-start: 18px;
   font-size: 13px;
 }
 .checklistCard em,
 .checklistEditor em {
-  margin-left: 6px;
+  margin-inline-start: 6px;
   padding: 1px 7px;
   border-radius: 999px;
   font-size: 10px;

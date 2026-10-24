@@ -27,16 +27,26 @@ function isLanguage(value: unknown): value is Language {
   return typeof value === "string" && value in LANGUAGES;
 }
 
-function stored(): Language {
+/** The language someone picked on this device (or their account's), if they ever did. */
+export function explicitLanguage(): Language | null {
   try {
     const value = localStorage.getItem(STORAGE_KEY);
-    return isLanguage(value) ? value : "en";
+    return isLanguage(value) ? value : null;
   } catch {
-    return "en";
+    return null;
   }
 }
 
-let current: Language = stored();
+/** A first visit: English, unless the phone or browser is set to one of the app's other languages. */
+export function browserLanguage(languages: readonly string[] = navigator.languages ?? [navigator.language]): Language {
+  for (const tag of languages) {
+    const code = tag.toLowerCase().split("-")[0];
+    if (isLanguage(code)) return code;
+  }
+  return "en";
+}
+
+let current: Language = explicitLanguage() ?? browserLanguage();
 
 function applyToPage(language: Language) {
   document.documentElement.lang = language;
@@ -63,7 +73,12 @@ export function setLanguage(next: unknown) {
 }
 
 export function t(text: string, values?: Record<string, string | number>) {
-  const translated = CATALOGS[current][text] ?? text;
+  return inLanguage(current, text, values);
+}
+
+/** Text in a given language, whatever the app is in: for offering another language. */
+export function inLanguage(language: Language, text: string, values?: Record<string, string | number>) {
+  const translated = CATALOGS[language][text] ?? text;
   return values ? translated.replace(/\{(\w+)\}/g, (match, key: string) => (key in values ? String(values[key]) : match)) : translated;
 }
 

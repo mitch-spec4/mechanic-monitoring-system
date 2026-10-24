@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { LogOut, UserRound } from "lucide-react";
 import { ROLE_NAMES } from "./Sidebar";
+import type { User } from "../services/api";
 import { t } from "../i18n";
 import "./Profile.css";
 
-type ProfileProps = { user: any; onLogout: () => void };
+type ProfileProps = { user: User; onLogout: () => void };
 
 export default function Profile({ user, onLogout }: ProfileProps) {
   const [open, setOpen] = useState(false);
@@ -31,7 +32,7 @@ export default function Profile({ user, onLogout }: ProfileProps) {
         <span className="profileAvatar">{user.name[0].toUpperCase()}</span>
         <span className="profileIdentity">
           <strong>{user.name}</strong>
-          <small>{t(ROLE_NAMES[user.role] ?? user.role)}</small>
+          <small>{t(ROLE_NAMES[user.role])}</small>
         </span>
         <span className="profileChevron" aria-hidden="true">
           {open ? "⌃" : "⌄"}

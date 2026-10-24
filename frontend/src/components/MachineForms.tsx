@@ -1,20 +1,19 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Plus, Wrench } from "lucide-react";
 import Modal from "./Modal";
+import Field from "./Field";
 import { createMachine, customers, updateMachine } from "../services/api";
+import type { Customer, Machine } from "../services/types";
 import { errorMessage } from "../lib/format";
 import { EQUIPMENT_STATUSES } from "../lib/labels";
 import { t } from "../i18n";
 
-type Customer = { id: number; name: string };
-type Equipment = { id: number; name: string; model?: string | null; serial_no: string; status: string };
 
 const formData = (event: FormEvent<HTMLFormElement>) => Object.fromEntries(new FormData(event.currentTarget));
 
 function StatusSelect({ value = "Operational" }: { value?: string }) {
   return (
-    <div className="formGroup">
-      <label htmlFor="field-status">{t("Status")}</label>
+    <Field label={t("Status")}>
       <select id="field-status" name="status" defaultValue={value}>
         {EQUIPMENT_STATUSES.map((status) => (
           <option key={status} value={status}>
@@ -22,7 +21,7 @@ function StatusSelect({ value = "Operational" }: { value?: string }) {
           </option>
         ))}
       </select>
-    </div>
+    </Field>
   );
 }
 
@@ -48,8 +47,7 @@ export function AddMachine({ customerId, onClose, onAdded }: { customerId?: numb
     <Modal title={t("Add equipment")} icon={<Wrench size={20} />} onClose={onClose}>
       <form className="form form-upgraded" onSubmit={submit}>
         {formError && <div className="error">{formError}</div>}
-        <div className="formGroup">
-          <label htmlFor="field-customer_id">{t("Customer")}</label>
+        <Field label={t("Customer")}>
           <select id="field-customer_id" name="customer_id" defaultValue={customerId ? String(customerId) : ""} key={customerList.length} required>
             <option value="">{t("Select customer")}</option>
             {customerList.map((customer) => (
@@ -58,19 +56,16 @@ export function AddMachine({ customerId, onClose, onAdded }: { customerId?: numb
               </option>
             ))}
           </select>
-        </div>
-        <div className="formGroup">
-          <label htmlFor="field-name">{t("Equipment name")}</label>
+        </Field>
+        <Field label={t("Equipment name")}>
           <input id="field-name" name="name" placeholder={t("e.g. {example}", { example: "Generator G-102" })} required />
-        </div>
-        <div className="formGroup">
-          <label htmlFor="field-model">{t("Model")}</label>
+        </Field>
+        <Field label={t("Model")} optional>
           <input id="field-model" name="model" placeholder={t("e.g. {example}", { example: "CAT XQ200" })} />
-        </div>
-        <div className="formGroup">
-          <label htmlFor="field-serial_no">{t("Serial number")}</label>
+        </Field>
+        <Field label={t("Serial number")}>
           <input id="field-serial_no" name="serial_no" placeholder={t("Serial number")} required />
-        </div>
+        </Field>
         <StatusSelect />
         <button className="primary">
           <Plus size={15} /> {t("Add equipment")}
@@ -104,25 +99,22 @@ export function EditForm({ title, onClose, save, children }: EditFormProps) {
   );
 }
 
-export function EditMachine({ machine, onClose, onSaved }: { machine: Equipment; onClose: () => void; onSaved: () => void }) {
+export function EditMachine({ machine, onClose, onSaved }: { machine: Machine; onClose: () => void; onSaved: () => void }) {
   const save = async (data: Record<string, FormDataEntryValue>) => {
     await updateMachine(machine.id, data);
     onSaved();
   };
   return (
     <EditForm title={t("Edit equipment")} onClose={onClose} save={save}>
-      <div className="formGroup">
-        <label htmlFor="field-name">{t("Equipment name")}</label>
+      <Field label={t("Equipment name")}>
         <input id="field-name" name="name" defaultValue={machine.name} required />
-      </div>
-      <div className="formGroup">
-        <label htmlFor="field-model">{t("Model")}</label>
+      </Field>
+      <Field label={t("Model")} optional>
         <input id="field-model" name="model" defaultValue={machine.model || ""} />
-      </div>
-      <div className="formGroup">
-        <label htmlFor="field-serial_no">{t("Serial number")}</label>
+      </Field>
+      <Field label={t("Serial number")}>
         <input id="field-serial_no" name="serial_no" defaultValue={machine.serial_no} required />
-      </div>
+      </Field>
       <StatusSelect value={machine.status} />
     </EditForm>
   );

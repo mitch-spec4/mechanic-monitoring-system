@@ -1,22 +1,24 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { AlertTriangle, Clock, MapPin } from "lucide-react";
 import Modal from "./Modal";
-import { correctShift, mechanics, shiftList } from "../services/api";
+import { correctShift, mechanics, shiftList, type User } from "../services/api";
+import type { Mechanic, Shift } from "../services/types";
 import { asDate, errorMessage, formatDay as day, formatTime as time, fromZoneInput, toZoneInput } from "../lib/format";
 import { mapLink } from "../lib/location";
 import { t } from "../i18n";
 import "./Team.css";
 import { EmptyState } from "./States";
+import Field from "./Field";
 
 /** Shift times and hours. Managers see everyone and can fix a clock-out; technicians see their own. */
-export default function ShiftsView({ user }: { user: any }) {
+export default function ShiftsView({ user }: { user: User }) {
   const isBoss = user.role === "boss";
-  const [shifts, setShifts] = useState<any[] | null>(null);
-  const [people, setPeople] = useState<any[]>([]);
+  const [shifts, setShifts] = useState<Shift[] | null>(null);
+  const [people, setPeople] = useState<Mechanic[]>([]);
   const [mechanicId, setMechanicId] = useState<number | "">("");
   const [days, setDays] = useState(14);
   const [error, setError] = useState("");
-  const [fixing, setFixing] = useState<any>(null);
+  const [fixing, setFixing] = useState<Shift | null>(null);
 
   const load = () =>
     shiftList({ mechanic_id: mechanicId, days })
@@ -26,7 +28,7 @@ export default function ShiftsView({ user }: { user: any }) {
     load();
   }, [mechanicId, days]);
   useEffect(() => {
-    if (isBoss) mechanics().then((data) => setPeople(data.mechanics || [])).catch(() => {});
+    if (isBoss) mechanics().then((data) => setPeople(data.mechanics)).catch(() => {});
   }, [isBoss]);
 
   const total = (shifts || []).reduce((sum, shift) => sum + shift.hours, 0);
@@ -35,8 +37,7 @@ export default function ShiftsView({ user }: { user: any }) {
       {error && <div className="error">{error}</div>}
       <div className="shiftFilters">
         {isBoss && (
-          <label>
-            {t("Technician")}
+          <Field wrap label={t("Technician")}>
             <select value={mechanicId} onChange={(e) => setMechanicId(e.target.value ? Number(e.target.value) : "")}>
               <option value="">{t("Everyone")}</option>
               {people.map((person) => (
@@ -45,10 +46,9 @@ export default function ShiftsView({ user }: { user: any }) {
                 </option>
               ))}
             </select>
-          </label>
+          </Field>
         )}
-        <label>
-          {t("Period")}
+        <Field wrap label={t("Period")}>
           <select value={days} onChange={(e) => setDays(Number(e.target.value))}>
             {[7, 14, 30, 90].map((count) => (
               <option key={count} value={count}>
@@ -56,7 +56,7 @@ export default function ShiftsView({ user }: { user: any }) {
               </option>
             ))}
           </select>
-        </label>
+        </Field>
         <span className="shiftTotal">
           <Clock size={14} /> {t("{hours} h total", { hours: total.toFixed(1) })}
         </span>
@@ -92,8 +92,8 @@ export default function ShiftsView({ user }: { user: any }) {
                 {shift.edited && (
                   <small title={shift.original_clocked_out_at ? t("Originally {time}", { time: time(shift.original_clocked_out_at) }) : t("Clock-out set by a manager")}>
                     {shift.original_clocked_out_at
-                      ? t("Set by {name} (was {time})", { name: shift.edited_by, time: time(shift.original_clocked_out_at) })
-                      : t("Set by {name}", { name: shift.edited_by })}
+                      ? t("Set by {name} (was {time})", { name: shift.edited_by ?? t("a manager"), time: time(shift.original_clocked_out_at) })
+                      : t("Set by {name}", { name: shift.edited_by ?? t("a manager") })}
                   </small>
                 )}
               </span>
@@ -106,7 +106,7 @@ export default function ShiftsView({ user }: { user: any }) {
                 )}
               </span>
               <span role="cell" data-label={t("Clock-in place")}>
-                {shift.clock_in_location?.latitude != null ? (
+                {shift.clock_in_location?.latitude != null && shift.clock_in_location.longitude != null ? (
                   <a href={mapLink(shift.clock_in_location.latitude, shift.clock_in_location.longitude)} target="_blank" rel="noreferrer">
                     <MapPin size={11} /> {t("Map")}
                   </a>
@@ -141,7 +141,7 @@ export default function ShiftsView({ user }: { user: any }) {
   );
 }
 
-function FixShift({ shift, onClose, onSaved }: { shift: any; onClose: () => void; onSaved: () => void }) {
+function FixShift({ shift, onClose, onSaved }: { shift: Shift; onClose: () => void; onSaved: () => void }) {
   // The input shows the company's clock, the same times as the table.
   const start = asDate(shift.clocked_in_at);
   const suggested = shift.clocked_out_at ? asDate(shift.clocked_out_at) : new Date(Math.min(Date.now(), start.getTime() + 8 * 3600000));
@@ -158,7 +158,7 @@ function FixShift({ shift, onClose, onSaved }: { shift: any; onClose: () => void
     }
   };
   return (
-    <Modal title={t("Clock-out for {name}", { name: shift.mechanic })} icon={<Clock size={20} />} onClose={onClose}>
+    <Modal title={t("Clock-out for {name}", { name: shift.mechanic ?? t("Technician") })} icon={<Clock size={20} />} onClose={onClose}>
       <form className="form form-upgraded" onSubmit={save}>
         {error && <div className="error">{error}</div>}
         <p className="muted">
@@ -166,8 +166,7 @@ function FixShift({ shift, onClose, onSaved }: { shift: any; onClose: () => void
           {shift.open ? `${t("Setting a clock-out time ends this shift now and pauses any job in progress.")} ` : ""}
           {t("The change is recorded with your name, and the technician is notified.")}
         </p>
-        <div className="formGroup">
-          <label htmlFor="field-clocked_out_at">{t("Clock-out time")}</label>
+        <Field label={t("Clock-out time")}>
           <input
             id="field-clocked_out_at"
             type="datetime-local"
@@ -177,7 +176,7 @@ function FixShift({ shift, onClose, onSaved }: { shift: any; onClose: () => void
             onChange={(e) => setValue(e.target.value)}
             required
           />
-        </div>
+        </Field>
         <button className="primary">{t("Save clock-out")}</button>
       </form>
     </Modal>

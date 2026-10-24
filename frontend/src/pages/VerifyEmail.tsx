@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { verifyEmail } from "../services/api";
+import { verifyEmail, type User } from "../services/api";
 import { go } from "../lib/route";
 import { errorMessage } from "../lib/format";
 import { t } from "../i18n";
 
-type Props = { token: string; user: any; onVerified: (user: any) => void };
+type Props = { token: string; user: User | null; onVerified: (user: User) => void };
 
 /** The link in a verification email. It works signed in or not: the link itself is the proof. */
 export default function VerifyEmail({ token, user, onVerified }: Props) {

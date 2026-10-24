@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, Clock, LogIn, LogOut, MapPin, ShieldCheck } from "lucide-react";
 import Modal from "./Modal";
 import { clockIn, clockOut, jobs, sendLiveLocation, setLocationConsent, shiftStatus, updateJob } from "../services/api";
@@ -8,6 +8,7 @@ import { confirmAction } from "./Feedback";
 import { t } from "../i18n";
 import { Trans } from "../i18n/Trans";
 import { usePolling } from "../lib/usePolling";
+import type { Job, ShiftStatus } from "../services/types";
 import "./Shift.css";
 
 // Live positions while a job is in progress: at most one every 2 minutes, sooner after moving 100 m.
@@ -15,13 +16,12 @@ const LIVE_EVERY_MS = 120000;
 const LIVE_MIN_MS = 60000;
 const LIVE_MOVE_M = 100;
 
-type Status = { consent: boolean; shift: any | null };
 type ShiftState = {
-  status: Status | null;
+  status: ShiftStatus | null;
   busy: string;
   problem: string;
   permission: PermissionState | "unknown";
-  activeJob: any | null;
+  activeJob: Job | null;
   startClockIn: () => void;
   startClockOut: () => void;
   withdrawConsent: () => Promise<void>;
@@ -32,9 +32,9 @@ const ShiftContext = createContext<ShiftState | null>(null);
 export const useShift = () => useContext(ShiftContext);
 
 /** Clock-in state and location sharing for a signed-in mechanic. Other roles get no provider. */
-export function ShiftProvider({ children }: { children: any }) {
-  const [status, setStatus] = useState<Status | null>(null);
-  const [activeJob, setActiveJob] = useState<any | null>(null);
+export function ShiftProvider({ children }: { children: ReactNode }) {
+  const [status, setStatus] = useState<ShiftStatus | null>(null);
+  const [activeJob, setActiveJob] = useState<Job | null>(null);
   const [busy, setBusy] = useState("");
   const [problem, setProblem] = useState("");
   const [asking, setAsking] = useState(false);
@@ -45,7 +45,7 @@ export function ShiftProvider({ children }: { children: any }) {
     Promise.all([shiftStatus(), jobs()])
       .then(([shiftData, jobData]) => {
         setStatus(shiftData);
-        setActiveJob((jobData.jobs || []).find((job: any) => job.status === "In Progress") || null);
+        setActiveJob(jobData.jobs.find((job) => job.status === "In Progress") ?? null);
       })
       .catch(() => {});
   usePolling(load, 60000, true);
@@ -218,7 +218,11 @@ export function LocationIndicator() {
   if (!shift?.status?.shift) return null;
   const blocked = shift.permission === "denied";
   return (
-    <div className={`locationPill ${blocked ? "blocked" : ""}`} role="status" title={blocked ? t("Your browser is blocking location") : t("Your location is shared while you are clocked in")}>
+    <div
+      className={`locationPill ${blocked ? "blocked" : ""}`}
+      role="status"
+      title={blocked ? t("Your browser is blocking location") : t("Your location is shared while you are clocked in")}
+    >
       {blocked ? <AlertTriangle size={13} /> : <span className="locationDot" />}
       {blocked ? t("Location blocked") : t("Location on")}
     </div>

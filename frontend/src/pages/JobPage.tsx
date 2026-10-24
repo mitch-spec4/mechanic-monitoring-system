@@ -39,17 +39,17 @@ import { mapLink } from "../lib/location";
 import { asDate, errorMessage, formatDate, formatDay as dayOf, formatDistance, formatTime as timeOf, fromZoneInput } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
 import type { User } from "../services/api";
+import type { ChecklistItem, JobDetail, JobEvent, JobFile, LocationPoint, Part, Payload, WorkEntry } from "../services/types";
 import { mark, t } from "../i18n";
 import { Trans } from "../i18n/Trans";
 import "./JobPage.css";
 import { Loading } from "../components/States";
+import Field from "../components/Field";
 
 type Props = { jobId: number; user: User; onBack: () => void };
-// The worksheet as the API sends it, read loosely: it has many nested parts.
-type Row = Record<string, any>;
 
 // Times are shown on the company's clock.
-const stamp = (value: string) => `${dayOf(value)}, ${timeOf(value)}`;
+const stamp = (value: string | null | undefined) => (value ? `${dayOf(value)}, ${timeOf(value)}` : "");
 
 function duration(hours: number) {
   const minutes = Math.round(hours * 60);
@@ -84,7 +84,7 @@ const FILE_KINDS: Record<string, string> = {
 };
 const after = (note: string, prefix: RegExp) => note.replace(prefix, "").trim();
 
-function historyText(event: Row): string {
+function historyText(event: JobEvent): string {
   const note: string = event.note || "";
   switch (event.action) {
     case "created":
@@ -134,7 +134,7 @@ function historyText(event: Row): string {
 }
 
 export default function JobPage({ jobId, user, onBack }: Props) {
-  const [job, setJob] = useState<Row | null>(null);
+  const [job, setJob] = useState<JobDetail | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(Date.now());
@@ -153,11 +153,12 @@ export default function JobPage({ jobId, user, onBack }: Props) {
   }, [job?.timer_running]);
 
   // Every change returns the fresh worksheet; failures show at the top instead of disappearing.
-  const run = async (change: () => Promise<any>) => {
+  const run = async (change: () => Promise<unknown>) => {
     setError("");
     setBusy(true);
     try {
-      const data = await change();
+      // Changes to the worksheet send it back whole; anything else (a status change) means loading it again.
+      const data = (await change()) as { job?: JobDetail } | undefined;
       if (data?.job?.entries !== undefined || data?.job?.parts !== undefined) setJob(data.job);
       else await load();
     } catch (e) {
@@ -179,16 +180,18 @@ export default function JobPage({ jobId, user, onBack }: Props) {
   const isMechanic = user.role === "mechanic";
   const canEdit = Boolean(job.can_edit);
   const isCustomer = user.role === "customer";
-  const doneCount = job.checklist.filter((item: Row) => item.done).length;
-  const running = (job.entries || []).find((entry: Row) => entry.running);
-  const closedSeconds = (job.entries || [])
-    .filter((entry: Row) => !entry.running)
-    .reduce((sum: number, entry: Row) => sum + entry.hours * 3600, 0);
+  const blockers = job.completion_blockers ?? [];
+  const entries = job.entries ?? [];
+  const doneCount = job.checklist.filter((item) => item.done).length;
+  const running = entries.find((entry) => entry.running);
+  const closedSeconds = entries
+    .filter((entry) => !entry.running)
+    .reduce((sum, entry) => sum + entry.hours * 3600, 0);
   const liveSeconds = closedSeconds + (running ? Math.max(0, (now - asDate(running.started_at).getTime()) / 1000) : 0);
   const setStatus = (status: string) => run(() => changeJobStatus(job.id, status, user.role));
   // Completing asks for the customer's sign-off first; it is sent with the completion.
   const complete = (signOff: SignOff) => changeJobStatus(job.id, "Completed", user.role, signOff);
-  const photoCount = (job.files || []).filter((file: Row) => file.kind !== "video").length;
+  const photoCount = (job.files || []).filter((file) => file.kind !== "video").length;
   const partCount = job.parts.length;
   const signFacts = [
     job.customer?.name,
@@ -256,7 +259,7 @@ export default function JobPage({ jobId, user, onBack }: Props) {
               <>
                 <button
                   className="primary"
-                  disabled={busy || job.completion_blockers.length > 0}
+                  disabled={busy || blockers.length > 0}
                   onClick={() => setSigning(true)}
                 >
                   <CheckCircle2 size={16} /> {t("Complete job")}
@@ -268,7 +271,7 @@ export default function JobPage({ jobId, user, onBack }: Props) {
             )}
           </div>
         )}
-        {job.report_url && <ReportActions job={job} onError={setError} />}
+        {job.report_url && <ReportActions job={job} url={job.report_url} onError={setError} />}
       </section>
 
       {error && (
@@ -277,11 +280,11 @@ export default function JobPage({ jobId, user, onBack }: Props) {
         </div>
       )}
 
-      {isMechanic && job.status === "In Progress" && job.completion_blockers.length > 0 && (
+      {isMechanic && job.status === "In Progress" && blockers.length > 0 && (
         <div className="jobBlockers" role="status">
           <strong>{t("Before you can complete this job")}</strong>
           <ul>
-            {job.completion_blockers.map((blocker: string) => (
+            {blockers.map((blocker) => (
               <li key={blocker}>{blocker}</li>
             ))}
           </ul>
@@ -293,7 +296,7 @@ export default function JobPage({ jobId, user, onBack }: Props) {
           <Card title={t("Work done")} icon={<Wrench size={16} />}>
             {job.work_done.length ? (
               <ul className="workDoneList">
-                {job.work_done.map((line: string, index: number) => (
+                {job.work_done.map((line, index) => (
                   <li key={index}>{line}</li>
                 ))}
               </ul>
@@ -305,11 +308,11 @@ export default function JobPage({ jobId, user, onBack }: Props) {
           <Card
             title={t("Time & work")}
             icon={<Clock size={16} />}
-            badge={job.entries.length === 1 ? t("1 entry") : t("{count} entries", { count: job.entries.length })}
+            badge={entries.length === 1 ? t("1 entry") : t("{count} entries", { count: entries.length })}
           >
-            {job.entries.length === 0 && <Empty text={canEdit ? t("Press Start work to begin timing this job.") : t("No time recorded yet.")} />}
+            {entries.length === 0 && <Empty text={canEdit ? t("Press Start work to begin timing this job.") : t("No time recorded yet.")} />}
             <ol className="entryList">
-              {job.entries.map((entry: Row) => (
+              {entries.map((entry) => (
                 <EntryRow key={entry.id} entry={entry} canEdit={canEdit} onSave={(data) => run(() => updateEntry(job.id, entry.id, data))} />
               ))}
             </ol>
@@ -330,7 +333,7 @@ export default function JobPage({ jobId, user, onBack }: Props) {
                 <i style={{ width: `${(doneCount / job.checklist.length) * 100}%` }} />
               </div>
               <ul className="checklist">
-                {job.checklist.map((item: Row) => (
+                {job.checklist.map((item: ChecklistItem) => (
                   <li key={item.id} className={item.done ? "done" : ""}>
                     <label>
                       <input
@@ -362,7 +365,7 @@ export default function JobPage({ jobId, user, onBack }: Props) {
         <Card title={t("Parts used")} icon={<Package size={16} />} badge={job.parts.length ? String(job.parts.length) : undefined}>
           {job.parts.length === 0 && <Empty text={t("No parts recorded.")} />}
           <ul className="partList">
-            {job.parts.map((part: Row) => (
+            {job.parts.map((part: Part) => (
               <li key={part.id}>
                 <span className="partQty">×{part.label}</span>
                 <span className="partName">{part.name}</span>
@@ -404,7 +407,7 @@ export default function JobPage({ jobId, user, onBack }: Props) {
 
         {job.signature && (
           <Card title={t("Customer sign-off")} icon={<PenLine size={16} />}>
-            {job.signature.not_signed_reason ? (
+            {"not_signed_reason" in job.signature ? (
               <p className="signOffNote">{t("Not signed: {reason}", { reason: job.signature.not_signed_reason })}</p>
             ) : (
               <div className="signOffView">
@@ -417,20 +420,20 @@ export default function JobPage({ jobId, user, onBack }: Props) {
           </Card>
         )}
 
-        {!isCustomer && job.locations?.length > 0 && (
+        {!isCustomer && job.locations && job.locations.length > 0 && (
           <Card title={t("Locations")} icon={<MapPin size={16} />} wide>
             <ul className="stampList">
-              {job.locations.map((point: Row, index: number) => (
+              {job.locations.map((point, index) => (
                 <li key={index}>
                   <strong>{STAMP_TEXT[point.kind] ? t(STAMP_TEXT[point.kind]) : point.kind}</strong>
                   <span>{stamp(point.recorded_at)}</span>
-                  {point.latitude != null ? (
+                  {point.latitude != null && point.longitude != null ? (
                     <a href={mapLink(point.latitude, point.longitude)} target="_blank" rel="noreferrer">
                       <MapPin size={12} /> {t("View on map")}
                       {point.accuracy_m ? ` (±${formatDistance(point.accuracy_m)})` : ""}
                     </a>
                   ) : (
-                    <em>{t("Location not shared ({reason})", { reason: t(MISSING_TEXT[point.missing_reason] || MISSING_TEXT.none) })}</em>
+                    <em>{t("Location not shared ({reason})", { reason: t(MISSING_TEXT[point.missing_reason ?? "none"] || MISSING_TEXT.none) })}</em>
                   )}
                 </li>
               ))}
@@ -441,7 +444,7 @@ export default function JobPage({ jobId, user, onBack }: Props) {
         {!isCustomer && (
           <Card title={t("History")} icon={<History size={16} />} wide>
             <ol className="timeline">
-              {job.history.map((event: Row) => (
+              {(job.history || []).map((event: JobEvent) => (
                 <li key={event.id} className={`timeline-${event.action}`}>
                   <span className="timelineDot" aria-hidden="true" />
                   <div>
@@ -488,14 +491,15 @@ const MISSING_TEXT: Record<string, string> = {
 const KIND_LABEL: Record<string, string> = { before: mark("Before"), after: mark("After"), other: mark("Photo"), video: mark("Video") };
 const PICK_LABEL: Record<string, string> = { before: mark("Before photo"), after: mark("After photo"), other: mark("Other photo") };
 
-type Run = (change: () => Promise<any>) => Promise<void>;
+type Run = (change: () => Promise<unknown>) => Promise<void>;
 
-function MediaCard({ job, busy, run }: { job: Row; busy: boolean; run: Run }) {
+function MediaCard({ job, busy, run }: { job: JobDetail; busy: boolean; run: Run }) {
   const [uploading, setUploading] = useState("");
   const [problem, setProblem] = useState("");
-  const photos: Row[] = job.files.filter((file: Row) => file.kind !== "video");
-  const videos: Row[] = job.files.filter((file: Row) => file.kind === "video");
-  const canUpload = Boolean(job.can_upload);
+  const photos: JobFile[] = job.files.filter((file) => file.kind !== "video");
+  const videos: JobFile[] = job.files.filter((file) => file.kind === "video");
+  const limits = job.media_limits;
+  const canUpload = Boolean(job.can_upload && limits);
   if (!canUpload && job.files.length === 0) {
     const finished = job.status === "Completed" || job.status === "Cancelled";
     return (
@@ -507,12 +511,12 @@ function MediaCard({ job, busy, run }: { job: Row; busy: boolean; run: Run }) {
   const pick = async (kind: string, input: HTMLInputElement) => {
     const files = Array.from(input.files || []);
     input.value = "";
-    if (!files.length) return;
+    if (!files.length || !limits) return;
     setProblem("");
     for (const [index, file] of files.entries()) {
       setUploading(files.length > 1 ? t("Uploading {number} of {count}…", { number: index + 1, count: files.length }) : t("Uploading…"));
       try {
-        const updated = await uploadMedia(job.id, kind, file, job.media_limits);
+        const updated = await uploadMedia(job.id, kind, file, limits);
         await run(async () => ({ job: updated }));
       } catch (e) {
         setProblem(errorMessage(e));
@@ -521,7 +525,7 @@ function MediaCard({ job, busy, run }: { job: Row; busy: boolean; run: Run }) {
     }
     setUploading("");
   };
-  const remove = (file: Row) => run(() => deleteFile(file.id));
+  const remove = (file: JobFile) => run(() => deleteFile(file.id));
   return (
     <Card title={t("Photos & videos")} icon={<Camera size={16} />} badge={job.files.length ? String(job.files.length) : undefined} wide>
       {problem && <div className="error">{problem}</div>}
@@ -556,7 +560,7 @@ function MediaCard({ job, busy, run }: { job: Row; busy: boolean; run: Run }) {
           ))}
         </ul>
       )}
-      {canUpload && (
+      {canUpload && limits && (
         <div className="mediaActions">
           {uploading ? (
             <span className="mediaUploading" role="status">
@@ -578,8 +582,8 @@ function MediaCard({ job, busy, run }: { job: Row; busy: boolean; run: Run }) {
           )}
           <small className="muted">
             {t("Photos are shrunk on your phone before they upload. Videos: up to {seconds} seconds and {size} MB.", {
-              seconds: job.media_limits.video_seconds,
-              size: job.media_limits.video_mb,
+              seconds: limits.video_seconds,
+              size: limits.video_mb,
             })}
           </small>
         </div>
@@ -588,14 +592,14 @@ function MediaCard({ job, busy, run }: { job: Row; busy: boolean; run: Run }) {
   );
 }
 
-function ReportActions({ job, onError }: { job: Row; onError: (message: string) => void }) {
+function ReportActions({ job, url: reportUrl, onError }: { job: JobDetail; url: string; onError: (message: string) => void }) {
   const [working, setWorking] = useState(false);
   const fileName = `job-${job.id}-report.pdf`;
   // The phone's share sheet (WhatsApp, email...) when it can share files; otherwise a download.
   const share = async () => {
     setWorking(true);
     try {
-      const file = new File([await downloadReport(job.report_url)], fileName, { type: "application/pdf" });
+      const file = new File([await downloadReport(reportUrl)], fileName, { type: "application/pdf" });
       if (navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], title: t("{title} service report", { title: job.title }) }).catch(() => {});
       } else {
@@ -619,7 +623,7 @@ function ReportActions({ job, onError }: { job: Row; onError: (message: string) 
       <button className="primary" disabled={working} onClick={share}>
         <Share2 size={16} /> {working ? t("Preparing…") : t("Share report")}
       </button>
-      <a className="secondary" href={apiUrl(`${job.report_url}?download=1`)} download={fileName}>
+      <a className="secondary" href={apiUrl(`${reportUrl}?download=1`)} download={fileName}>
         <Download size={16} /> {t("Download PDF")}
       </a>
     </div>
@@ -665,9 +669,9 @@ function Empty({ text }: { text: string }) {
   return <p className="muted jobEmpty">{text}</p>;
 }
 
-type Save = (data: Record<string, unknown>) => Promise<unknown> | void;
+type Save = (data: Payload) => Promise<unknown> | void;
 
-function EntryRow({ entry, canEdit, onSave }: { entry: Row; canEdit: boolean; onSave: Save }) {
+function EntryRow({ entry, canEdit, onSave }: { entry: WorkEntry; canEdit: boolean; onSave: Save }) {
   const [work, setWork] = useState(entry.work_done || "");
   useEffect(() => setWork(entry.work_done || ""), [entry.work_done]);
   const changed = work.trim() !== (entry.work_done || "").trim();
@@ -687,13 +691,9 @@ function EntryRow({ entry, canEdit, onSave }: { entry: Row; canEdit: boolean; on
       )}
       {canEdit ? (
         <div className="entryWork">
-          <label htmlFor={`work-${entry.id}`}>{t("Work done")}</label>
-          <textarea
-            id={`work-${entry.id}`}
-            value={work}
-            placeholder={t("What did you do on this visit?")}
-            onChange={(event) => setWork(event.target.value)}
-          />
+          <Field wrap label={t("Work done")}>
+            <textarea id={`work-${entry.id}`} value={work} placeholder={t("What did you do on this visit?")} onChange={(event) => setWork(event.target.value)} />
+          </Field>
           {changed && (
             <button className="secondary" onClick={() => onSave({ work_done: work })}>
               {t("Save notes")}
@@ -730,23 +730,19 @@ function ManualEntry({ onAdd, busy, location }: { onAdd: Save; busy: boolean; lo
       }}
     >
       <div className="inlineRow">
-        <label>
-          {t("Start")}
+        <Field wrap label={t("Start")}>
           <input name="started_at" type="datetime-local" required />
-        </label>
-        <label>
-          {t("End")}
+        </Field>
+        <Field wrap label={t("End")}>
           <input name="ended_at" type="datetime-local" required />
-        </label>
+        </Field>
       </div>
-      <label>
-        {t("Site")}
+      <Field wrap label={t("Site")}>
         <input name="site" defaultValue={location || ""} />
-      </label>
-      <label>
-        {t("Work done")}
+      </Field>
+      <Field wrap label={t("Work done")}>
         <textarea name="work_done" placeholder={t("What did you do?")} />
-      </label>
+      </Field>
       <div className="inlineRow">
         <button className="primary" disabled={busy}>
           {t("Add time")}
@@ -770,14 +766,12 @@ function PartForm({ onAdd, busy }: { onAdd: Save; busy: boolean }) {
         formElement.reset();
       }}
     >
-      <label className="grow">
-        {t("Part")}
+      <Field wrap className="grow" label={t("Part")}>
         <input name="name" placeholder={t("e.g. {example}", { example: t("Oil filter") })} required />
-      </label>
-      <label className="qty">
-        {t("Qty")}
+      </Field>
+      <Field wrap className="qty" label={t("Qty")}>
         <input name="quantity" type="number" min="0.01" step="any" defaultValue="1" required />
-      </label>
+      </Field>
       <button className="primary" disabled={busy}>
         <Plus size={15} /> {t("Add")}
       </button>
@@ -785,7 +779,7 @@ function PartForm({ onAdd, busy }: { onAdd: Save; busy: boolean }) {
   );
 }
 
-function RecordForm({ record, onSave, busy }: { record: Row | null; onSave: Save; busy: boolean }) {
+function RecordForm({ record, onSave, busy }: { record: JobDetail["record"]; onSave: Save; busy: boolean }) {
   return (
     <form
       className="inlineForm"
@@ -795,18 +789,15 @@ function RecordForm({ record, onSave, busy }: { record: Row | null; onSave: Save
       }}
     >
       <p className="muted">{t("Shown to the customer in their service history. Work done and parts are added automatically.")}</p>
-      <label>
-        {t("Problem found")}
+      <Field wrap label={t("Problem found")}>
         <textarea name="problem" defaultValue={record?.problem || ""} />
-      </label>
-      <label>
-        {t("Solution")}
+      </Field>
+      <Field wrap label={t("Solution")}>
         <textarea name="solution" defaultValue={record?.solution || ""} />
-      </label>
-      <label>
-        {t("Advice for the customer")}
+      </Field>
+      <Field wrap label={t("Advice for the customer")}>
         <textarea name="advice" defaultValue={record?.advice || ""} />
-      </label>
+      </Field>
       <button className="secondary" disabled={busy}>
         {t("Save summary")}
       </button>
@@ -827,10 +818,9 @@ function NoteForm({ onAdd, busy }: { onAdd: (note: string) => Promise<unknown>; 
         formElement.reset();
       }}
     >
-      <label className="grow">
-        {t("Add a note to the history")}
+      <Field wrap className="grow" label={t("Add a note to the history")}>
         <input name="note" placeholder={t("e.g. {example}", { example: t("Customer asked us to call before arriving") })} />
-      </label>
+      </Field>
       <button className="secondary" disabled={busy}>
         {t("Add note")}
       </button>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { Mail, UserPlus, Users } from "lucide-react";
 import Modal from "./Modal";
 import ShareCode, { formatExpiry } from "./ShareCode";
@@ -6,6 +6,7 @@ import { invite } from "../services/api";
 import { errorMessage } from "../lib/format";
 import { mark, t } from "../i18n";
 import { Trans } from "../i18n/Trans";
+import Field from "./Field";
 
 type Props = { role: "customer" | "mechanic"; onClose: () => void; onDone?: () => void };
 
@@ -32,7 +33,7 @@ export default function InviteForm({ role, onClose, onDone }: Props) {
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ code: string; name: string; email: string; expires_at: string; emailed: boolean } | null>(null);
 
-  const submit = async (event: any) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormError("");
     setSending(true);
@@ -89,14 +90,12 @@ export default function InviteForm({ role, onClose, onDone }: Props) {
       ) : (
         <form className="form form-upgraded" onSubmit={submit}>
           {formError && <div className="error">{formError}</div>}
-          <div className="formGroup">
-            <label htmlFor="field-name">{t(text.nameLabel)}</label>
+          <Field label={t(text.nameLabel)}>
             <input id="field-name" name="name" placeholder={t(text.namePlaceholder)} required />
-          </div>
-          <div className="formGroup">
-            <label htmlFor="field-email">{t("Email Address")}</label>
+          </Field>
+          <Field label={t("Email Address")}>
             <input id="field-email" name="email" type="email" placeholder={text.emailPlaceholder} required />
-          </div>
+          </Field>
           <button className="primary" style={{ marginTop: "10px" }} disabled={sending}>
             {role === "customer" ? <Mail size={15} /> : <UserPlus size={15} />} {t("Send invitation")}
           </button>

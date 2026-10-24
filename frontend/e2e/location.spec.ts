@@ -96,7 +96,7 @@ test("customers never see locations", async ({ page }) => {
   await signIn(page, "abc@example.com");
   // The API itself leaves locations out for customers, not just the screen.
   const list = await (await page.request.get("/api/jobs")).json();
-  const job = list.jobs.find((item: any) => item.title === "Service Generator G-102");
+  const job = list.jobs.find((item: { title: string }) => item.title === "Service Generator G-102");
   const detail = await (await page.request.get(`/api/jobs/${job.id}`)).json();
   expect(detail.job.title).toBe("Service Generator G-102");
   expect(detail.job).not.toHaveProperty("locations");

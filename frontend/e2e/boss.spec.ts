@@ -48,7 +48,7 @@ test("deleting a started job through the API is still refused", async ({ page })
   const result = await page.evaluate(async () => {
     const csrf = document.cookie.split("; ").find((c) => c.startsWith("csrf_access_token="))?.split("=")[1] ?? "";
     const jobs = await (await fetch("/api/jobs")).json();
-    const started = jobs.jobs.find((job: any) => job.status === "In Progress");
+    const started = jobs.jobs.find((job: { status: string }) => job.status === "In Progress");
     const withoutCsrf = await fetch(`/api/jobs/${started.id}`, { method: "DELETE" });
     const withCsrf = await fetch(`/api/jobs/${started.id}`, { method: "DELETE", headers: { "X-CSRF-TOKEN": csrf } });
     return [withoutCsrf.status, withCsrf.status];

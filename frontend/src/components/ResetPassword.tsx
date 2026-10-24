@@ -3,6 +3,7 @@ import { KeyRound } from "lucide-react";
 import Modal from "./Modal";
 import ShareCode, { formatExpiry } from "./ShareCode";
 import { issueResetCode } from "../services/api";
+import type { IssuedCode } from "../services/types";
 import { errorMessage } from "../lib/format";
 import { t } from "../i18n";
 import { Trans } from "../i18n/Trans";
@@ -11,7 +12,7 @@ type Props = { userId: number; name: string; onClose: () => void };
 
 /** Manager-issued password reset: a one-time code the person enters on the sign-in page. */
 export default function ResetPassword({ userId, name, onClose }: Props) {
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<IssuedCode | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const issue = async () => {

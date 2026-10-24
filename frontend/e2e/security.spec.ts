@@ -50,7 +50,7 @@ test("a new browser asks for the sign-in code; a remembered one doesn't", async 
   await page.getByLabel("Email").fill("mitch@mechanicpro.test");
   await page.getByLabel("Password").fill(DEMO_PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.locator(".sidebar")).toBeVisible();
+  await expect(page.locator(".appShell")).toBeVisible();
   await expect(page.locator(".codeInput")).toHaveCount(0);
 });
 

@@ -2,8 +2,8 @@
 .demoBar {
   position: fixed;
   z-index: 35;
-  left: 158px;
-  right: 0;
+  inset-inline-start: 158px;
+  inset-inline-end: 0;
   bottom: 0;
   display: flex;
   flex-wrap: wrap;
@@ -105,7 +105,7 @@
   background: var(--role-soft, #eaf3ff);
 }
 .setupClose {
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 .setupProgress {
   height: 6px;
@@ -177,7 +177,7 @@
 @media (max-width: 760px) {
   /* Two short rows on phones: what this is and a sign-up button, then whose view to see. */
   .demoBar {
-    left: 57px;
+    inset-inline-start: 57px;
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     padding: 8px 12px;
@@ -218,6 +218,6 @@
     flex-wrap: wrap;
   }
   .appShell .setupSteps .secondary {
-    margin-left: 36px;
+    margin-inline-start: 36px;
   }
 }

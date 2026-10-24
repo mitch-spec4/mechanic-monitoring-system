@@ -2,13 +2,10 @@
   min-height: 100vh;
   background: #f4f7fb;
 }
-.appShell > .profile {
-  top: 12px;
-  right: 25px;
-}
 .sidebar {
   position: fixed;
-  inset: 0 auto 0 0;
+  inset-block: 0;
+  inset-inline: 0 auto;
   width: 158px;
   background: #08213d;
   color: #d9e5f3;
@@ -50,7 +47,7 @@
   color: #d0ddec;
   border-radius: 4px;
   padding: 8px 9px;
-  text-align: left;
+  text-align: start;
   font-size: 10px;
 }
 .sidebarLink:hover,
@@ -113,13 +110,14 @@
   color: #fff;
 }
 .appMain {
-  margin-left: 158px;
+  margin-inline-start: 158px;
   min-height: 100vh;
 }
 .appMain header {
   height: 49px;
-  padding-left: 20px;
-  padding-right: 190px;
+  padding-inline-start: 20px;
+  /* Room for the fixed language and profile buttons (.topBar), so the bell stays in view. */
+  padding-inline-end: 285px;
   background: #fff;
 }
 .appMain .logo {
@@ -197,10 +195,7 @@
     grid-row: auto;
   }
   .appMain {
-    margin-left: 57px;
-  }
-  .appMain header {
-    padding-right: 105px;
+    margin-inline-start: 57px;
   }
   .appMain .page {
     padding: 13px;
@@ -544,7 +539,7 @@
 .stars b {
   color: #172033;
   font-size: 10px;
-  margin-left: 5px;
+  margin-inline-start: 5px;
 }
 .reviewContent small,
 .adviceContent small {
@@ -557,9 +552,10 @@
   margin: 13px 0;
   padding: 8px;
   background: #f7f9fb;
-  border-left: 3px solid #f3ad22;
+  border-inline-start: 3px solid #f3ad22;
 }
-.reviewContent label {
+.reviewContent .reviewAdviceLabel {
+  display: block;
   font-size: 8px;
   font-weight: 800;
 }
@@ -1092,10 +1088,16 @@
     display: none;
   }
 }
+@media (max-width: 560px) {
+  /* The profile button shrinks to its avatar. */
+  .appMain header {
+    padding-inline-end: 170px;
+  }
+}
 @media (max-width: 760px) {
   /* Keep the mechanic greeting clear of the fixed profile button. */
   .mechanicDashboard .dashHeading {
-    padding-right: 72px;
+    padding-inline-end: 72px;
   }
 }
 
@@ -1105,9 +1107,164 @@
     flex: 1 1 calc(100% - 50px);
   }
   .subPageList article:has(.listAction) > .dataStatus {
-    margin-left: 46px;
+    margin-inline-start: 46px;
   }
   .subPageList small {
     white-space: normal;
+  }
+}
+
+/* ---------- A technician's day: Today's jobs, one big button each ---------- */
+.todayPanel {
+  margin-bottom: 14px;
+  background: #fff;
+  border: 1px solid #dfe6ed;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.todayEmpty {
+  margin: 0;
+  padding: 16px;
+  color: #68768a;
+  font-size: 13px;
+}
+.todayList {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.todayJob {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-top: 1px solid #edf1f5;
+}
+.todayJob:first-child {
+  border-top: 0;
+}
+.todayJob > div {
+  display: grid;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+.todayJob strong {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.todayJob small {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  color: #68768a;
+  font-size: 12px;
+}
+.todayJob em {
+  font-style: normal;
+  font-weight: 700;
+  color: #0969d7;
+}
+.todayJob em.overdue {
+  color: #b42318;
+}
+.appMain button.todayAction {
+  flex: none;
+  min-width: 108px;
+  min-height: 46px;
+  padding: 10px 16px;
+  font-size: 14px;
+}
+@media (max-width: 560px) {
+  .todayJob {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .appMain button.todayAction {
+    width: 100%;
+  }
+}
+
+/* ---------- A technician's phone: the bottom bar replaces the side strip ---------- */
+.bottomNav {
+  display: none;
+}
+.moreLinks {
+  display: grid;
+  gap: 6px;
+}
+.moreLinks button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid #e1e8f0;
+  border-radius: 12px;
+  background: #fff;
+  color: #172033;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: start;
+}
+.moreLinks button.active {
+  border-color: #9fc5eb;
+  background: #eef5fd;
+  color: #1264b9;
+}
+@media (max-width: 760px) {
+  .role-mechanic .sidebar {
+    display: none;
+  }
+  .appShell.role-mechanic .appMain {
+    margin-inline-start: 0;
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+  .bottomNav {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 36;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 2px;
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+    background: #fff;
+    border-top: 1px solid #e1e8f0;
+    box-shadow: 0 -10px 30px -18px #17203359;
+  }
+  .bottomNav button {
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    gap: 3px;
+    min-height: 54px;
+    padding: 6px 2px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: #68768a;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .bottomNav button.active {
+    color: #0f7a4b;
+    background: #e9f7ef;
+  }
+  /* The demo bar and the location sign sit above the bottom bar. */
+  .appShell.role-mechanic .demoBar {
+    inset-inline-start: 0;
+    bottom: calc(66px + env(safe-area-inset-bottom));
+  }
+  .appShell.role-mechanic.hasDemoBar .appMain {
+    padding-bottom: calc(170px + env(safe-area-inset-bottom));
+  }
+  .appShell.role-mechanic .locationPill {
+    bottom: calc(80px + env(safe-area-inset-bottom));
+  }
+  .appShell.role-mechanic.hasDemoBar .locationPill {
+    bottom: calc(176px + env(safe-area-inset-bottom));
   }
 }

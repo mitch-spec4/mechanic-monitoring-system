@@ -15,7 +15,7 @@ from app.models.user import User
 from app.services import audit, rate_limit
 from app.services.company_data import cancel_deletion, request_deletion
 from app.services.data_export import build_export
-from app.i18n import _
+from app.i18n import LANGUAGES, _
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
 from app.utils.validation import ValidationError, choice, json_body, text
@@ -83,21 +83,27 @@ def dismiss_setup():
 
 
 def settings_out(company):
-    return {"timezone": company.timezone, "currency": company.currency, "units": company.units}
+    return {"timezone": company.timezone, "currency": company.currency, "units": company.units, "language": company.language}
 
 
 @bp.get("/settings")
 @roles("boss")
 def settings():
     company = db.get_or_404(Company, current_user().company_id)
-    return jsonify(settings=settings_out(company), currencies=CURRENCIES, units=UNITS, timezones=sorted(available_timezones()))
+    return jsonify(
+        settings=settings_out(company),
+        currencies=CURRENCIES,
+        units=UNITS,
+        timezones=sorted(available_timezones()),
+        languages=[{"code": code, "name": name} for code, (name, _rtl) in LANGUAGES.items()],
+    )
 
 
 @bp.patch("/settings")
 @roles("boss")
 def update_settings():
-    """Company-wide settings: the time zone everyone's times are shown in, and the currency and
-    units for money and distances."""
+    """Company-wide settings: the time zone everyone's times are shown in, the currency and units
+    for money and distances, and the language new members start in."""
     company = db.get_or_404(Company, current_user().company_id)
     data = json_body()
     if "timezone" in data:
@@ -107,6 +113,7 @@ def update_settings():
         company.timezone = zone
     company.currency = choice(data, "currency", CURRENCIES, "Currency", default=company.currency)
     company.units = choice(data, "units", UNITS, "Units", default=company.units)
+    company.language = choice(data, "language", tuple(LANGUAGES), "Language", default=company.language)
     db.session.commit()
     return jsonify(settings=settings_out(company))
 

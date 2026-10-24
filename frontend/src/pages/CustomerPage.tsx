@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AlertTriangle, ArrowLeft, CheckCircle2, ClipboardList, FileText, Mail, Pencil, Phone, Plus, Wrench } from "lucide-react";
 import { customerDetail } from "../services/api";
+import type { CustomerDetail, EquipmentSummary, Machine } from "../services/types";
 import { CreateJobModal } from "../components/JobForms";
 import { AddMachine, EditMachine } from "../components/MachineForms";
 import { errorMessage, formatDate } from "../lib/format";
@@ -12,26 +13,13 @@ import { Loading } from "../components/States";
 
 type Props = { customerId: number; onBack: () => void; onOpenJob: (id: number) => void };
 
-/** Why a piece of equipment needs work: an open job, an open service request, or its own status. */
-type WorkReason = { type: "job" | "request" | "status"; id?: number; title?: string; status: string };
-export type EquipmentSummary = {
-  id: number;
-  customer_id: number;
-  name: string;
-  model?: string | null;
-  serial_no: string;
-  status: string;
-  needs_work: boolean;
-  work: WorkReason[];
-};
-
 /** A customer with all their equipment, the pieces needing work first, and their service history. */
 export default function CustomerPage({ customerId, onBack, onOpenJob }: Props) {
-  const [customer, setCustomer] = useState<any>(null);
+  const [customer, setCustomer] = useState<CustomerDetail | null>(null);
   const [error, setError] = useState("");
-  const [creatingFor, setCreatingFor] = useState<any>(null);
+  const [creatingFor, setCreatingFor] = useState<Machine | null>(null);
   const [addingMachine, setAddingMachine] = useState(false);
-  const [editing, setEditing] = useState<any>(null);
+  const [editing, setEditing] = useState<Machine | null>(null);
   const load = () =>
     customerDetail(customerId)
       .then((data) => {
@@ -50,7 +38,7 @@ export default function CustomerPage({ customerId, onBack, onOpenJob }: Props) {
     );
   }
 
-  const machines: EquipmentSummary[] = customer.machines;
+  const machines = customer.machines;
   const needing = customer.needs_work_count;
   return (
     <main className="jobPage customerPage">
@@ -129,14 +117,15 @@ export default function CustomerPage({ customerId, onBack, onOpenJob }: Props) {
             <p className="muted jobEmpty">{t("No service records yet.")}</p>
           ) : (
             <ul className="historyList">
-              {customer.records.map((record: any) => {
+              {customer.records.map((record) => {
                 const machine = machines.find((m) => m.id === record.machine_id);
+                const jobId = record.job_id;
                 return (
                   <li key={record.id}>
                     <span className="historyDate">{formatDate(record.service_date)}</span>
                     <div>
-                      {record.job_id ? (
-                        <button className="titleLink" onClick={() => onOpenJob(record.job_id)}>
+                      {jobId ? (
+                        <button className="titleLink" onClick={() => onOpenJob(jobId)}>
                           <strong>{record.service_type}</strong>
                         </button>
                       ) : (
@@ -213,7 +202,7 @@ export function MachineCard({ machine, onOpenJob, onCreateJob, onEdit }: CardPro
                   <ClipboardList size={13} />
                   <span>
                     {t("Job:")}{" "}
-                    <button className="titleLink reasonLink" onClick={() => reason.id && onOpenJob(reason.id)}>
+                    <button className="titleLink reasonLink" onClick={() => onOpenJob(reason.id)}>
                       {reason.title}
                     </button>{" "}
                     <em>{t(reason.status)}</em>

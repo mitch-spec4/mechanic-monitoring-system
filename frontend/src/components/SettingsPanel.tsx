@@ -1,6 +1,14 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Building2, Languages, Moon, UserRound } from "lucide-react";
-import { changePassword, companySettings, saveCompanySettings, saveLanguage, type CompanySettings, type User } from "../services/api";
+import {
+  changePassword,
+  companySettings,
+  saveCompanySettings,
+  saveLanguage,
+  type CompanySettings,
+  type CompanySettingsOptions,
+  type User,
+} from "../services/api";
 import { errorMessage } from "../lib/format";
 import { LocationSettings } from "./Shift";
 import LanguagePicker from "./LanguagePicker";
@@ -11,6 +19,7 @@ import { t } from "../i18n";
 import { Loading } from "./States";
 import { TwoFactorSettings } from "./TwoFactor";
 import { CompanyDataSettings } from "./CompanyData";
+import Field from "./Field";
 
 type Props = { user: User; onUserChanged: (user: User) => void };
 
@@ -34,7 +43,7 @@ export default function SettingsPanel({ user, onUserChanged }: Props) {
           </div>
           <div>
             <span>{t("Role")}</span>
-            <strong>{t(ROLE_NAMES[user.role] ?? user.role)}</strong>
+            <strong>{t(ROLE_NAMES[user.role])}</strong>
           </div>
         </div>
       </section>
@@ -96,7 +105,7 @@ const UNIT_NAMES: Record<string, string> = { metric: "Metric (m, km)", imperial:
 
 function CompanySettingsForm({ user, onUserChanged }: Props) {
   const [settings, setSettings] = useState<CompanySettings | null>(null);
-  const [options, setOptions] = useState<{ timezones: string[]; currencies: string[]; units: string[] }>({ timezones: [], currencies: [], units: [] });
+  const [options, setOptions] = useState<CompanySettingsOptions>({ timezones: [], currencies: [], units: [], languages: [] });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -104,7 +113,7 @@ function CompanySettingsForm({ user, onUserChanged }: Props) {
     companySettings()
       .then((data) => {
         setSettings(data.settings);
-        setOptions({ timezones: data.timezones, currencies: data.currencies, units: data.units });
+        setOptions({ timezones: data.timezones, currencies: data.currencies, units: data.units, languages: data.languages });
       })
       .catch((problem) => setError(errorMessage(problem)));
   }, []);
@@ -143,8 +152,7 @@ function CompanySettingsForm({ user, onUserChanged }: Props) {
         !error && <Loading />
       ) : (
         <>
-          <div className="formGroup">
-            <label htmlFor="field-timezone">{t("Time zone")}</label>
+          <Field label={t("Time zone")} hint={t("Every time in the app and on reports is shown in this zone.")}>
             <select {...field("timezone")}>
               {options.timezones.map((zone) => (
                 <option key={zone} value={zone}>
@@ -152,11 +160,18 @@ function CompanySettingsForm({ user, onUserChanged }: Props) {
                 </option>
               ))}
             </select>
-            <small className="muted">{t("Every time in the app and on reports is shown in this zone.")}</small>
-          </div>
+          </Field>
+          <Field label={t("Company language")} hint={t("New people start in this language, and invitations are written in it. Everyone can still choose their own.")}>
+            <select {...field("language")}>
+              {options.languages.map((option) => (
+                <option key={option.code} value={option.code} lang={option.code}>
+                  {option.name}
+                </option>
+              ))}
+            </select>
+          </Field>
           <div className="row">
-            <div className="formGroup">
-              <label htmlFor="field-currency">{t("Currency")}</label>
+            <Field label={t("Currency")}>
               <select {...field("currency")}>
                 {options.currencies.map((currency) => (
                   <option key={currency} value={currency}>
@@ -164,9 +179,8 @@ function CompanySettingsForm({ user, onUserChanged }: Props) {
                   </option>
                 ))}
               </select>
-            </div>
-            <div className="formGroup">
-              <label htmlFor="field-units">{t("Units")}</label>
+            </Field>
+            <Field label={t("Units")}>
               <select {...field("units")}>
                 {options.units.map((unit) => (
                   <option key={unit} value={unit}>
@@ -174,7 +188,7 @@ function CompanySettingsForm({ user, onUserChanged }: Props) {
                   </option>
                 ))}
               </select>
-            </div>
+            </Field>
           </div>
           <button className="primary" disabled={busy}>
             {busy ? t("Saving…") : t("Save company settings")}
@@ -208,18 +222,15 @@ function ChangePassword() {
     <form className="form form-upgraded changePassword settingsSection" onSubmit={submit}>
       <h3>{t("Change password")}</h3>
       {error && <div className="error">{error}</div>}
-      <div className="formGroup">
-        <label htmlFor="field-current_password">{t("Current password")}</label>
+      <Field label={t("Current password")}>
         <input id="field-current_password" name="current_password" type="password" autoComplete="current-password" required />
-      </div>
-      <div className="formGroup">
-        <label htmlFor="field-new_password">{t("New password")}</label>
+      </Field>
+      <Field label={t("New password")}>
         <input id="field-new_password" name="new_password" type="password" autoComplete="new-password" minLength={8} required />
-      </div>
-      <div className="formGroup">
-        <label htmlFor="field-confirm_password">{t("Confirm new password")}</label>
+      </Field>
+      <Field label={t("Confirm new password")}>
         <input id="field-confirm_password" name="confirm_password" type="password" autoComplete="new-password" minLength={8} required />
-      </div>
+      </Field>
       <button className="primary">{t("Update password")}</button>
     </form>
   );

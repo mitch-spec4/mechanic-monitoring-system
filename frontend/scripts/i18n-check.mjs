@@ -98,7 +98,8 @@ const problems = [];
 const used = new Set();
 
 for (const file of files(SRC)) {
-  const source = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  // Parsed by extension: in a .ts file, `api<{ ok: true }>(...)` is a type, not JSX.
+  const source = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
   const where = (node) => `${path.relative(ROOT, file)}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1}`;
   const visit = (node) => {
     if (ts.isJsxText(node)) {

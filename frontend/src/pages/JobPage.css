@@ -65,10 +65,22 @@
   color: var(--accent);
   background: var(--accent-soft);
 }
-.jobStatusPill.inprogress { color: #a15c07; background: #fff4e0; }
-.jobStatusPill.paused { color: #5b6b80; background: #eef2f7; }
-.jobStatusPill.completed { color: #15803d; background: #e7f7ec; }
-.jobStatusPill.cancelled { color: #b42318; background: #fdecec; }
+.jobStatusPill.inprogress {
+  color: #a15c07;
+  background: #fff4e0;
+}
+.jobStatusPill.paused {
+  color: #5b6b80;
+  background: #eef2f7;
+}
+.jobStatusPill.completed {
+  color: #15803d;
+  background: #e7f7ec;
+}
+.jobStatusPill.cancelled {
+  color: #b42318;
+  background: #fdecec;
+}
 
 .jobMeta {
   display: grid;
@@ -121,7 +133,7 @@
   color: #9fb2c9;
 }
 .pulseDot {
-  margin-left: auto;
+  margin-inline-start: auto;
   width: 10px;
   height: 10px;
   border-radius: 50%;
@@ -157,7 +169,7 @@
 }
 .jobBlockers ul {
   margin: 6px 0 0;
-  padding-left: 18px;
+  padding-inline-start: 18px;
 }
 
 /* ---------- Cards ---------- */
@@ -234,7 +246,7 @@
   font-size: 13px;
 }
 .entryTop em {
-  margin-left: auto;
+  margin-inline-start: auto;
   font-style: normal;
   font-weight: 800;
   color: var(--accent);
@@ -433,7 +445,7 @@
   display: grid;
   gap: 6px;
   margin: 0;
-  padding-left: 18px;
+  padding-inline-start: 18px;
   font-size: 13px;
 }
 
@@ -453,7 +465,7 @@
 .timeline li::before {
   content: "";
   position: absolute;
-  left: 5px;
+  inset-inline-start: 5px;
   top: 14px;
   bottom: 0;
   width: 2px;
@@ -489,7 +501,7 @@
 .timeline blockquote {
   margin: 4px 0;
   padding: 6px 10px;
-  border-left: 3px solid #f5d38a;
+  border-inline-start: 3px solid #f5d38a;
   background: #fffaf0;
   font-size: 13px;
 }
@@ -553,13 +565,13 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-left: auto;
+  margin-inline-start: auto;
   color: var(--role-color, #0969d7);
   font-weight: 700;
   text-decoration: none;
 }
 .stampList em {
-  margin-left: auto;
+  margin-inline-start: auto;
   color: #8a5300;
   font-style: normal;
 }
@@ -588,7 +600,7 @@
 }
 .mediaTag {
   position: absolute;
-  left: 6px;
+  inset-inline-start: 6px;
   top: 6px;
   padding: 2px 8px;
   border-radius: 999px;
@@ -605,7 +617,7 @@
 }
 .appShell .mediaRemove {
   position: absolute;
-  right: 6px;
+  inset-inline-end: 6px;
   top: 6px;
   width: 28px;
   height: 28px;

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { failOnPageErrors, finishSignIn, openPage, signIn } from "./helpers";
+import { failOnPageErrors, finishSignIn, goTo, openPage, signIn } from "./helpers";
 
 // Each test puts back what it changes: the database is shared with the other spec files.
 test.describe.configure({ mode: "serial" });
@@ -29,7 +29,8 @@ test("a technician switches the whole app to Kiswahili in Settings", async ({ pa
   await openPage(page, "Settings");
   await page.locator(".settingsSection", { hasText: "The app, your emails" }).getByLabel("Language").selectOption("sw");
   await expect(page.locator(".subPage h1")).toHaveText("Mipangilio");
-  await expect(page.locator(".sidebarLink", { hasText: "Kazi zangu" })).toBeVisible();
+  // The navigation too: the sidebar on a computer, the bottom bar on a technician's phone.
+  await expect(page.locator('[data-page="My Jobs"]:visible')).toHaveText(/^(Kazi zangu|Kazi)$/);
   await expect(page.locator(".subPage .eyebrow")).toContainText("FUNDI");
 
   // The choice belongs to the account, so it follows the technician to a fresh browser.
@@ -43,10 +44,10 @@ test("a technician switches the whole app to Kiswahili in Settings", async ({ pa
   await page.getByRole("button", { name: "Sign in" }).click();
   // A new browser: the sign-in code step comes up in Kiswahili too.
   await finishSignIn(page, "brian@mechanicpro.test");
-  await expect(page.locator(".sidebarLink", { hasText: "Dashibodi" })).toBeVisible();
+  await expect(page.locator('[data-page="Dashboard"]:visible')).toHaveText(/^(Dashibodi|Leo)$/);
   await expect(page.locator(".clockCard")).toContainText("Umetoka kazini");
 
-  await page.locator(".sidebarLink", { hasText: "Mipangilio" }).click();
+  await goTo(page, "Settings");
   await page.locator(".settingsSection", { hasText: "Programu, barua pepe" }).getByLabel("Lugha").selectOption("en");
   await expect(page.locator(".subPage h1")).toHaveText("Settings");
   noErrors();

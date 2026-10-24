@@ -4,9 +4,9 @@ import { plans as fetchPlans } from "../services/api";
 import { money } from "../lib/route";
 import { t } from "../i18n";
 
-export type Interval = "month" | "year";
-export type Plan = { key: string; name: string; mechanics: number; storage_gb: number; prices: Record<Interval, number> };
-export type Pricing = { plans: Plan[]; currency: string; trial_days: number; yearly_months: number; payment_provider: string | null };
+import type { Interval, Plan, Pricing } from "../services/types";
+
+export type { Interval, Plan, Pricing };
 
 /** The plans and prices come from the server, so every page shows what checkout charges. */
 export function usePricing() {
@@ -44,7 +44,11 @@ export function PlanCards({
         const price = plan.prices[interval];
         const featured = plan.key === "professional";
         return (
-          <article key={plan.key} ref={plan.key === focus ? focused : undefined} className={`planCard ${featured ? "featured" : ""} ${plan.key === focus ? "focused" : ""}`}>
+          <article
+            key={plan.key}
+            ref={plan.key === focus ? focused : undefined}
+            className={`planCard ${featured ? "featured" : ""} ${plan.key === focus ? "focused" : ""}`}
+          >
             {featured && <span className="planBadge">{t("Recommended")}</span>}
             <h3>{t(plan.name)}</h3>
             <p className="planPrice">

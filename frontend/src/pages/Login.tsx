@@ -4,7 +4,10 @@ import { TermsAgreement } from "../components/Legal";
 import { go } from "../lib/route";
 import { errorMessage } from "../lib/format";
 import LanguagePicker from "../components/LanguagePicker";
-import { mark, t } from "../i18n";
+import LanguageSuggestion from "../components/LanguageSuggestion";
+import { explicitLanguage, mark, t } from "../i18n";
+import Field from "../components/Field";
+import { BackArrow } from "../components/Arrows";
 
 // "link" sets a new password from the link in a reset email; "code" uses a code from a manager.
 export type LoginMode = "signin" | "invite" | "forgot" | "code" | "link";
@@ -65,7 +68,8 @@ export default function Login({ done, mode: startMode = "signin", code: startCod
     setBusy(true);
     try {
       if (mode === "invite") {
-        await acceptInvitation({ code, name, email, password, accept_terms: agreed });
+        // A language picked on this page wins; otherwise the company's language is used.
+        await acceptInvitation({ code, name, email, password, accept_terms: agreed, language: explicitLanguage() });
         signInWith(t("Invitation accepted. You can now sign in."));
       } else if (mode === "forgot") {
         setMessage((await forgotPassword(email)).message);
@@ -74,7 +78,7 @@ export default function Login({ done, mode: startMode = "signin", code: startCod
         signInWith(t("Password updated. You can now sign in."), result.email || email);
       } else {
         const data = await login(email, password);
-        if (data.two_factor_required) {
+        if ("ticket" in data) {
           setTicket(data.ticket);
           setPassword("");
           return;
@@ -121,8 +125,7 @@ export default function Login({ done, mode: startMode = "signin", code: startCod
               {error}
             </div>
           )}
-          <label>
-            {t("Sign-in code")}
+          <Field wrap label={t("Sign-in code")}>
             <input
               className="codeInput"
               value={otp}
@@ -133,7 +136,7 @@ export default function Login({ done, mode: startMode = "signin", code: startCod
               maxLength={12}
               required
             />
-          </label>
+          </Field>
           <label className="checkRow">
             <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
             {t("Remember this device for 30 days")}
@@ -171,31 +174,26 @@ export default function Login({ done, mode: startMode = "signin", code: startCod
         )}
         {mode === "invite" && (
           <>
-            <label>
-              {t("Invitation code")}
+            <Field wrap label={t("Invitation code")}>
               <input value={code} onChange={(event) => setCode(event.target.value)} placeholder="DK-XXXXXXXXXX" required />
-            </label>
-            <label>
-              {t("Full name")}
+            </Field>
+            <Field wrap label={t("Full name")}>
               <input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" required />
-            </label>
+            </Field>
           </>
         )}
         {mode === "code" && (
-          <label>
-            {t("Reset code")}
+          <Field wrap label={t("Reset code")}>
             <input value={code} onChange={(event) => setCode(event.target.value)} placeholder="RS-XXXXXXXXXX" required />
-          </label>
+          </Field>
         )}
         {mode !== "link" && (
-          <label>
-            {t("Email")}
+          <Field wrap label={t("Email")}>
             <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required />
-          </label>
+          </Field>
         )}
         {mode !== "forgot" && (
-          <label>
-            {signingIn ? t("Password") : t("New password")}
+          <Field wrap label={signingIn ? t("Password") : t("New password")}>
             <input
               type="password"
               value={password}
@@ -204,7 +202,7 @@ export default function Login({ done, mode: startMode = "signin", code: startCod
               autoComplete={signingIn ? "current-password" : "new-password"}
               required
             />
-          </label>
+          </Field>
         )}
         {mode === "invite" && <TermsAgreement checked={agreed} onChange={setAgreed} />}
         <button className="primary" disabled={busy}>
@@ -245,10 +243,11 @@ export default function Login({ done, mode: startMode = "signin", code: startCod
           </button>
         </p>
         <button type="button" className="loginSwitch loginHome" onClick={() => go("/")}>
-          ← {t("Back to the homepage")}
+          <BackArrow /> {t("Back to the homepage")}
         </button>
         <LanguagePicker className="loginLanguage" />
       </form>
+      <LanguageSuggestion />
     </main>
   );
 }
