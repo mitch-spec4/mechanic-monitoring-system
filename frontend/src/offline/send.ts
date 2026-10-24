@@ -154,8 +154,9 @@ async function keep(db: OfflineDB, env: SendEnv, item: QueueItem, data: unknown)
   }
   if (!item.jobId) return;
   let detail = reply.job && "parts" in reply.job ? reply.job : null;
-  if (item.kind === "status") {
-    // The reply is the job as the list shows it: update the list, and fetch the worksheet.
+  if (item.kind === "status" || item.kind === "on_the_way") {
+    // The reply is the job as the list shows it: update the list, and fetch the worksheet. Without
+    // this newer copy, a read that left before the change was sent can land after it and undo it.
     const list = await readCache(db, "/jobs");
     const listed = list?.data as { jobs: Job[] } | undefined;
     if (listed && reply.job) {
