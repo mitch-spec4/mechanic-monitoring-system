@@ -192,7 +192,13 @@ export async function submit<T>(change: NewChange, direct: () => Promise<T>, blo
   const database = db;
   if (!database || !me) return direct();
   const item: QueueItem = { ...change, id: newId(), userId: me.id, at: serverNow().toISOString(), lang: language(), state: "waiting", attempts: 0 };
-  await addItem(database, item, blob);
+  try {
+    await addItem(database, item, blob);
+  } catch {
+    // The phone couldn't keep it (out of space, say): online it goes straight to the server.
+    if (navigator.onLine) return direct();
+    throw new Error(t("This phone couldn't keep the change. Free up some space, or connect to the internet and try again."));
+  }
   if (blob) previews.set(item.id, URL.createObjectURL(blob));
   const online = navigator.onLine;
   const answer = online

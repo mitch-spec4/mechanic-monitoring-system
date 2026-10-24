@@ -307,6 +307,15 @@ def create_app(overrides=None):
     def health():
         return {"status": "ok"}
 
+    @app.after_request
+    def never_cache_api_data(response):
+        # Personal data stays out of the browser's cache. That also keeps a browser that is offline
+        # (Firefox serves its cache then) from passing an old answer off as the server's: the
+        # technician's app keeps its own copy (frontend/src/offline).
+        if response.mimetype == "application/json" and "Cache-Control" not in response.headers:
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
     return app
 
 

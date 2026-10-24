@@ -330,3 +330,8 @@ def test_the_checklist_reaches_the_phone_before_work_starts(client, data, auth, 
     untouched = new_job("Check the fan")
     assert client.patch(f"/api/jobs/{untouched}", headers=auth(BOSS), json={"job_type": "Repair"}).status_code == 200
     assert detail(client, auth, untouched)["checklist"] == []
+
+
+def test_api_answers_are_never_kept_in_the_browser_cache(client, data, auth):
+    response = client.get(f"/api/jobs/{data['job']}", headers=auth(MECH))
+    assert response.headers["Cache-Control"] == "no-store"

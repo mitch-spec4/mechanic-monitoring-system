@@ -27,5 +27,13 @@ export function noteServerClock(date: string | null, sentAt: number, receivedAt:
   }
 }
 
-/** Now, on the server's clock. */
-export const serverNow = () => new Date(Date.now() + offset);
+let last = 0;
+
+/**
+ * Now, on the server's clock. Never earlier than the time it gave before: the correction moves a
+ * little with each reply (the header counts whole seconds), and two quick taps must stay in order.
+ */
+export function serverNow() {
+  last = Math.max(Date.now() + offset, last + 1);
+  return new Date(last);
+}

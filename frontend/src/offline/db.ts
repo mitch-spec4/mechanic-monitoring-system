@@ -12,11 +12,13 @@ import type { QueueItem } from "./types";
 interface OfflineSchema extends DBSchema {
   cache: { key: string; value: { path: string; data: unknown; savedAt: number } };
   outbox: { key: number; value: QueueItem; indexes: { id: string } };
-  blobs: { key: string; value: Blob };
+  blobs: { key: string; value: StoredFile | Blob };
   meta: { key: string; value: Record<string, number> };
 }
 
 export type OfflineDB = IDBPDatabase<OfflineSchema>;
+// A photo or video kept as bytes: Safari can't keep a Blob in the database in a private window.
+type StoredFile = { data: ArrayBuffer; type: string };
 
 const name = (userId: number) => `mechanicpro-${userId}`;
 
@@ -45,9 +47,11 @@ export const getItem = (db: OfflineDB, seq: number) => db.get("outbox", seq);
 export const putItem = (db: OfflineDB, item: QueueItem) => db.put("outbox", item);
 
 export async function addItem(db: OfflineDB, item: QueueItem, blob?: Blob) {
+  // Read before the transaction starts: it closes on its own while anything else is awaited.
+  const file: StoredFile | undefined = blob ? { data: await blob.arrayBuffer(), type: blob.type } : undefined;
   const tx = db.transaction(["outbox", "blobs"], "readwrite");
   const seq = await tx.objectStore("outbox").add(item);
-  if (blob) await tx.objectStore("blobs").put(blob, item.id);
+  if (file) await tx.objectStore("blobs").put(file, item.id);
   await tx.done;
   return { ...item, seq };
 }
@@ -59,7 +63,10 @@ export async function deleteItem(db: OfflineDB, item: QueueItem) {
   await tx.done;
 }
 
-export const getBlob = (db: OfflineDB, id: string) => db.get("blobs", id);
+export async function getBlob(db: OfflineDB, id: string) {
+  const file = await db.get("blobs", id);
+  return !file || file instanceof Blob ? file : new Blob([file.data], { type: file.type });
+}
 
 export const readCache = (db: OfflineDB, path: string) => db.get("cache", path);
 export const writeCache = (db: OfflineDB, path: string, data: unknown) => db.put("cache", { path, data, savedAt: Date.now() });

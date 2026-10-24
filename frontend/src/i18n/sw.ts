@@ -897,6 +897,7 @@ export const SW: Record<string, string> = {
   "This company's account will be deleted on {date}. Ask a manager if this is a mistake.": "Akaunti ya kampuni hii itafutwa tarehe {date}. Muulize meneja ikiwa hili ni kosa.",
   "This job has no equipment, so there is no service record for the customer.": "Kazi hii haina kifaa, kwa hivyo hakuna rekodi ya huduma kwa mteja.",
   "This job has no job type, so it has no checklist.": "Kazi hii haina aina ya kazi, kwa hivyo haina orodha ya ukaguzi.",
+  "This phone couldn't keep the change. Free up some space, or connect to the internet and try again.": "Simu hii haikuweza kuhifadhi badiliko. Futa vitu upate nafasi, au unganisha intaneti ujaribu tena.",
   "This phone is nearly out of space. Connect to the internet so your photos and videos can upload.": "Simu hii inakaribia kujaa. Unganisha intaneti ili picha na video zako zipakiwe.",
   "This phone is out of space for photos and videos waiting to upload. Connect to the internet so the waiting ones can upload, or free up space.": "Simu hii haina nafasi ya picha na video zinazosubiri kupakiwa. Unganisha intaneti ili zinazosubiri zipakiwe, au futa vitu upate nafasi.",
   "This photo format can't be read here. Take a new photo or choose a JPEG.": "Muundo wa picha hii hauwezi kusomwa hapa. Piga picha mpya au chagua JPEG.",

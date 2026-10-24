@@ -121,7 +121,9 @@ function send(path: string, options: RequestInit) {
   headers.set("Accept-Language", language());
   headers.set("X-Language", language());
   const sentAt = Date.now();
-  return fetch(`${BASE}${path.startsWith("/") ? path : `/${path}`}`, { ...options, headers, credentials: "include" }).then((response) => {
+  // Never an old answer from the browser's cache (an offline Firefox serves it): a technician's
+  // offline copy is the app's own, and says how old it is.
+  return fetch(`${BASE}${path.startsWith("/") ? path : `/${path}`}`, { cache: "no-store", ...options, headers, credentials: "include" }).then((response) => {
     noteServerClock(response.headers.get("Date"), sentAt, Date.now());
     return response;
   });
