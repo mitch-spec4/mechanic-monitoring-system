@@ -142,7 +142,11 @@ function CompanySettingsForm({ user, onUserChanged }: Props) {
   const field = (key: Exclude<keyof CompanySettings, "booking" | "base">) => ({
     id: `field-${key}`,
     value: settings?.[key] ?? "",
-    onChange: (event: { target: { value: string } }) => settings && setSettings({ ...settings, [key]: event.target.value }),
+    // From the latest state, so two quick changes (a field, then the map) never undo each other.
+    onChange: (event: { target: { value: string } }) => {
+      const { value } = event.target;
+      setSettings((current) => current && { ...current, [key]: value });
+    },
   });
 
   return (
@@ -197,7 +201,7 @@ function CompanySettingsForm({ user, onUserChanged }: Props) {
           <div className="formGroup">
             <span className="fieldTitle">{t("Where technicians start the day")}</span>
             <small className="muted fieldHint">{t("Your yard or office. Planned routes start here when a technician hasn't shared where they are.")}</small>
-            <MapPicker value={settings.base} onChange={(base) => setSettings({ ...settings, base })} label={t("Map: where technicians start the day")} />
+            <MapPicker value={settings.base} onChange={(base) => setSettings((current) => current && { ...current, base })} label={t("Map: where technicians start the day")} />
           </div>
           <button className="primary" disabled={busy}>
             {busy ? t("Saving…") : t("Save company settings")}
