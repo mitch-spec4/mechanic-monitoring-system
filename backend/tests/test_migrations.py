@@ -46,6 +46,9 @@ def test_upgrading_a_database_that_already_has_data(tmp_path):
             values (1, 1, 1, 1, 1, 'Repair', '2026-01-01');
         insert into review (id, customer_id, mechanic_id, machine_id, company_id, service_record_id, rating, created_at)
             values (1, 1, 1, 1, 1, 1, 5, '2026-01-02');
+        insert into service_request (id, customer_id, company_id, machine_id, subject, description, priority, status, created_at)
+            values (1, 1, 1, 1, 'Noise', 'Loud', 'Medium', 'Reviewing', '2026-01-03'),
+                   (2, 1, 1, 1, 'Leak', 'Drips', 'Medium', 'Completed', '2026-01-04');
         """
     )
     db.commit()
@@ -56,6 +59,8 @@ def test_upgrading_a_database_that_already_has_data(tmp_path):
     assert db.execute("select count(*) from review").fetchone() == (1,)
     assert db.execute("select job_id from service_record").fetchone() == (None,)
     assert db.execute("pragma foreign_key_check").fetchall() == []
+    # Requests at the old hand-set steps wait for the customer to book a visit.
+    assert db.execute("select status from service_request order by id").fetchall() == [("Submitted",), ("Completed",)]
     # Companies from before plans existed get the largest plan with no end date.
     assert db.execute("select company_id, plan, status, current_period_end from subscription").fetchall() == [(1, "business", "active", None)]
     # People from before email verification count as confirmed, and the setup guide is for new companies only.
@@ -76,7 +81,7 @@ def test_migrations_roll_back_and_forward(tmp_path):
         upgrade(directory=migrations)
         downgrade(directory=migrations, revision="base")
         upgrade(directory=migrations)
-    assert sqlite3.connect(path).execute("select version_num from alembic_version").fetchone() == ("0011_offline_sync",)
+    assert sqlite3.connect(path).execute("select version_num from alembic_version").fetchone() == ("0012_booking",)
 
 
 def test_the_old_team_plan_becomes_professional(tmp_path):

@@ -5,7 +5,7 @@ import { ClockCard, changeJobStatus, useShift } from "../components/Shift";
 import { InstallCard, Waiting } from "../components/Offline";
 import { offlineState } from "../offline";
 import SignatureModal, { type SignOff } from "../components/SignatureModal";
-import { errorMessage, formatDate, formatDay, greeting, toZoneInput } from "../lib/format";
+import { errorMessage, formatDate, formatDay, formatTime, greeting, toZoneInput } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
 import { t } from "../i18n";
 import { EmptyState } from "../components/States";
@@ -22,7 +22,13 @@ function todaysJobs(jobs: Job[]) {
   const today = toZoneInput(new Date()).slice(0, 10);
   return jobs
     .filter((job) => job.status in TODAY_ORDER || (job.due_date && job.due_date <= today))
-    .sort((a, b) => (TODAY_ORDER[a.status] ?? 2) - (TODAY_ORDER[b.status] ?? 2) || String(a.due_date).localeCompare(String(b.due_date)));
+    .sort(
+      (a, b) =>
+        (TODAY_ORDER[a.status] ?? 2) - (TODAY_ORDER[b.status] ?? 2) ||
+        String(a.due_date).localeCompare(String(b.due_date)) ||
+        // Booked visits by their time; others after them.
+        String(a.scheduled_start ?? "~").localeCompare(String(b.scheduled_start ?? "~")),
+    );
 }
 
 export default function MechanicDashboard({ u, onOpenJob }: Props) {
@@ -241,7 +247,13 @@ function TodaysJobs({ jobs, changing, onChange, onOpenJob }: TodayProps) {
                   {job.pending_status && <Waiting />}
                   {job.location || t("No site")}
                   {job.due_date && job.due_date < today && <em className="overdue">{t("Overdue since {date}", { date: formatDate(job.due_date) })}</em>}
-                  {job.due_date === today && <em>{t("Due today")}</em>}
+                  {job.due_date === today &&
+                    (job.scheduled_start ? (
+                      <em>{t("Visit at {time}", { time: formatTime(job.scheduled_start) })}</em>
+                    ) : (
+                      <em>{t("Due today")}</em>
+                    ))}
+                  {job.on_the_way_at && <em>{t("On the way")}</em>}
                 </small>
               </div>
               {job.status === "In Progress" ? (

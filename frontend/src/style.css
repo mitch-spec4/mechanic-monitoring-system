@@ -223,6 +223,17 @@ header {
   margin: auto;
   padding: 28px;
 }
+.welcomeActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.welcomeActions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+}
 .welcome {
   display: flex;
   justify-content: space-between;
@@ -1465,6 +1476,40 @@ body {
   color: #0969d7;
 }
 .themeChoices input {
+  accent-color: #0969d7;
+}
+
+/* The days customers can book, in Settings. */
+.dayChoices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.dayChoices legend {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.dayChoices label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid #dce3eb;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+.dayChoices label.chosen {
+  border-color: #0969d7;
+  background: #eaf3ff;
+  color: #0969d7;
+}
+.dayChoices input {
   accent-color: #0969d7;
 }
 

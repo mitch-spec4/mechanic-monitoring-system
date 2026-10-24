@@ -25,7 +25,7 @@ def test_needs_work_rule(client, data, auth):
     requested = add_machine(data, "Conveyor", "SN-5")
     db.session.add_all(
         [
-            ServiceRequest(customer_id=data["acme_customer"], company_id=data["acme"], machine_id=requested, subject="Belt slipping", description="x", status="Reviewing"),
+            ServiceRequest(customer_id=data["acme_customer"], company_id=data["acme"], machine_id=requested, subject="Belt slipping", description="x", status="Inspection booked"),
             ServiceRequest(customer_id=data["acme_customer"], company_id=data["acme"], machine_id=quiet, subject="Done already", description="x", status="Completed"),
             Job(title="Old job", description="x", company_id=data["acme"], customer_id=data["acme_customer"], machine_id=quiet, status="Completed"),
         ]

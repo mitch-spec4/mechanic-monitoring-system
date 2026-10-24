@@ -1,8 +1,10 @@
 import { language, t } from "../i18n";
 import type {
   AuditEvent,
+  ChatMessage,
   Checklist,
   Company,
+  Conversation,
   Customer,
   CustomerDetail,
   CustomerSummary,
@@ -18,11 +20,13 @@ import type {
   Payment,
   Pricing,
   Report,
+  RequestDetail,
   Review,
   Role,
   ServiceRecord,
   ServiceRequest,
   SetupStepState,
+  Slot,
   Shift,
   ShiftStatus,
   Subscription,
@@ -30,6 +34,7 @@ import type {
   TwoFactorSetup,
   TwoFactorStatus,
   Usage,
+  Visit,
 } from "./types";
 import type { PositionResult } from "../lib/location";
 import { noteServerClock } from "../offline/clock";
@@ -211,11 +216,23 @@ export const resendVerification = () => post<Message & { sent: boolean }>("/auth
 export const me = () => api<Signed>("/users/me");
 export const saveLanguage = (language: string) => patch<Signed>("/users/me", { language });
 
-// Company settings (managers): time zone, currency, units and the company's language
-export type CompanySettings = { timezone: string; currency: string; units: string; language: string };
+// Company settings (managers): time zone, currency, units, the company's language and booking
+/** When customers can book visits: ISO weekdays (1 = Monday), opening hours, lengths in minutes. */
+export type BookingSettings = {
+  days: number[];
+  start: string;
+  end: string;
+  inspection_minutes: number;
+  repair_minutes: number;
+  travel_minutes: number;
+  notice_hours: number;
+  window_days: number;
+};
+export type CompanySettings = { timezone: string; currency: string; units: string; language: string; booking: BookingSettings };
 export type CompanySettingsOptions = { timezones: string[]; currencies: string[]; units: string[]; languages: { code: string; name: string }[] };
 export const companySettings = () => api<{ settings: CompanySettings } & CompanySettingsOptions>("/company/settings");
-export const saveCompanySettings = (settings: Partial<CompanySettings>) => patch<{ settings: CompanySettings }>("/company/settings", settings);
+export const saveCompanySettings = (settings: Partial<Omit<CompanySettings, "booking">> & { booking?: Partial<BookingSettings> }) =>
+  patch<{ settings: CompanySettings }>("/company/settings", settings);
 
 // "Try the demo": a private demo company, seen as the boss, a mechanic or a customer
 export const startDemo = (role: string) => post<Signed>("/demo", { role });
@@ -256,7 +273,20 @@ export const createMachine = (data: Payload) => post<{ id: number; machine: Mach
 export const createRequest = (data: Payload) => post<{ id: number }>("/customers/requests", data);
 export const updateMachine = (id: number, data: Payload) => patch<{ ok: true; machine: Machine }>(`/machines/${id}`, data);
 export const updateCustomer = (id: number, data: Payload) => patch<{ ok: true; customer: Customer }>(`/customers/${id}`, data);
-export const updateRequest = (id: number, data: Payload) => patch<{ ok: true; status: string }>(`/customers/requests/${id}`, data);
+export const updateRequest = (id: number, data: Payload) => patch<{ ok: true; status: string; request: RequestDetail }>(`/customers/requests/${id}`, data);
+
+// A request's page: its visits, booking a time, and the chat with the company
+export const requestDetail = (id: number) => api<{ request: RequestDetail }>(`/customers/requests/${id}`);
+export const requestSlots = (id: number) =>
+  api<{ visit: Visit | null; minutes: number | null; moving?: number | null; slots: Slot[] }>(`/customers/requests/${id}/slots`);
+export const bookVisit = (id: number, start: string) => post<{ request: RequestDetail }>(`/customers/requests/${id}/book`, { start });
+export const cancelRequest = (id: number) => post<{ request: RequestDetail }>(`/customers/requests/${id}/cancel`, {});
+export const conversations = () => api<{ conversations?: Conversation[]; unread: number }>("/messages");
+export const customerThread = (customerId: number) => api<{ customer: { id: number; name: string }; messages: ChatMessage[] }>(`/messages/${customerId}`);
+export const sendToCustomer = (customerId: number, body: string) => post<{ message: ChatMessage }>(`/messages/${customerId}`, { body });
+export const myThread = () => api<{ company: string; messages: ChatMessage[] }>("/messages/mine");
+export const sendToCompany = (body: string) => post<{ message: ChatMessage }>("/messages/mine", { body });
+export const onTheWay = (jobId: number) => post<{ job: Job }>(`/jobs/${jobId}/on-the-way`, {});
 export const createReview = (data: Payload) => post<{ id: number }>("/reviews", data);
 export const markNotificationRead = (id: number) => patch<Ok>(`/notifications/${id}/read`, {});
 export const markAllNotificationsRead = () => patch<Ok>("/notifications/read-all", {});

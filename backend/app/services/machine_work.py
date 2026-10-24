@@ -1,10 +1,9 @@
 """Which machines need work, and why. One rule shared by every screen:
 an open job, an open service request, or a status of Under Maintenance or Under Repair."""
-from app.models.constants import ACTIVE_JOB_STATUSES
+from app.models.constants import ACTIVE_JOB_STATUSES, CLOSED_REQUEST_STATUSES
 from app.models.job import Job
 from app.models.request import ServiceRequest
 
-CLOSED_REQUEST_STATUSES = ("Completed", "Cancelled")
 NEEDS_WORK_STATUSES = ("Under Maintenance", "Under Repair")
 
 

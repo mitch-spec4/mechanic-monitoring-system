@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from "react";
-import { CheckCircle2, ClipboardList, Plus, Star, Wrench } from "lucide-react";
+import { CalendarClock, CheckCircle2, ClipboardList, MessageSquare, Plus, Star, Wrench } from "lucide-react";
 import { createRequest, createReview, jobs, machines, requests, reviews, services, type User } from "../services/api";
 import Notifications from "../components/Notifications";
 import Modal from "../components/Modal";
 import { toast } from "../components/Feedback";
-import { errorMessage } from "../lib/format";
+import { errorMessage, formatVisit } from "../lib/format";
 import { PRIORITIES, statusClass } from "../lib/labels";
 import { usePolling } from "../lib/usePolling";
 import { mark, t } from "../i18n";
@@ -14,7 +14,7 @@ import type { Job, Machine, Review, ServiceRecord, ServiceRequest } from "../ser
 // The request form, or the review form for one service visit.
 type ModalState = null | "request" | ServiceRecord;
 
-const FINISHED = ["Completed", "Cancelled"];
+const FINISHED = ["Completed", "Cancelled", "Declined"];
 const RATINGS: [number, string][] = [
   [5, mark("Excellent")],
   [4, mark("Very good")],
@@ -23,7 +23,9 @@ const RATINGS: [number, string][] = [
   [1, mark("Poor")],
 ];
 
-export default function CustomerDashboard({ u, onOpenJob }: { u: User; onOpenJob: (id: number) => void }) {
+type Props = { u: User; onOpenJob: (id: number) => void; onOpenRequest: (id: number) => void; onOpenMessages: () => void };
+
+export default function CustomerDashboard({ u, onOpenJob, onOpenRequest, onOpenMessages }: Props) {
   const [jobList, setJobList] = useState<Job[]>([]);
   const [equipment, setEquipment] = useState<Machine[]>([]);
   const [records, setRecords] = useState<ServiceRecord[]>([]);
@@ -58,6 +60,19 @@ export default function CustomerDashboard({ u, onOpenJob }: { u: User; onOpenJob
       setFormError(errorMessage(error));
     }
   };
+  // A new request opens its page, to pick a time for the inspection.
+  const sendRequest = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setFormError("");
+    try {
+      const { id } = await createRequest(Object.fromEntries(new FormData(e.currentTarget)));
+      setModal(null);
+      toast(t("Request sent. Now pick a time for the inspection."));
+      onOpenRequest(id);
+    } catch (error) {
+      setFormError(errorMessage(error));
+    }
+  };
   const openJobs = jobList.filter((x) => !FINISHED.includes(x.status));
   const activeRequests = requestList.filter((x) => !FINISHED.includes(x.status));
   return (
@@ -69,9 +84,14 @@ export default function CustomerDashboard({ u, onOpenJob }: { u: User; onOpenJob
             <h1>{t("Welcome, {name}.", { name: u.name.split(" ")[0] })}</h1>
             <p>{t("Everything about your equipment and service history in one place.")}</p>
           </div>
-          <button className="primary" onClick={() => setModal("request")}>
-            <Plus size={17} /> {t("Request service")}
-          </button>
+          <div className="welcomeActions">
+            <button className="secondary" onClick={onOpenMessages}>
+              <MessageSquare size={16} /> {t("Message us")}
+            </button>
+            <button className="primary" onClick={() => setModal("request")}>
+              <Plus size={17} /> {t("Request service")}
+            </button>
+          </div>
         </div>
         <div className="stats">
           <div className="stat">
@@ -136,7 +156,9 @@ export default function CustomerDashboard({ u, onOpenJob }: { u: User; onOpenJob
               activeRequests.slice(0, 5).map((request) => (
                 <div className="request" key={request.id}>
                   <div>
-                    <b>{request.subject}</b>
+                    <button className="titleLink" onClick={() => onOpenRequest(request.id)}>
+                      <b>{request.subject}</b>
+                    </button>
                     <span>
                       {t(request.status)} · {request.description}
                     </span>
@@ -153,10 +175,18 @@ export default function CustomerDashboard({ u, onOpenJob }: { u: User; onOpenJob
             {openJobs.slice(0, 5).map((job) => (
               <div className="request" key={job.id}>
                 <div>
-                  <button className="titleLink" onClick={() => onOpenJob(job.id)}>
+                  <button className="titleLink" onClick={() => (job.request_id ? onOpenRequest(job.request_id) : onOpenJob(job.id))}>
                     <b>{job.title}</b>
                   </button>
-                  <span>{job.location || t("Site not set")}</span>
+                  <span>
+                    {job.scheduled_start ? (
+                      <>
+                        <CalendarClock size={12} /> {formatVisit(job.scheduled_start, job.scheduled_end)}
+                      </>
+                    ) : (
+                      job.location || t("Site not set")
+                    )}
+                  </span>
                 </div>
                 <span className={`status ${statusClass(job.status)}`}>{t(job.status)}</span>
               </div>
@@ -200,7 +230,7 @@ export default function CustomerDashboard({ u, onOpenJob }: { u: User; onOpenJob
       </main>
       {modal === "request" && (
         <Modal title={t("Request a service")} onClose={() => setModal(null)}>
-          <form className="form" onSubmit={submit(createRequest, t("Request sent"))}>
+          <form className="form" onSubmit={sendRequest}>
             {formError && <div className="error">{formError}</div>}
             {equipment.length === 0 && <p className="muted">{t("No equipment is registered to your account yet. Ask your service company to add it.")}</p>}
             <Field label={t("Equipment")}>

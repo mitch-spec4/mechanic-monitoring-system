@@ -7,6 +7,7 @@ import CustomerDashboard from "./pages/CustomerDashboard";
 import WorkspacePage from "./pages/WorkspacePage";
 import JobPage from "./pages/JobPage";
 import CustomerPage from "./pages/CustomerPage";
+import RequestPage from "./pages/RequestPage";
 import Home from "./pages/Home";
 import Signup from "./pages/Signup";
 import Checkout from "./pages/Checkout";
@@ -43,6 +44,9 @@ export default function App() {
   );
 }
 
+// Links into the signed-in app, sent in emails.
+const APP_LINK = /^\/(requests\/\d+|messages)$/;
+
 function storedUser(): User | null {
   try {
     const stored = localStorage.getItem("user");
@@ -76,13 +80,28 @@ function Screens() {
   const [active, setActive] = useState("Dashboard");
   const [openJobId, setOpenJobId] = useState<number | null>(null);
   const [openCustomerId, setOpenCustomerId] = useState<number | null>(null);
+  const [openRequestId, setOpenRequestId] = useState<number | null>(null);
+  // The customer whose chat Messages opens on (managers).
+  const [chatCustomerId, setChatCustomerId] = useState<number | null>(null);
   const [billingFocus, setBillingFocus] = useState<{ plan: string; interval: Interval }>();
   const route = useRoute();
   const navigate = (label: string) => {
     setOpenJobId(null);
     setOpenCustomerId(null);
+    setOpenRequestId(null);
+    setChatCustomerId(null);
     setBillingFocus(undefined);
     setActive(label);
+  };
+  const openRequest = (id: number) => {
+    setOpenJobId(null);
+    setOpenCustomerId(null);
+    setOpenRequestId(id);
+    window.scrollTo({ top: 0 });
+  };
+  const openMessages = (customerId?: number) => {
+    navigate("Messages");
+    setChatCustomerId(customerId ?? null);
   };
   const openCustomer = (id: number) => {
     setOpenCustomerId(id);
@@ -98,6 +117,7 @@ function Screens() {
     setUser(null);
     setOpenJobId(null);
     setOpenCustomerId(null);
+    setOpenRequestId(null);
     setActive("Dashboard");
   };
   const logout = async () => {
@@ -126,6 +146,7 @@ function Screens() {
     setUser(loggedInUser);
     setOpenJobId(null);
     setOpenCustomerId(null);
+    setOpenRequestId(null);
     setActive("Dashboard");
   };
   // The profile kept for reloads changes too, e.g. once the email address is confirmed.
@@ -141,8 +162,18 @@ function Screens() {
       setBillingFocus({ plan: route.query.get("plan") || "", interval: route.query.get("interval") === "year" ? "year" : "month" });
       setActive("Billing");
     }
-    go(next.startsWith("/checkout/") ? next : "/");
+    // A link from an email (a request, the chat) opens once signed in.
+    go(next.startsWith("/checkout/") ? next : APP_LINK.test(route.path) ? route.path : "/");
   };
+
+  // Links from emails: "/requests/12" opens that request, "/messages" the chat.
+  useEffect(() => {
+    if (!user || !APP_LINK.test(route.path)) return;
+    const request = /^\/requests\/(\d+)$/.exec(route.path);
+    if (request) openRequest(Number(request[1]));
+    else openMessages();
+    go("/");
+  }, [user?.id, route.path]);
 
   useEffect(() => {
     // An ended session goes back to the sign-in page, not the homepage; a checkout is kept.
@@ -208,7 +239,7 @@ function Screens() {
   }
 
   if (!user) {
-    if (route.path === "/signin") {
+    if (route.path === "/signin" || APP_LINK.test(route.path)) {
       return <Login done={afterLogin} />;
     }
     if (route.path === "/signup") {
@@ -238,16 +269,40 @@ function Screens() {
     <JobPage key={openJobId} jobId={openJobId} user={user} onBack={() => setOpenJobId(null)} />
   ) : openCustomerId ? (
     <CustomerPage key={openCustomerId} customerId={openCustomerId} onBack={() => setOpenCustomerId(null)} onOpenJob={openJob} />
+  ) : openRequestId ? (
+    <RequestPage
+      key={openRequestId}
+      requestId={openRequestId}
+      user={user}
+      onBack={() => setOpenRequestId(null)}
+      onOpenJob={openJob}
+      onOpenMessages={openMessages}
+    />
   ) : active === "Billing" && user.role === "boss" ? (
     <BillingPage focus={billingFocus} />
   ) : active !== "Dashboard" && active !== "Profile" ? (
-    <WorkspacePage title={active} user={user} onOpenJob={openJob} onOpenCustomer={openCustomer} onUserChanged={updateUser} />
+    <WorkspacePage
+      title={active}
+      user={user}
+      onOpenJob={openJob}
+      onOpenCustomer={openCustomer}
+      onOpenRequest={openRequest}
+      chatCustomerId={chatCustomerId}
+      onUserChanged={updateUser}
+    />
   ) : user.role === "boss" ? (
-    <BossDashboard u={user} onOpenJob={openJob} onOpenCustomer={openCustomer} onOpenBilling={() => navigate("Billing")} onUserChanged={updateUser} />
+    <BossDashboard
+      u={user}
+      onOpenJob={openJob}
+      onOpenCustomer={openCustomer}
+      onOpenRequest={openRequest}
+      onOpenBilling={() => navigate("Billing")}
+      onUserChanged={updateUser}
+    />
   ) : user.role === "mechanic" ? (
     <MechanicDashboard u={user} onOpenJob={openJob} />
   ) : (
-    <CustomerDashboard u={user} onOpenJob={openJob} />
+    <CustomerDashboard u={user} onOpenJob={openJob} onOpenRequest={openRequest} onOpenMessages={() => openMessages()} />
   );
 
   const shell = (
@@ -255,7 +310,7 @@ function Screens() {
       <button className="skipLink" onClick={() => document.getElementById("content")?.focus()}>
         {t("Skip to content")}
       </button>
-      <Sidebar user={user} active={openJobId || openCustomerId ? "" : active} onNavigate={navigate} />
+      <Sidebar user={user} active={openJobId || openCustomerId || openRequestId ? "" : active} onNavigate={navigate} />
       {user.role === "mechanic" && <BottomNav active={openJobId ? "" : active} onNavigate={navigate} />}
       <div className="appMain">
         <div className="topBar">

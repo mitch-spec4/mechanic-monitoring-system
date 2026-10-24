@@ -91,6 +91,8 @@ export function describe(item: QueueItem) {
       return t("Clock in");
     case "clock_out":
       return t("Clock out");
+    case "on_the_way":
+      return t("On my way");
   }
 }
 

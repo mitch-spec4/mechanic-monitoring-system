@@ -1,4 +1,5 @@
 import io
+import re
 from zoneinfo import available_timezones
 
 from flask import Blueprint, jsonify, request, send_file
@@ -14,11 +15,12 @@ from app.models.security import AuditEvent
 from app.models.user import User
 from app.services import audit, rate_limit
 from app.services.company_data import cancel_deletion, request_deletion
+from app.services.booking import minutes_of
 from app.services.data_export import build_export
-from app.i18n import LANGUAGES, _
+from app.i18n import LANGUAGES, N_, _
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
-from app.utils.validation import ValidationError, choice, json_body, text
+from app.utils.validation import ValidationError, choice, integer, json_body, text
 
 # The currencies a company can show money in (more can be added; amounts are stored in cents).
 CURRENCIES = ("KES", "TZS", "UGX", "RWF", "ETB", "NGN", "GHS", "ZAR", "USD", "EUR", "GBP")
@@ -83,7 +85,65 @@ def dismiss_setup():
 
 
 def settings_out(company):
-    return {"timezone": company.timezone, "currency": company.currency, "units": company.units, "language": company.language}
+    return {
+        "timezone": company.timezone,
+        "currency": company.currency,
+        "units": company.units,
+        "language": company.language,
+        "booking": booking_out(company),
+    }
+
+
+def booking_out(company):
+    return {
+        "days": [int(day) for day in company.booking_days.split(",") if day],
+        "start": company.booking_start,
+        "end": company.booking_end,
+        "inspection_minutes": company.inspection_minutes,
+        "repair_minutes": company.repair_minutes,
+        "travel_minutes": company.travel_minutes,
+        "notice_hours": company.booking_notice_hours,
+        "window_days": company.booking_window_days,
+    }
+
+
+CLOCK = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+
+def clock_time(data, field, label):
+    value = text(data, field, label, required=True, max_length=5)
+    if not CLOCK.match(value):
+        raise ValidationError(_("{label} must be a time like 08:00", label=_(label)))
+    return value
+
+
+def update_booking(company, data):
+    """When customers can book visits, and how long visits take (app/services/booking.py)."""
+    if "days" in data:
+        days = data["days"]
+        if not isinstance(days, list) or not days or any(not isinstance(day, int) or isinstance(day, bool) or not 1 <= day <= 7 for day in days):
+            raise ValidationError(_("Choose at least one day for bookings"))
+        company.booking_days = ",".join(str(day) for day in sorted(set(days)))
+    if "start" in data:
+        company.booking_start = clock_time(data, "start", N_("Bookings start"))
+    if "end" in data:
+        company.booking_end = clock_time(data, "end", N_("Bookings end"))
+    if company.booking_end <= company.booking_start:
+        raise ValidationError(_("Bookings must end after they start"))
+    limits = {
+        "inspection_minutes": (N_("Inspection length (minutes)"), 15, 24 * 60),
+        "repair_minutes": (N_("Repair length (minutes)"), 15, 24 * 60),
+        "travel_minutes": (N_("Travel time between visits (minutes)"), 0, 240),
+        "notice_hours": (N_("Notice needed (hours)"), 0, 24 * 14),
+        "window_days": (N_("How far ahead customers can book (days)"), 1, 90),
+    }
+    columns = {"notice_hours": "booking_notice_hours", "window_days": "booking_window_days"}
+    for field, (label, minimum, maximum) in limits.items():
+        if field in data:
+            setattr(company, columns.get(field, field), integer(data, field, label, required=True, minimum=minimum, maximum=maximum))
+    day = minutes_of(company.booking_end) - minutes_of(company.booking_start)
+    if max(company.inspection_minutes, company.repair_minutes) > day:
+        raise ValidationError(_("A visit has to fit in one working day ({count} minutes).", count=day))
 
 
 @bp.get("/settings")
@@ -114,6 +174,10 @@ def update_settings():
     company.currency = choice(data, "currency", CURRENCIES, "Currency", default=company.currency)
     company.units = choice(data, "units", UNITS, "Units", default=company.units)
     company.language = choice(data, "language", tuple(LANGUAGES), "Language", default=company.language)
+    if "booking" in data:
+        if not isinstance(data["booking"], dict):
+            raise ValidationError(_("Send the request as JSON."))
+        update_booking(company, data["booking"])
     db.session.commit()
     return jsonify(settings=settings_out(company))
 

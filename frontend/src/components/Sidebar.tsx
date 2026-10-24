@@ -6,6 +6,7 @@ import { mark, t } from "../i18n";
 import {
   BarChart3,
   Bell,
+  CalendarClock,
   ClipboardList,
   Clock,
   Cog,
@@ -35,6 +36,7 @@ const commonLinks = [
 const roleLinks = {
   boss: [
     [ClipboardList, mark("Jobs / Requests")],
+    [CalendarClock, mark("Service Requests")],
     [Users, mark("Customers")],
     [Wrench, mark("Equipment")],
     [ListChecks, mark("Checklists")],
@@ -98,7 +100,8 @@ type SidebarProps = { user: User; active: string; onNavigate: (label: string) =>
 export default function Sidebar({ user, active, onNavigate }: SidebarProps) {
   const [stats, setStats] = useState<Report | null>(null);
   usePolling(() => reports().then(setStats).catch(() => {}), 60000, true);
-  const visibleLinks = [...commonLinks, ...roleLinks[user.role], ...utilityLinks];
+  // The chat is between customers and managers.
+  const visibleLinks = [...commonLinks, ...roleLinks[user.role], ...utilityLinks.filter(([, label]) => user.role !== "mechanic" || label !== "Messages")];
   const select = (label: string) => {
     if (label === "Profile") document.querySelector<HTMLButtonElement>(".profileTrigger")?.click();
     else onNavigate(label);

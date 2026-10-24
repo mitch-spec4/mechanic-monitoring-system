@@ -11,7 +11,10 @@ test("customer requests service with the unified priorities", async ({ page }) =
   await form.locator("input[name=subject]").fill("Strange noise");
   await form.locator("textarea[name=description]").fill("Knocking at startup");
   await form.getByRole("button", { name: "Send request" }).click();
-  await expect(page.locator(".request", { hasText: "Strange noise" })).toContainText("Submitted");
+  // The request's page opens, to pick a time for the inspection.
+  await expect(page.locator(".requestPage h1")).toHaveText("Strange noise");
+  await expect(page.locator(".requestPage .jobHero .jobStatusPill")).toHaveText("Submitted");
+  await expect(page.locator(".slotPicker h2")).toHaveText("Pick a time for the inspection");
   noErrors();
 });
 

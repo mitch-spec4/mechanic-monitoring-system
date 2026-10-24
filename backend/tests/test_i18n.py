@@ -89,13 +89,23 @@ def test_new_accounts_start_in_the_language_the_app_is_in(client):
 def test_company_settings(client, data, auth):
     boss = auth("boss@acme.test")
     settings = client.get("/api/company/settings", headers=boss).get_json()
-    assert settings["settings"] == {"timezone": "Africa/Nairobi", "currency": "KES", "units": "metric", "language": "en"}
+    assert {key: value for key, value in settings["settings"].items() if key != "booking"} == {
+        "timezone": "Africa/Nairobi",
+        "currency": "KES",
+        "units": "metric",
+        "language": "en",
+    }
     assert "Africa/Dar_es_Salaam" in settings["timezones"] and "TZS" in settings["currencies"]
     assert settings["languages"] == [{"code": "en", "name": "English"}, {"code": "sw", "name": "Kiswahili"}]
     changed = client.patch(
         "/api/company/settings", headers=boss, json={"timezone": "Africa/Dar_es_Salaam", "currency": "TZS", "units": "imperial", "language": "sw"}
     )
-    assert changed.get_json()["settings"] == {"timezone": "Africa/Dar_es_Salaam", "currency": "TZS", "units": "imperial", "language": "sw"}
+    assert {key: value for key, value in changed.get_json()["settings"].items() if key != "booking"} == {
+        "timezone": "Africa/Dar_es_Salaam",
+        "currency": "TZS",
+        "units": "imperial",
+        "language": "sw",
+    }
     assert db.session.get(Company, data["acme"]).timezone == "Africa/Dar_es_Salaam"
     assert client.patch("/api/company/settings", headers=boss, json={"timezone": "Mars/Olympus"}).status_code == 400
     assert client.patch("/api/company/settings", headers=boss, json={"currency": "BTC"}).status_code == 400

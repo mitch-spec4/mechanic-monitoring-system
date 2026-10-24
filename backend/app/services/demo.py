@@ -9,7 +9,7 @@ It's built in two ways from the same code:
 import io
 import math
 import secrets
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 
 from PIL import Image, ImageDraw
 
@@ -19,6 +19,7 @@ from app.models import (
     ChecklistTemplateItem,
     Company,
     Customer,
+    CustomerMessage,
     Job,
     JobChecklistItem,
     JobEvent,
@@ -273,12 +274,62 @@ def populate(company, tag=None, password=None):
         )
     )
 
+    requests = {}
     for subject, description, priority, status, customer, record in (
         ("Generator G-102 overheating issue", "The generator overheats and vibrates after extended use.", "High", "Submitted", abc, generator),
-        ("Hydraulic leak inspection", "Please inspect the hydraulic line before the next production run.", "Medium", "Reviewing", kenya, pump),
-        ("Mixer vibration check", "The mixer vibrates when processing heavier batches.", "High", "Approved", xyz, mixer),
+        ("Hydraulic leak inspection", "Please inspect the hydraulic line before the next production run.", "Medium", "Inspection booked", kenya, pump),
+        ("Mixer vibration check", "The mixer vibrates when processing heavier batches.", "High", "Inspected", xyz, mixer),
     ):
-        db.session.add(ServiceRequest(customer_id=customer.id, company_id=company.id, machine_id=record.id, subject=subject, description=description, priority=priority, status=status))
+        requests[subject] = ServiceRequest(
+            customer_id=customer.id, company_id=company.id, machine_id=record.id, subject=subject, description=description,
+            priority=priority, status=status, created_at=now - timedelta(days=4), updated_at=now - timedelta(days=2),
+        )
+        db.session.add(requests[subject])
+    db.session.flush()
+
+    # Visits customers booked: Kenya Motors' pump inspection in three days (10:00 in Nairobi), and
+    # XYZ Factory's mixer inspection two days ago, whose findings are in (it books the repair next).
+    leak = requests["Hydraulic leak inspection"]
+    leak_visit = job(leak.subject, leak.description, leak.priority, "Assigned", "Thika Road", 3, kenya, pump, amina, "Inspection")
+    leak_visit.request_id, leak_visit.visit = leak.id, "inspection"
+    leak_visit.scheduled_start = datetime.combine(today + timedelta(days=3), time(7, 0))
+    leak_visit.scheduled_end = leak_visit.scheduled_start + timedelta(hours=2)
+    worksheet(leak_visit)
+
+    check = requests["Mixer vibration check"]
+    check_visit = job(check.subject, check.description, check.priority, "Completed", "Nairobi South", -2, xyz, mixer, brian, "Inspection")
+    check_visit.request_id, check_visit.visit = check.id, "inspection"
+    check_visit.scheduled_start = (now - timedelta(hours=50)).replace(minute=0, second=0, microsecond=0)
+    check_visit.scheduled_end = check_visit.scheduled_start + timedelta(hours=2)
+    worksheet(
+        check_visit,
+        statuses=[(50, "In Progress"), (48, "Completed")],
+        entries=[(50, 2, "Measured vibration at three loads. The motor mount is worn and the drive belt is loose.")],
+        ticked=3,
+    )
+    findings = ServiceRecord.query.filter_by(job_id=check_visit.id).one()
+    findings.problem = "Worn motor mount and a loose drive belt."
+    findings.solution = "Tightened the drive belt for now."
+    findings.advice = "Replace the motor mount within two weeks, and run below half load until then."
+    add_signature(check_visit, brian, "Peter Odhiambo", now, hours_ago=48)
+    check.inspected_at = now - timedelta(hours=48)
+    for visit in (leak_visit, check_visit):
+        JobEvent.query.filter_by(job_id=visit.id, action="created").one().note = "booked"
+
+    # The chat: Kenya Motors asked for a quote; XYZ Factory is waiting on an answer.
+    kenya_user = User.query.filter_by(customer_id=kenya.id).one()
+    xyz_user = User.query.filter_by(customer_id=xyz.id).one()
+    for customer, sender, from_customer, body, hours_ago, read in (
+        (kenya, kenya_user, True, "Could you also quote for a new seal kit for the pump?", 30, True),
+        (kenya, boss, False, "Yes: about KSh 12,500 fitted. Amina will confirm at the inspection.", 28, True),
+        (xyz, xyz_user, True, "Thanks for the inspection. Can the repair be this week?", 3, False),
+    ):
+        db.session.add(
+            CustomerMessage(
+                company_id=company.id, customer_id=customer.id, sender_id=sender.id, from_customer=from_customer, body=body,
+                created_at=now - timedelta(hours=hours_ago), read_at=now - timedelta(hours=hours_ago - 1) if read else None,
+            )
+        )
 
     abc_user = User.query.filter_by(customer_id=abc.id).one()
     for user, title, message, kind, is_read in (
@@ -296,7 +347,7 @@ def populate(company, tag=None, password=None):
     return boss
 
 
-def add_signature(job, mechanic, name, now):
+def add_signature(job, mechanic, name, now, hours_ago=70):
     """The customer's sign-off on a completed job: a drawn signature stored like a real one."""
     image = Image.new("RGBA", (480, 160), (255, 255, 255, 0))
     pen = ImageDraw.Draw(image)
@@ -311,7 +362,7 @@ def add_signature(job, mechanic, name, now):
                 size_bytes=len(out.getvalue()), storage_key=key, original_name="signature.png", status="ready")
     )
     job.signed_by_name = name
-    job.signed_at = now - timedelta(hours=70)
+    job.signed_at = now - timedelta(hours=hours_ago)
     db.session.add(JobEvent(job_id=job.id, user_id=mechanic.id, action="signed", note=f"Signed by {name}", created_at=job.signed_at))
 
 

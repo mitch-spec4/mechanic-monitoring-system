@@ -43,12 +43,12 @@ def test_each_visitor_gets_a_private_copy_of_the_demo_company(app, data):
     assert company.is_demo and company.demo_expires_at - utcnow() > timedelta(hours=23)
 
     jobs = first.get("/api/jobs").get_json()["jobs"]
-    assert len(jobs) == 6 and {job["status"] for job in jobs} >= {"In Progress", "Completed", "Paused", "Pending"}
+    assert len(jobs) == 8 and {job["status"] for job in jobs} >= {"In Progress", "Completed", "Paused", "Pending"}
     assert len(first.get("/api/customers").get_json()["customers"]) == 3
     # A change in one copy never shows up in another, or in a real company.
     first.delete(f"/api/jobs/{next(job['id'] for job in jobs if job['status'] == 'Pending')}", headers=csrf(first))
-    assert len(first.get("/api/jobs").get_json()["jobs"]) == 5
-    assert len(second.get("/api/jobs").get_json()["jobs"]) == 6
+    assert len(first.get("/api/jobs").get_json()["jobs"]) == 7
+    assert len(second.get("/api/jobs").get_json()["jobs"]) == 8
     assert db.session.get(Company, data["acme"]).demo_expires_at is None
 
 
@@ -107,9 +107,9 @@ def test_demo_companies_cannot_start_real_payments(app, client):
 def test_expired_copies_are_deleted_with_every_row_and_file(app, client, data):
     before = row_counts()
     boss = start(client)
-    signature = JobFile.query.filter_by(company_id=boss["company_id"], kind="signature").one()
-    stored = Path(app.config["STORAGE_LOCAL_DIR"]) / signature.storage_key
-    assert stored.exists()
+    signatures = JobFile.query.filter_by(company_id=boss["company_id"], kind="signature").all()
+    stored = [Path(app.config["STORAGE_LOCAL_DIR"]) / signature.storage_key for signature in signatures]
+    assert len(stored) == 2 and all(path.exists() for path in stored)
 
     assert demo.purge_expired() == 0
     db.session.get(Company, boss["company_id"]).demo_expires_at = utcnow() - timedelta(minutes=1)
@@ -118,7 +118,7 @@ def test_expired_copies_are_deleted_with_every_row_and_file(app, client, data):
     after = row_counts()
     after.pop("auth_attempt"), before.pop("auth_attempt")
     assert after == before
-    assert not stored.exists()
+    assert not any(path.exists() for path in stored)
 
 
 def test_an_expired_copy_ends_its_session(client, data):
@@ -182,6 +182,7 @@ def test_the_daily_url_needs_the_cron_secret(app, client, data):
         "old_activity": 0,
         "old_offline_changes": 0,
         "deleted_companies": 0,
+        "reminders": {"visit_reminders": 0, "repair_reminders": 0, "follow_ups": 0},
     }
 
 

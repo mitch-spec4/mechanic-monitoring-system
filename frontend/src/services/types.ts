@@ -16,9 +16,18 @@ export type Job = {
   customer_id: number | null;
   machine_id: number | null;
   mechanic_id: number | null;
+  /** A visit a customer booked: when, and since when the technician is on the way. */
+  request_id?: number | null;
+  visit?: Visit | null;
+  scheduled_start?: string | null;
+  scheduled_end?: string | null;
+  on_the_way_at?: string | null;
   /** Changed on this phone, not yet on the server. */
   pending_status?: boolean;
 };
+
+/** A booked visit: the inspection, or the repair after it. */
+export type Visit = "inspection" | "repair";
 
 /** Why a piece of equipment needs work: an open job or request, or its status. */
 export type WorkReason = { type: "job" | "request"; id: number; title: string; status: string } | { type: "status"; status: string };
@@ -82,6 +91,45 @@ export type ServiceRequest = {
   priority: string;
   status: string;
   created_at: string;
+  updated_at?: string | null;
+};
+
+/** A visit as a request's page shows it; findings and photos once it's done. */
+export type RequestVisit = {
+  job_id: number;
+  visit: Visit;
+  status: string;
+  scheduled_start: string | null;
+  scheduled_end: string | null;
+  on_the_way_at: string | null;
+  technician: { id: number; name: string } | null;
+  findings: { problem: string | null; solution: string | null; advice: string | null; work_done: string | null } | null;
+  photos: { id: number; kind: string; content_type: string; url: string }[];
+};
+
+export type RequestDetail = ServiceRequest & {
+  machine: { id: number; name: string; serial_no: string } | null;
+  customer: { id: number; name: string } | null;
+  inspection_minutes: number;
+  repair_minutes: number;
+  visits: RequestVisit[];
+  /** What the customer can book now, if anything. */
+  can_book: Visit | null;
+  /** A visit is booked and hasn't started: it can move. */
+  can_move: boolean;
+  can_cancel: boolean;
+};
+
+/** A time a visit can start (UTC, without a zone marker). */
+export type Slot = { start: string; end: string };
+
+export type ChatMessage = { id: number; body: string; created_at: string; from_customer: boolean; sender: string | null; mine: boolean; read_at: string | null };
+
+export type Conversation = {
+  customer_id: number;
+  customer: string;
+  last: { body: string; created_at: string; from_customer: boolean };
+  unread: number;
 };
 
 export type Review = {
@@ -201,6 +249,11 @@ export type JobDetail = {
   job_type: string | null;
   location: string | null;
   due_date: string | null;
+  request_id?: number | null;
+  visit?: Visit | null;
+  scheduled_start?: string | null;
+  scheduled_end?: string | null;
+  on_the_way_at?: string | null;
   customer: { id: number; name: string } | null;
   machine: { id: number; name: string; serial_no: string } | null;
   mechanic: { id: number; name: string | null } | null;

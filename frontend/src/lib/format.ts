@@ -71,6 +71,35 @@ export function formatTime(value?: string | null) {
   return value ? parts(value).time : "";
 }
 
+const WEEKDAYS = [mark("Sun"), mark("Mon"), mark("Tue"), mark("Wed"), mark("Thu"), mark("Fri"), mark("Sat")];
+
+/** The company's calendar day of a moment, "2026-11-03": to group a day's times together. */
+export function dayKey(value: string) {
+  const { day, month, year } = parts(value);
+  return `${year}-${String(month).padStart(2, "0")}-${day}`;
+}
+
+/** A visit's day: "Tue 03 Nov". */
+export function formatWeekday(value: string) {
+  const name = new Intl.DateTimeFormat("en-US", { timeZone: zone, weekday: "short" }).format(asDate(value));
+  const { day, month } = parts(value);
+  return `${t(WEEKDAYS[["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(name)] ?? name)} ${day} ${t(MONTHS[month - 1])}`;
+}
+
+/** A booked visit: "Tue 03 Nov, 09:00–11:00". */
+export function formatVisit(start?: string | null, end?: string | null) {
+  if (!start) return "";
+  return end ? `${formatWeekday(start)}, ${formatTime(start)}–${formatTime(end)}` : `${formatWeekday(start)}, ${formatTime(start)}`;
+}
+
+/** A length of time: "45 min", "2 h", "1 h 30 min". */
+export function formatMinutes(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (!hours) return t("{minutes} min", { minutes: rest });
+  return rest ? t("{hours} h {minutes} min", { hours, minutes: rest }) : t("{hours} h", { hours });
+}
+
 /** How long ago a moment was: "just now", "5 min ago", "2 h 10 min ago". */
 export function ago(value: string, now = Date.now()) {
   const minutes = Math.max(0, Math.round((now - asDate(value).getTime()) / 60000));

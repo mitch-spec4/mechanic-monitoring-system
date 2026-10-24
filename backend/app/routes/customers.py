@@ -4,13 +4,12 @@ from datetime import timedelta
 from flask import Blueprint, jsonify
 
 from app import db
-from app.models.constants import DEFAULT_PRIORITY, PRIORITIES, REQUEST_STATUSES
 from app.models.customer import Customer
 from app.models.invitation import Invitation
 from app.models.job import Job
 from app.models.machine import Machine
 from app.models.notification import Notification
-from app.models.request import ServiceRequest
+from app.models.request import CustomerMessage, ServiceRequest
 from app.models.review import Review
 from app.models.security import PasswordReset
 from app.models.service_record import ServiceRecord
@@ -20,12 +19,11 @@ from app.routes.services import out as record_out
 from app.services.accounts import send_invitation
 from app.services.billing import check_mechanic_limit, require_active
 from app.services.machine_work import with_work
-from app.services.notifications import notify, notify_bosses
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
-from app.utils.validation import ValidationError, choice, integer, json_body, text
+from app.utils.validation import ValidationError, json_body, text
 from app.utils.validation import email as read_email
-from app.i18n import N_, _
+from app.i18n import _
 from app.services import audit, two_factor
 from app.models.security import AuditEvent
 
@@ -42,19 +40,6 @@ def customer_out(customer):
         "phone": customer.phone,
         "user_id": login_user.id if login_user else None,
         "two_factor_enabled": bool(login_user and login_user.totp_enabled_at),
-    }
-
-
-def request_out(service_request):
-    return {
-        "id": service_request.id,
-        "machine_id": service_request.machine_id,
-        "customer_id": service_request.customer_id,
-        "subject": service_request.subject,
-        "description": service_request.description,
-        "priority": service_request.priority,
-        "status": service_request.status,
-        "created_at": service_request.created_at.isoformat(),
     }
 
 
@@ -172,58 +157,6 @@ def update_customer(cid):
     return jsonify(ok=True, customer=customer_out(customer))
 
 
-@bp.get("/requests")
-@roles("boss", "customer")
-def requests_list():
-    user = current_user()
-    query = ServiceRequest.query.filter_by(company_id=user.company_id)
-    if user.role == "customer":
-        query = query.filter_by(customer_id=user.customer_id)
-    return jsonify(requests=[request_out(row) for row in query.order_by(ServiceRequest.id.desc()).all()])
-
-
-@bp.post("/requests")
-@roles("customer")
-def create_request():
-    user = current_user()
-    data = json_body()
-    machine_id = integer(data, "machine_id", "Equipment", required=True)
-    machine = Machine.query.filter_by(
-        id=machine_id, customer_id=user.customer_id, company_id=user.company_id
-    ).first()
-    if not machine:
-        raise ValidationError(_("Equipment not found"), 404)
-
-    service_request = ServiceRequest(
-        customer_id=user.customer_id,
-        company_id=user.company_id,
-        machine_id=machine.id,
-        subject=text(data, "subject", "Subject", required=True, max_length=180),
-        description=text(data, "description", "Description", required=True),
-        priority=choice(data, "priority", PRIORITIES, default=DEFAULT_PRIORITY),
-    )
-    db.session.add(service_request)
-    notify_bosses(user.company_id, N_("New customer service request"), N_("{subject} was submitted."), "request", subject=service_request.subject)
-    db.session.commit()
-    return jsonify(id=service_request.id), 201
-
-
-@bp.patch("/requests/<int:rid>")
-@roles("boss")
-def update_request(rid):
-    service_request = ServiceRequest.query.filter_by(id=rid, company_id=current_user().company_id).first_or_404()
-    data = json_body()
-    status = choice(data, "status", REQUEST_STATUSES, "Status", default=service_request.status)
-    if status != service_request.status:
-        service_request.status = status
-        for customer_user in User.query.filter_by(
-            company_id=service_request.company_id, customer_id=service_request.customer_id, role="customer"
-        ).all():
-            notify(customer_user.id, N_("Service request updated"), N_("Your request is now {status}."), "request", ("status",), status=status)
-    db.session.commit()
-    return jsonify(ok=True, status=service_request.status)
-
-
 @bp.delete("/<int:cid>")
 @roles("boss")
 def delete_customer(cid):
@@ -235,6 +168,8 @@ def delete_customer(cid):
     if has_history:
         return jsonify(error=_("This customer has equipment or service history and cannot be deleted.")), 409
 
+    # Their chat with the company goes with them.
+    CustomerMessage.query.filter_by(customer_id=customer.id).delete()
     for customer_user in User.query.filter_by(customer_id=customer.id).all():
         Notification.query.filter_by(user_id=customer_user.id).delete()
         PasswordReset.query.filter_by(user_id=customer_user.id).delete()

@@ -38,6 +38,7 @@ with app.app_context():
             record_agreement(user)
         db.session.commit()
         print(
-            "Demo data ready: 3 customers, 3 mechanics, 6 machines, 6 jobs with worksheets and history, 3 checklists, "
-            "shifts and locations, 6 service records, 3 reviews, 3 requests, notifications, and a paid Professional plan."
+            "Demo data ready: 3 customers, 3 mechanics, 6 machines, 8 jobs with worksheets and history (2 of them visits "
+            "customers booked), 3 checklists, shifts and locations, 7 service records, 3 reviews, 3 requests, a customer chat, "
+            "notifications, and a paid Professional plan."
         )

@@ -4,10 +4,12 @@ DEFAULT_PRIORITY = "Medium"
 JOB_STATUSES = ("Pending", "Assigned", "Accepted", "In Progress", "Paused", "Completed", "Cancelled")
 ACTIVE_JOB_STATUSES = ("Pending", "Assigned", "Accepted", "In Progress", "Paused")
 
-REQUEST_STATUSES = (
-    "Submitted", "Received", "Reviewing", "Approved", "Mechanic Assigned",
-    "Scheduled", "In Progress", "Completed", "Cancelled",
-)
+# A customer's request: they book an inspection, the technician inspects, they book the repair.
+REQUEST_STATUSES = ("Submitted", "Inspection booked", "Inspected", "Repair booked", "Completed", "Declined", "Cancelled")
+# What a manager can set by hand; the booked steps follow the visits.
+MANUAL_REQUEST_STATUSES = ("Submitted", "Inspected", "Completed", "Declined", "Cancelled")
+CLOSED_REQUEST_STATUSES = ("Completed", "Declined", "Cancelled")
+VISITS = ("inspection", "repair")
 
 MACHINE_STATUSES = ("Operational", "Under Maintenance", "Under Repair", "Retired")
 ROLES = ("boss", "mechanic", "customer")

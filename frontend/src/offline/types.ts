@@ -14,7 +14,8 @@ export type ChangeKind =
   | "media_remove"
   | "consent"
   | "clock_in"
-  | "clock_out";
+  | "clock_out"
+  | "on_the_way";
 
 export type MediaInfo = { kind: string; contentType: string; size: number; name: string };
 
