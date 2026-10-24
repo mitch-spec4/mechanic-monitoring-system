@@ -34,7 +34,7 @@ def server_texts():
             if not isinstance(node, ast.Call):
                 continue
             name = node.func.id if isinstance(node.func, ast.Name) else getattr(node.func, "attr", None)
-            where = f"{path.relative_to(APP.parent)}:{node.lineno}"
+            where = f"{path.relative_to(APP.parent).as_posix()}:{node.lineno}"
             if name in ("_", "N_") and node.args and _literal(node.args[0]) is not None:
                 found.setdefault(_literal(node.args[0]), where)
             elif name in LABELLED and len(node.args) >= 2:

@@ -929,8 +929,9 @@ body {
     overflow-wrap: anywhere;
   }
 }
-/* The narrowest phones: the icon sits above the number, so two cards fit side by side. */
-@media (max-width: 400px) {
+/* Phones: the icon sits above the number, so two cards fit side by side and a word like
+   "Connected" keeps the card's full width. */
+@media (max-width: 760px) {
   .appShell .subPageStats > div {
     grid-template-columns: minmax(0, 1fr);
     row-gap: 8px;

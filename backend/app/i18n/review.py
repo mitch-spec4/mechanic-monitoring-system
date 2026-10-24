@@ -122,7 +122,7 @@ def app_usages(texts, source=APP_SOURCE):
     for text in texts:
         # Written plainly, or with \u escapes for curly quotes.
         quoted = (json.dumps(text, ensure_ascii=False), json.dumps(text), f"'{text}'", f"`{text}`")
-        found = [str(path.relative_to(source)) for path, content in contents.items() if any(q in content for q in quoted)]
+        found = [path.relative_to(source).as_posix() for path, content in contents.items() if any(q in content for q in quoted)]
         usages[text] = ", ".join(sorted(found)[:3])
     return usages
 

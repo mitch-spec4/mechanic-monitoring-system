@@ -31,6 +31,10 @@ test("technicians get a bottom bar on a phone, with everything else under More",
   await bar.getByRole("button", { name: "Jobs" }).click();
   await expect(page.locator(".subPage h1")).toHaveText("My Jobs");
   await expect(bar.getByRole("button", { name: "Jobs" })).toHaveAttribute("aria-current", "page");
+  // The stat cards' values stay whole words on one line ("Connected", not "Connect / ed").
+  const value = page.locator(".subPageStats strong").nth(1);
+  await expect(value).toHaveText("Connected");
+  expect((await value.boundingBox())!.height).toBeLessThan(36);
 
   await bar.getByRole("button", { name: "More" }).click();
   const more = page.getByRole("dialog", { name: "More" });
@@ -72,6 +76,21 @@ test("today's jobs: open the one in progress, resume a paused one", async ({ pag
   await expect(brianToday.getByRole("button", { name: "Resume" })).toBeVisible();
   // Jobs due later and not started stay out of today's list.
   await expect(page.locator(".todayJob", { hasText: "Conveyor Line CL-4" })).toHaveCount(0);
+});
+
+test.describe("on a computer", () => {
+  test.use({ viewport: { width: 1280, height: 900 } });
+
+  test("today's jobs keep each button beside its job", async ({ page }) => {
+    await signIn(page, "mitch@mechanicpro.test");
+    const row = page.locator(".todayJob", { hasText: "Service Generator G-102" });
+    const title = (await row.locator("strong").boundingBox())!;
+    const button = (await row.getByRole("button", { name: "Open" }).boundingBox())!;
+    expect(button.x).toBeGreaterThan(title.x + title.width);
+    expect(button.width).toBeLessThan(200);
+    // The row is the same height whatever the job's status says, so nothing below it jumps.
+    expect((await row.boundingBox())!.height).toBeLessThan(90);
+  });
 });
 
 test("today's jobs: a job due today is started with one press", async ({ page }) => {
