@@ -6,6 +6,19 @@ import { failOnPageErrors, forget, openPage, signAndComplete, signIn } from "./h
 test.use({ viewport: { width: 390, height: 844 } });
 test.describe.configure({ mode: "serial" });
 
+// On a failure: the page as text and what it logged, in the run's output (CI's screenshots are
+// only in a downloadable report).
+const logged: string[] = [];
+test.beforeEach(({ page }) => {
+  logged.length = 0;
+  page.on("console", (message) => logged.push(`${message.type()}: ${message.text()}`));
+});
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status === testInfo.expectedStatus) return;
+  console.log(`--- The page when "${testInfo.title}" failed ---\n${await page.locator("body").ariaSnapshot().catch(String)}`);
+  console.log(`--- Its console ---\n${logged.join("\n")}`);
+});
+
 // A small real PNG; the phone turns photos into JPEG before keeping them.
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAABAAAAAMCAIAAADkharWAAAAF0lEQVR4nGM8EaXBQApgIkn1qIYRpAEAEg0BYj9k0WMAAAAASUVORK5CYII=",
@@ -95,6 +108,8 @@ test("the whole job with no signal, sent once when it's back", async ({ page, co
 
   const media = sheet.locator(".jobCard", { hasText: "Photos & videos" });
   await media.locator(".mediaPick", { hasText: "Before photo" }).locator("input").setInputFiles({ name: "pump.png", mimeType: "image/png", buffer: PNG });
+  await expect(media.locator(".mediaGrid li, .error").first()).toBeVisible();
+  expect(await media.locator(".error").allTextContents()).toEqual([]);
   await expect(media.locator(".mediaGrid li")).toHaveCount(1);
   await expect(media.locator(".mediaGrid li")).toContainText("Waiting to sync");
 
@@ -106,6 +121,7 @@ test("the whole job with no signal, sent once when it's back", async ({ page, co
 
   // Signing out now would lose it all: the app says so.
   await page.locator(".profileTrigger").click();
+  await expect(page.locator(".profileTrigger")).toHaveAttribute("aria-expanded", "true");
   await page.locator(".profileLogout").click();
   const warning = page.getByRole("alertdialog");
   await expect(warning).toContainText("10 changes haven't synced");
