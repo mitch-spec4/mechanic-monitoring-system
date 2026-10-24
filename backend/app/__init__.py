@@ -198,6 +198,7 @@ def create_app(overrides=None):
     from app.routes.messages import bp as messages
     from app.routes.notifications import bp as notifications
     from app.routes.reports import bp as reports
+    from app.routes.insights import bp as insights
     from app.routes.requests import bp as requests
     from app.routes.reviews import bp as reviews
     from app.routes.services import bp as services
@@ -220,6 +221,7 @@ def create_app(overrides=None):
     app.register_blueprint(reviews, url_prefix="/api/reviews")
     app.register_blueprint(users, url_prefix="/api/users")
     app.register_blueprint(reports, url_prefix="/api/reports")
+    app.register_blueprint(insights, url_prefix="/api/insights")
     app.register_blueprint(media, url_prefix="/api")
     app.register_blueprint(equipment, url_prefix="/api")
     app.register_blueprint(shifts, url_prefix="/api/shifts")

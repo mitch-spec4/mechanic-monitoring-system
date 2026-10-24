@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   BarChart3,
@@ -25,14 +25,16 @@ import {
   company,
   customers,
   jobs,
+  jobsPage,
   machines,
   mechanics,
-  notifications,
+  notificationsPage,
+  PAGE_SIZE,
   reports,
-  requests,
+  requestsPage,
   resetTwoFactor,
-  reviews,
-  services,
+  reviewsPage,
+  servicesPage,
   updateCustomer,
   type User,
 } from "../services/api";
@@ -57,6 +59,8 @@ import "./CustomerPage.css";
 import { AddMachine, EditForm, EditMachine } from "../components/MachineForms";
 import ShiftsView from "../components/ShiftsView";
 import TeamMap from "../components/TeamMap";
+import Insights from "../components/Insights";
+import Pager from "../components/Pager";
 import InviteForm from "../components/InviteForm";
 import VerifyBanner from "../components/VerifyBanner";
 import ResetPassword from "../components/ResetPassword";
@@ -89,13 +93,18 @@ type Resource = {
   /** One line under the page title. */
   description: string;
   icon: Icon;
-  /** The page's list, loaded when it opens. */
+  /** The page's list, loaded whole when it opens (and shown a page at a time). */
   list?: () => Promise<ListItem[]>;
+  /** Or, for lists that grow without end, one page at a time from the server, searched there. */
+  page?: (page: number, q: string) => Promise<Found>;
   /** What "Add" says on pages where managers can add to the list. */
   addLabel?: string;
 };
 
+type Found = { items: ListItem[]; total: number; pages: number };
+
 const isActiveJob = (job: Job) => !["Completed", "Cancelled"].includes(job.status);
+// A technician's own jobs come whole: the phone keeps them for when there's no signal.
 const jobList = () => jobs().then((data) => data.jobs);
 
 // Keys are the page names the sidebar uses (in English); labels and descriptions are shown translated.
@@ -104,7 +113,7 @@ const resources: Record<string, Resource> = {
     label: mark("Jobs / requests"),
     description: mark("Every job across your team."),
     icon: ClipboardList,
-    list: jobList,
+    page: (page, q) => jobsPage(page, q).then((data) => ({ items: data.jobs, total: data.total, pages: data.pages })),
   },
   "My Jobs": {
     label: mark("Jobs"),
@@ -143,25 +152,25 @@ const resources: Record<string, Resource> = {
     label: mark("Service records"),
     description: mark("A searchable history of completed service work."),
     icon: FileText,
-    list: () => services().then((data) => data.records),
+    page: (page, q) => servicesPage(page, q).then((data) => ({ items: data.records, total: data.total, pages: data.pages })),
   },
   "Service History": {
     label: mark("Service history"),
     description: mark("Every service visit recorded on your equipment."),
     icon: FileText,
-    list: () => services().then((data) => data.records),
+    page: (page, q) => servicesPage(page, q).then((data) => ({ items: data.records, total: data.total, pages: data.pages })),
   },
   Reviews: {
     label: mark("Reviews"),
     description: mark("Ratings and feedback visible according to your role."),
     icon: Star,
-    list: () => reviews().then((data) => data.reviews),
+    page: (page, q) => reviewsPage(page, q).then((data) => ({ items: data.reviews, total: data.total, pages: data.pages })),
   },
   Notifications: {
     label: mark("Notifications"),
     description: mark("Updates about your jobs, requests, and reviews."),
     icon: Bell,
-    list: () => notifications().then((data) => data.notifications),
+    page: (page, q) => notificationsPage(page, q).then((data) => ({ items: data.notifications, total: data.total, pages: data.pages })),
   },
   "My Equipment": {
     label: mark("My equipment"),
@@ -173,7 +182,7 @@ const resources: Record<string, Resource> = {
     label: mark("Service requests"),
     description: mark("Each request, where it is, and its booked visits."),
     icon: ClipboardList,
-    list: () => requests().then((data) => data.requests),
+    page: (page, q) => requestsPage(page, q).then((data) => ({ items: data.requests, total: data.total, pages: data.pages })),
   },
   "My Company": { label: mark("My company"), description: mark("The service company that looks after your equipment."), icon: Users },
   Reports: { label: mark("Reports"), description: mark("Operational performance for the data you are allowed to see."), icon: BarChart3 },
@@ -204,6 +213,11 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
   const [editing, setEditing] = useState<ListItem | null>(null);
   const [resetting, setResetting] = useState<{ id: number; name: string } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [found, setFound] = useState({ total: 0, pages: 1 });
+  // The search, a moment after typing stops (server-paged lists search on the server).
+  const [search, setSearch] = useState("");
+  const asked = useRef(0);
   // The Equipment page groups equipment under its customer.
   const [customerList, setCustomerList] = useState<CustomerSummary[]>([]);
   const isBoss = user.role === "boss";
@@ -215,6 +229,8 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
     setError("");
     setAdding(false);
     setQuery("");
+    setSearch("");
+    setPageNumber(1);
     const failed = (problem: unknown) => setError(errorMessage(problem));
     resource.list?.().then(setItems).catch(failed);
     if (title === "Reports") reports().then(setSummary).catch(failed);
@@ -230,7 +246,35 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
     }
   }, [title, reloadKey]);
 
-  const filtered = items.filter((item) => JSON.stringify(item).toLowerCase().includes(query.toLowerCase()));
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearch(query), 300);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+  useEffect(() => setPageNumber(1), [search]);
+  useEffect(() => {
+    if (!resource.page) return;
+    // Only the newest answer counts: pages can come back out of order.
+    const ask = ++asked.current;
+    resource
+      .page(pageNumber, search)
+      .then((result) => {
+        if (ask !== asked.current) return;
+        setItems(result.items);
+        setFound({ total: result.total, pages: result.pages });
+      })
+      .catch((problem) => ask === asked.current && setError(errorMessage(problem)));
+  }, [title, reloadKey, pageNumber, search]);
+
+  const serverPaged = Boolean(resource.page);
+  const filtered = serverPaged ? items : items.filter((item) => JSON.stringify(item).toLowerCase().includes(query.toLowerCase()));
+  const total = serverPaged ? found.total : filtered.length;
+  const pages = serverPaged ? found.pages : Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(pageNumber, pages);
+  const onPage = (rows: ListItem[]) => (serverPaged ? rows : rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE));
+  const turnPage = (next: number) => {
+    setPageNumber(next);
+    document.querySelector(".subPagePanel")?.scrollIntoView({ block: "start" });
+  };
   // Managers see each piece of equipment with what makes it need work.
   const equipment = items.filter((item): item is EquipmentSummary => "serial_no" in item && item.work !== undefined);
   const canAdd = isBoss && !!resource.addLabel;
@@ -323,11 +367,16 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
       );
     }
     if (!filtered.length) {
-      return <EmptyState icon={<Icon size={26} />} title={t("Nothing here yet")} text={t("New records will appear here as your team uses the workspace.")} />;
+      return query ? (
+        <EmptyState icon={<Search size={26} />} title={t("No matches")} text={t("Try a different search.")} />
+      ) : (
+        <EmptyState icon={<Icon size={26} />} title={t("Nothing here yet")} text={t("New records will appear here as your team uses the workspace.")} />
+      );
     }
     return (
+      <>
       <div className="subPageList">
-        {(title === "Customers" ? sortByNeedsWork(filtered) : filtered).map((item) => (
+        {onPage(title === "Customers" ? sortByNeedsWork(filtered) : filtered).map((item) => (
           <ResourceRow
             key={item.id}
             item={item}
@@ -340,6 +389,8 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
           />
         ))}
       </div>
+      <Pager page={currentPage} pages={pages} total={total} size={PAGE_SIZE} onPage={turnPage} />
+      </>
     );
   };
 
@@ -357,12 +408,15 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
       </div>
       {isBoss && user.email_verified === false && (title === "Customers" || title === "Technicians") && <VerifyBanner user={user} onVerified={onUserChanged} />}
       {summary ? (
-        <ReportSummary summary={summary} />
-      ) : !resource.list ? null : (
+        <>
+          <ReportSummary summary={summary} />
+          {isBoss && <Insights onOpenMachine={onOpenMachine} />}
+        </>
+      ) : !(resource.list || resource.page) ? null : (
         <div className="subPageStats">
           <div>
             <Icon size={20} />
-            <strong>{items.length}</strong>
+            <strong>{serverPaged ? found.total : items.length}</strong>
             <span>{t(resource.label)}</span>
           </div>
           <div>
@@ -381,7 +435,7 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
             {t(resource.label)}
           </h2>
           <div className="subPageTools">
-            {items.length > 0 && (
+            {(items.length > 0 || query) && (
               <label className="searchBox">
                 <Search size={14} />
                 <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("Search")} aria-label={t("Search")} />

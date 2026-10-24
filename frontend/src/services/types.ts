@@ -391,3 +391,37 @@ export type SetupStepState = { key: SetupStepKey; done: boolean; waiting?: boole
 export type Interval = "month" | "year";
 export type Plan = { key: string; name: string; mechanics: number; storage_gb: number; prices: Record<Interval, number> };
 export type Pricing = { plans: Plan[]; currency: string; trial_days: number; yearly_months: number; payment_provider: string | null };
+
+/** Where a page of a long list sits. */
+export type Paging = { page: number; per_page: number; total: number; pages: number };
+
+export type TechnicianInsight = {
+  id: number;
+  name: string;
+  clocked_hours: number;
+  job_hours: number;
+  /** Job hours as a share of clocked hours, 0-100 (null with no clocked hours). */
+  share_on_jobs: number | null;
+  jobs_completed: number;
+  median_hours_to_complete: number | null;
+  rating: number | null;
+  reviews: number;
+};
+
+/** A manager's view of a range of days: see backend/app/services/insights.py. */
+export type Insights = {
+  range: { start: string; end: string; days: number; unit: "day" | "week" };
+  jobs: {
+    created: number;
+    completed: number;
+    cancelled: number;
+    median_hours_to_complete: number | null;
+    average_hours_to_complete: number | null;
+    average_hours_worked: number | null;
+  };
+  hours: { clocked: number; on_jobs: number };
+  completed_over_time: { start: string; count: number }[];
+  by_type: { job_type: string; count: number }[];
+  technicians: TechnicianInsight[];
+  repeat_faults: { machine_id: number; name: string; equipment_type: string | null; customer: string | null; faults: number; last_fault: string | null }[];
+};
