@@ -19,19 +19,10 @@ import {
   Trash2,
   Wrench,
 } from "lucide-react";
-import {
-  addEntry,
-  addNote,
-  addPart,
-  jobDetail,
-  removePart,
-  saveRecord,
-  updateChecklistItem,
-  updateEntry,
-  apiUrl,
-  deleteFile,
-  downloadReport,
-} from "../services/api";
+import { jobDetail, apiUrl, downloadReport } from "../services/api";
+import { queueCheck, queueEntry, queueEntryUpdate, queueMediaRemoval, queueNote, queuePart, queuePartRemoval, queueRecord } from "../offline/changes";
+import { Waiting } from "../components/Offline";
+import { toast } from "../components/Feedback";
 import SignatureModal, { type SignOff } from "../components/SignatureModal";
 import { uploadMedia } from "../lib/media";
 import { changeJobStatus } from "../components/Shift";
@@ -128,9 +119,57 @@ function historyText(event: JobEvent): string {
       return t("recorded the customer's signature ({name})", { name: after(note, /^Signed by/) });
     case "not_signed":
       return t("completed without a signature: {reason}", { reason: note });
+    case "change_not_applied":
+      return t("made a change offline that wasn't applied: a newer change was kept");
+    case "replaced":
+      return t("replaced an earlier version with a change made offline");
     default:
       return event.action;
   }
+}
+
+// A version of a worksheet item kept in the history (a change not applied, or one replaced), as
+// the server stores it: {"item": "summary" | "entry" | "checklist", "label": ..., "values": {...}}.
+const FIELD_TEXT: Record<string, string> = {
+  service_type: mark("Service type"),
+  problem: mark("Problem"),
+  solution: mark("Solution"),
+  advice: mark("Advice"),
+  work_done: mark("Work done"),
+  site: mark("Site"),
+  started_at: mark("Start"),
+  ended_at: mark("End"),
+  done: mark("Ticked"),
+  note: mark("Note"),
+};
+
+function VersionNote({ note }: { note: string | null }) {
+  let version: { item?: string; label?: string | null; values?: Record<string, unknown> };
+  try {
+    version = JSON.parse(note || "{}");
+  } catch {
+    return note ? <blockquote>{note}</blockquote> : null;
+  }
+  const show = (field: string, value: unknown) =>
+    field === "done" ? (value ? t("Yes") : t("No")) : field.endsWith("_at") ? stamp(String(value)) : String(value ?? "—");
+  const title =
+    version.item === "summary"
+      ? t("Service summary")
+      : version.item === "entry"
+        ? t("Time entry started {time}", { time: stamp(version.label) })
+        : version.item === "checklist"
+          ? `“${version.label ?? ""}”`
+          : "";
+  return (
+    <blockquote className="versionNote">
+      {title && <strong>{title}</strong>}
+      {Object.entries(version.values ?? {}).map(([field, value]) => (
+        <span key={field}>
+          {FIELD_TEXT[field] ? t(FIELD_TEXT[field]) : field}: {show(field, value)}
+        </span>
+      ))}
+    </blockquote>
+  );
 }
 
 export default function JobPage({ jobId, user, onBack }: Props) {
@@ -144,7 +183,8 @@ export default function JobPage({ jobId, user, onBack }: Props) {
     jobDetail(jobId)
       .then((data) => setJob(data.job))
       .catch((e) => setError(errorMessage(e)));
-  usePolling(load, 30000);
+  // Reloaded after every change: a technician's waiting changes show on the copy at once.
+  usePolling(load, 30000, true);
 
   useEffect(() => {
     if (!job?.timer_running) return;
@@ -157,10 +197,10 @@ export default function JobPage({ jobId, user, onBack }: Props) {
     setError("");
     setBusy(true);
     try {
-      // Changes to the worksheet send it back whole; anything else (a status change) means loading it again.
-      const data = (await change()) as { job?: JobDetail } | undefined;
-      if (data?.job?.entries !== undefined || data?.job?.parts !== undefined) setJob(data.job);
-      else await load();
+      // Online it's on the server when this returns; offline it waits on the phone. Either way the
+      // copy loaded next shows it.
+      await change();
+      await load();
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -188,9 +228,9 @@ export default function JobPage({ jobId, user, onBack }: Props) {
     .filter((entry) => !entry.running)
     .reduce((sum, entry) => sum + entry.hours * 3600, 0);
   const liveSeconds = closedSeconds + (running ? Math.max(0, (now - asDate(running.started_at).getTime()) / 1000) : 0);
-  const setStatus = (status: string) => run(() => changeJobStatus(job.id, status, user.role));
+  const setStatus = (status: string) => run(() => changeJobStatus(job, status, user.role));
   // Completing asks for the customer's sign-off first; it is sent with the completion.
-  const complete = (signOff: SignOff) => changeJobStatus(job.id, "Completed", user.role, signOff);
+  const complete = (signOff: SignOff) => changeJobStatus(job, "Completed", user.role, signOff);
   const photoCount = (job.files || []).filter((file) => file.kind !== "video").length;
   const partCount = job.parts.length;
   const signFacts = [
@@ -211,6 +251,7 @@ export default function JobPage({ jobId, user, onBack }: Props) {
             {[job.job_type || t("General job"), t("{priority} priority", { priority: t(job.priority) })].join(" · ")}
           </span>
           <span className={`jobStatusPill ${job.status.replace(/ /g, "").toLowerCase()}`}>{t(job.status)}</span>
+          {job.pending_status && <Waiting />}
         </div>
         <h1>{job.title}</h1>
         <p className="jobDescription">{job.description}</p>
@@ -313,10 +354,10 @@ export default function JobPage({ jobId, user, onBack }: Props) {
             {entries.length === 0 && <Empty text={canEdit ? t("Press Start work to begin timing this job.") : t("No time recorded yet.")} />}
             <ol className="entryList">
               {entries.map((entry) => (
-                <EntryRow key={entry.id} entry={entry} canEdit={canEdit} onSave={(data) => run(() => updateEntry(job.id, entry.id, data))} />
+                <EntryRow key={entry.id} entry={entry} canEdit={canEdit} onSave={(data) => run(() => queueEntryUpdate(job, entry.id, data))} />
               ))}
             </ol>
-            {canEdit && <ManualEntry busy={busy} location={job.location} onAdd={(data) => run(() => addEntry(job.id, data))} />}
+            {canEdit && <ManualEntry busy={busy} location={job.location} onAdd={(data) => run(() => queueEntry(job, data))} />}
           </Card>
         )}
 
@@ -340,7 +381,7 @@ export default function JobPage({ jobId, user, onBack }: Props) {
                         type="checkbox"
                         checked={item.done}
                         disabled={!canEdit || busy}
-                        onChange={(event) => run(() => updateChecklistItem(job.id, item.id, { done: event.target.checked }))}
+                        onChange={(event) => run(() => queueCheck(job, item, { done: event.target.checked }))}
                       />
                       <span className="checkBox" aria-hidden="true">
                         <CheckCircle2 size={14} />
@@ -353,6 +394,7 @@ export default function JobPage({ jobId, user, onBack }: Props) {
                             {item.done_by} · {stamp(item.done_at)}
                           </small>
                         )}
+                        {item.pending && <Waiting />}
                       </span>
                     </label>
                   </li>
@@ -368,14 +410,16 @@ export default function JobPage({ jobId, user, onBack }: Props) {
             {job.parts.map((part: Part) => (
               <li key={part.id}>
                 <span className="partQty">×{part.label}</span>
-                <span className="partName">{part.name}</span>
+                <span className="partName">
+                  {part.name} {part.pending && <Waiting />}
+                </span>
                 {canEdit && (
                   <button
                     className="iconButton partRemove"
                     title={t("Remove part")}
                     aria-label={t("Remove {name}", { name: part.name })}
                     disabled={busy}
-                    onClick={() => run(() => removePart(job.id, part.id))}
+                    onClick={() => run(() => queuePartRemoval(job, part))}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -383,14 +427,14 @@ export default function JobPage({ jobId, user, onBack }: Props) {
               </li>
             ))}
           </ul>
-          {canEdit && <PartForm busy={busy} onAdd={(data) => run(() => addPart(job.id, data))} />}
+          {canEdit && <PartForm busy={busy} onAdd={(data) => run(() => queuePart(job, data))} />}
         </Card>
 
         <Card title={t("Service summary")} icon={<FileText size={16} />}>
           {!job.machine ? (
             <Empty text={t("This job has no equipment, so there is no service record for the customer.")} />
           ) : canEdit ? (
-            <RecordForm record={job.record} busy={busy} onSave={(data) => run(() => saveRecord(job.id, data))} />
+            <RecordForm record={job.record} pending={Boolean(job.record_pending)} busy={busy} onSave={(data) => run(() => queueRecord(job, data))} />
           ) : job.record ? (
             <dl className="recordView">
               <Meta label={t("Service")} value={job.record.service_type} />
@@ -449,15 +493,20 @@ export default function JobPage({ jobId, user, onBack }: Props) {
                   <span className="timelineDot" aria-hidden="true" />
                   <div>
                     <p>
-                      <strong>{event.user || t("System")}</strong> {historyText(event)}
+                      <strong>{event.user || t("System")}</strong> {historyText(event)} {event.pending && <Waiting />}
                     </p>
                     {event.action === "note" && <blockquote>{event.note}</blockquote>}
-                    <small>{stamp(event.created_at)}</small>
+                    {(event.action === "change_not_applied" || event.action === "replaced") && <VersionNote note={event.note} />}
+                    <small>
+                      {event.synced_at
+                        ? t("Done offline at {time}, synced at {synced}", { time: stamp(event.created_at), synced: stamp(event.synced_at) })
+                        : stamp(event.created_at)}
+                    </small>
                   </div>
                 </li>
               ))}
             </ol>
-            <NoteForm busy={busy} onAdd={(note) => run(() => addNote(job.id, note))} />
+            <NoteForm busy={busy} onAdd={(note) => run(() => queueNote(job, note))} />
           </Card>
         )}
       </div>
@@ -516,8 +565,10 @@ function MediaCard({ job, busy, run }: { job: JobDetail; busy: boolean; run: Run
     for (const [index, file] of files.entries()) {
       setUploading(files.length > 1 ? t("Uploading {number} of {count}…", { number: index + 1, count: files.length }) : t("Uploading…"));
       try {
-        const updated = await uploadMedia(job.id, kind, file, limits);
-        await run(async () => ({ job: updated }));
+        const sent = await uploadMedia(job, kind, file, limits);
+        // Not uploaded yet (offline, or a slow connection): it's kept on the phone and goes later.
+        if (!sent) toast(t("Saved on this phone. It uploads when you have a good connection."), "info");
+        await run(async () => undefined);
       } catch (e) {
         setProblem(errorMessage(e));
         break;
@@ -525,7 +576,7 @@ function MediaCard({ job, busy, run }: { job: JobDetail; busy: boolean; run: Run
     }
     setUploading("");
   };
-  const remove = (file: JobFile) => run(() => deleteFile(file.id));
+  const remove = (file: JobFile) => run(() => queueMediaRemoval(job, file.id));
   return (
     <Card title={t("Photos & videos")} icon={<Camera size={16} />} badge={job.files.length ? String(job.files.length) : undefined} wide>
       {problem && <div className="error">{problem}</div>}
@@ -537,6 +588,7 @@ function MediaCard({ job, busy, run }: { job: JobDetail; busy: boolean; run: Run
                 <img src={apiUrl(file.url)} alt={t(PICK_LABEL[file.kind] ?? "Photo")} loading="lazy" />
               </a>
               <span className={`mediaTag ${file.kind}`}>{t(KIND_LABEL[file.kind] ?? "Photo")}</span>
+              {file.pending && <Waiting />}
               {canUpload && (
                 <button className="iconButton mediaRemove" title={t("Remove photo")} aria-label={t("Remove photo")} disabled={busy} onClick={() => remove(file)}>
                   <Trash2 size={13} />
@@ -551,6 +603,7 @@ function MediaCard({ job, busy, run }: { job: JobDetail; busy: boolean; run: Run
           {videos.map((file) => (
             <li key={file.id}>
               <video src={apiUrl(file.url)} controls preload="metadata" playsInline />
+              {file.pending && <Waiting />}
               {canUpload && (
                 <button className="iconButton mediaRemove" title={t("Remove video")} aria-label={t("Remove video")} disabled={busy} onClick={() => remove(file)}>
                   <Trash2 size={13} />
@@ -683,6 +736,7 @@ function EntryRow({ entry, canEdit, onSave }: { entry: WorkEntry; canEdit: boole
           {timeOf(entry.started_at)} – {entry.running ? t("now") : timeOf(entry.ended_at)}
         </span>
         <em>{entry.running ? t("Running") : duration(entry.hours)}</em>
+        {entry.pending && <Waiting />}
       </div>
       {entry.site && (
         <small className="entrySite">
@@ -779,7 +833,7 @@ function PartForm({ onAdd, busy }: { onAdd: Save; busy: boolean }) {
   );
 }
 
-function RecordForm({ record, onSave, busy }: { record: JobDetail["record"]; onSave: Save; busy: boolean }) {
+function RecordForm({ record, pending, onSave, busy }: { record: JobDetail["record"]; pending: boolean; onSave: Save; busy: boolean }) {
   return (
     <form
       className="inlineForm"
@@ -798,9 +852,12 @@ function RecordForm({ record, onSave, busy }: { record: JobDetail["record"]; onS
       <Field wrap label={t("Advice for the customer")}>
         <textarea name="advice" defaultValue={record?.advice || ""} />
       </Field>
-      <button className="secondary" disabled={busy}>
-        {t("Save summary")}
-      </button>
+      <div className="inlineRow">
+        <button className="secondary" disabled={busy}>
+          {t("Save summary")}
+        </button>
+        {pending && <Waiting />}
+      </div>
     </form>
   );
 }

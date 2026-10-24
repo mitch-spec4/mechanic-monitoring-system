@@ -310,3 +310,23 @@ def test_remembered_changes_are_cleared(client, data, auth):
     delete_company(data["other"])
     db.session.commit()
     assert ClientRequest.query.filter_by(user_id=data["other_boss"]).count() == 0
+
+
+def test_the_checklist_reaches_the_phone_before_work_starts(client, data, auth, inspection):
+    def new_job(title):
+        response = client.post("/api/jobs", headers=auth(BOSS), json={"title": title, "description": "Leaks", "job_type": "Inspection", "mechanic_id": data["mechanic"]})
+        assert response.status_code == 201, response.get_json()
+        return response.get_json()["job"]["id"]
+
+    job = new_job("Check the pump")
+    checklist = detail(client, auth, job)["checklist"]
+    assert [item["label"] for item in checklist] == ["Check oil", "Photograph site"]
+    # Ticked on the phone before work starts.
+    assert client.patch(f"/api/jobs/{job}/checklist/{checklist[0]['id']}", headers=queued(auth), json={"done": True}).status_code == 200
+    # Changing the job type keeps a checklist that has ticks...
+    assert client.patch(f"/api/jobs/{job}", headers=auth(BOSS), json={"job_type": "Repair"}).status_code == 200
+    assert [item["label"] for item in detail(client, auth, job)["checklist"]] == ["Check oil", "Photograph site"]
+    # ...and replaces one that hasn't been touched (no checklist for this type).
+    untouched = new_job("Check the fan")
+    assert client.patch(f"/api/jobs/{untouched}", headers=auth(BOSS), json={"job_type": "Repair"}).status_code == 200
+    assert detail(client, auth, untouched)["checklist"] == []

@@ -268,5 +268,6 @@ test("boss creates a checklist and uses it as a job type", async ({ page }) => {
   await form.getByRole("button", { name: "Create & notify technician" }).click();
   await page.locator(".job", { hasText: "Install new compressor" }).locator(".titleLink").click();
   await expect(page.locator(".jobHero .eyebrow")).toContainText("Installation");
-  await expect(page.locator(".jobCard", { hasText: "Checklist" })).toContainText("The checklist appears when work starts.");
+  // Copied as soon as the job has a technician, so their phone has it before work starts (offline too).
+  await expect(page.locator(".jobCard", { hasText: "Checklist" }).locator(".checklist li")).toHaveText([/Confirm mounting points/, /Commissioning test/]);
 });

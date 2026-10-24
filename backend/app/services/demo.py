@@ -147,7 +147,8 @@ def populate(company, tag=None, password=None):
         for name, quantity in parts:
             db.session.add(JobPart(job_id=record.id, name=name, quantity=quantity, added_by=record.mechanic_id, created_at=now - timedelta(hours=2)))
         db.session.flush()
-        if record.status in {"In Progress", "Paused", "Completed"}:
+        # A job's checklist arrives with its technician (their phone has it before work starts).
+        if record.mechanic_id:
             copy_checklist(record)
         db.session.flush()
         items = JobChecklistItem.query.filter_by(job_id=record.id).order_by(JobChecklistItem.position).all()
@@ -168,6 +169,17 @@ def populate(company, tag=None, password=None):
         entries=[(26, 3, "Drained the coolant and flushed the radiator."), (1, None, "Replacing the thermostat.")],
         parts=[("Coolant (L)", 8), ("Thermostat", 1)],
         ticked=1,
+    )
+    # Written with no signal in the plant room, and sent once Mitch's phone was back online.
+    db.session.add(
+        JobEvent(
+            job_id=generator_job.id,
+            user_id=mitch.id,
+            action="note",
+            note="No signal in the plant room. Coolant was 2 litres low before the flush.",
+            created_at=now - timedelta(hours=25, minutes=20),
+            synced_at=now - timedelta(hours=23, minutes=5),
+        )
     )
     worksheet(
         mixer_job,

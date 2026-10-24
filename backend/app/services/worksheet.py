@@ -74,7 +74,8 @@ def stop_timer(job):
 
 
 def copy_checklist(job):
-    """Copy the job type's checklist onto the job the first time work starts."""
+    """Copy the job type's checklist onto the job once it has a technician, so their phone has it
+    before work starts (it can be ticked offline), or else when work starts."""
     if not job.job_type or JobChecklistItem.query.filter_by(job_id=job.id).first():
         return
     template = ChecklistTemplate.query.filter_by(company_id=job.company_id, job_type=job.job_type).first()
@@ -83,6 +84,16 @@ def copy_checklist(job):
     items = ChecklistTemplateItem.query.filter_by(template_id=template.id).order_by(ChecklistTemplateItem.position)
     for item in items:
         db.session.add(JobChecklistItem(job_id=job.id, label=item.label, required=item.required, position=item.position))
+
+
+def refresh_checklist(job):
+    """The job type changed before work started: the checklist follows it, unless something is ticked."""
+    items = JobChecklistItem.query.filter_by(job_id=job.id)
+    if WorkEntry.query.filter_by(job_id=job.id).first() or items.filter_by(done=True).first():
+        return
+    items.delete(synchronize_session=False)
+    if job.mechanic_id:
+        copy_checklist(job)
 
 
 def completion_problems(job):

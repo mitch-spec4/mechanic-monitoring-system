@@ -1222,7 +1222,8 @@
   }
   .appShell.role-mechanic .appMain {
     margin-inline-start: 0;
-    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+    /* The bottom bar, and the sync and location signs above it. */
+    padding-bottom: calc(124px + env(safe-area-inset-bottom));
   }
   .bottomNav {
     position: fixed;

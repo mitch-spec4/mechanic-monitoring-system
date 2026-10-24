@@ -228,10 +228,10 @@ If sending fails, the request still succeeds and the error is logged: signup car
 
 ## Daily clean-up
 
-Once a day, five things should be cleared away: demo companies whose 24 hours are up, uploads that were started but never finished, live positions older than 30 days, activity-log entries older than 12 months, and companies whose 30 days after a deletion request are up (with all their files). Either:
+Once a day, six things should be cleared away: demo companies whose 24 hours are up, uploads that were started but never finished, live positions older than 30 days, activity-log entries older than 12 months, the IDs of changes sent from phones' offline queues more than 30 days ago, and companies whose 30 days after a deletion request are up (with all their files). Either:
 
 - call `GET /api/cron/daily` with the header `Authorization: Bearer <CRON_SECRET>` from your host's scheduler (Vercel Cron sends exactly this header when `CRON_SECRET` is set), or
-- run `flask --app run.py purge-demos`, `purge-uploads`, `purge-locations`, `purge-activity` and `delete-due-companies` from cron.
+- run `flask --app run.py purge-demos`, `purge-uploads`, `purge-locations`, `purge-activity`, `purge-sync-requests` and `delete-due-companies` from cron.
 
 Without a `CRON_SECRET`, the URL doesn't exist.
 
@@ -288,6 +288,38 @@ A real provider (for example Paystack or Flutterwave for cards and mobile money 
 
 To try it locally: open http://localhost:5173, choose a plan, and sign up with a new email. **Pay now and skip the trial** goes to the test checkout; **Try a declined card** shows what happens when a card fails.
 
+## Offline mode and the installable app
+
+Technicians can do their whole day with no signal; managers' and customers' screens stay online only and say "You're offline" when there's no connection.
+
+**What works offline:** clocking in and out (with location sharing agreed), starting, pausing, resuming and completing jobs (with the customer's signature), time entries, parts, checklist ticks, the service summary, notes, photos and videos, and the position stamps that go with them.
+
+**How it works:**
+
+- While online, the technician's job list and the worksheet of every job assigned to them are kept on the phone, in a database of their own (IndexedDB) that is deleted when they sign out. Offline, screens show that copy with "Offline · last updated 10:42".
+- Every change goes into a queue on the phone and shows at once, marked "waiting to sync". Online it's sent straight away; offline it waits. Changes are sent one at a time, oldest first, when the signal returns, when the app opens, and every 30 seconds while any are waiting. On Android, Chrome can also send them with the app closed (Background Sync); iPhones can't.
+- Each change carries its own ID (`Idempotency-Key`) and the time it was made (`X-Client-Time`), corrected for a phone whose clock is wrong (measured against the server's clock while online). The server saves a change once however often it arrives, records the time it happened, and refuses times in the future (5 minutes of drift allowed) or older than 30 days. History lines made offline say "Done offline at 10:42, synced at 13:05".
+- Photos and videos are shrunk and kept on the phone, then uploaded on a good connection (online, not 2G, data saver off; iPhones: whenever online), retrying with longer and longer waits, up to 15 minutes apart. The app asks the browser to keep its storage, and warns when the phone is nearly out of space.
+- The sync sign shows "All synced", "Offline · 3 waiting", "Syncing 2 of 5…" or "1 needs attention". Tapping it lists what's waiting; a change the server refused shows why, with **Discard** (and, for a photo or video, **Save to phone** first).
+- Signing out with changes waiting asks first ("3 changes haven't synced", **Sign out anyway**). If the session runs out while offline, the changes wait and are sent when the same person signs in again, never under someone else.
+
+**When the job changed meanwhile:**
+
+| What happened | Result |
+| --- | --- |
+| The job was reassigned or cancelled | Work from before (time, photos, notes, parts, ticks) is kept; anything after it, and any start, pause or completion, is refused with what happened ("Reassigned to Amina at 11:05"). |
+| The same item was changed in two places (summary, time entry, tick) | The most recent change, by when it was made, wins; the other version goes into the job's history. |
+| A part was removed twice | Adds are always kept; removing a part that's already gone does nothing. |
+| Clocked in or out on another phone too | Treated as already done. |
+| A status change or clock-in dated before the job's or shift's last update | Refused: it would be out of order. |
+| Completing was refused | The list says exactly what's missing. |
+
+**Limits:** iPhones delete the data of sites that haven't been opened for 7 days, unless the app was added to the Home Screen; a phone whose clock is changed while it's offline can shift the times of its changes; the first sign-in (with its two-step code), the team map and its tiles, and photos already on the server need a connection.
+
+**The installable app:** a production build (`npm run build`) adds the web app manifest, icons and a service worker (`src/sw.ts`) that keeps the app's own files so it opens with no signal. It never keeps API data. Android shows an **Install app** button on the technician's dashboard; iPhones show the steps (Share, then Add to Home Screen). When a new version is deployed, a bar offers **Reload**; nothing reloads on its own, so nobody loses a half-filled form.
+
+To try it on a computer: `npm run build && npm run preview` (with the backend running), open http://localhost:4173 in Chrome, sign in as a technician, then turn the network off in DevTools (Network → Offline) and keep working. The development server (`npm run dev`) has offline mode too, but no service worker, so it can't be reloaded while offline.
+
 ## Production notes (until the deployment guide is written)
 
 - Run `flask --app run.py db upgrade` on every deploy. Never run `seed.py`.
@@ -298,7 +330,7 @@ To try it locally: open http://localhost:5173, choose a plan, and sign up with a
 - Use `STORAGE_BACKEND=s3` unless the app runs on one server with a lasting disk.
 - Map tiles come from the free OpenStreetMap servers, which are not meant for heavy commercial use. Switch to a paid tile provider before launch.
 - Serve the backend with a production WSGI server (for example gunicorn), not `flask run`.
-- Build the frontend with `npm run build` and serve `frontend/dist/` as static files.
+- Build the frontend with `npm run build` and serve `frontend/dist/` as static files. Serve `sw.js` and `index.html` without long caching, so phones find new versions.
 - Serve the frontend and the API from the same site over HTTPS (for example `app.example.com` with the API at `/api`). Sessions are httpOnly, `Secure` cookies with CSRF protection, so browsers won't send them to a different site.
 - Behind a load balancer, set `TRUSTED_PROXY_COUNT` so rate limiting sees real client IPs.
 - Never commit `.env` files; set the variables in your host's settings.

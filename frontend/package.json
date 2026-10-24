@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:phone": "vite --mode phone",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && tsc -p tsconfig.sw.json && vite build",
     "preview": "vite preview",
     "test:e2e": "playwright test --project=chromium",
     "i18n:check": "node scripts/i18n-check.mjs",
@@ -16,6 +16,7 @@
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
+    "idb": "8.0.3",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
@@ -29,6 +30,11 @@
     "@vitejs/plugin-basic-ssl": "^1.2.0",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.7.2",
-    "vite": "^6.0.5"
+    "vite": "^6.0.5",
+    "vite-plugin-pwa": "1.3.0",
+    "workbox-core": "7.4.1",
+    "workbox-precaching": "7.4.1",
+    "workbox-routing": "7.4.1",
+    "workbox-window": "7.4.1"
   }
 }

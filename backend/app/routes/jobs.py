@@ -23,6 +23,7 @@ from app.services.worksheet import (
     last_status_event,
     reassigned_problem,
     record_event,
+    refresh_checklist,
     start_timer,
     stop_timer,
 )
@@ -143,6 +144,7 @@ def create_job():
     if job.mechanic_id:
         mechanic = db.session.get(User, job.mechanic_id)
         record_event(job, user, "assigned", note=f"Assigned to {mechanic.name}")
+        copy_checklist(job)
         notify(job.mechanic_id, N_("New job assigned"), N_("{title} was assigned to you."), "job", title=job.title)
     db.session.commit()
     return jsonify(job=out(job)), 201
@@ -172,6 +174,8 @@ def update_job(jid):
         edited = edit_details(job, data)
         if edited:
             record_event(job, user, "updated", note="Changed " + ", ".join(edited))
+        if "job type" in edited:
+            refresh_checklist(job)
         if "mechanic_id" in data:
             assign_mechanic(job, integer(data, "mechanic_id", "Technician"), user)
 
@@ -297,6 +301,7 @@ def assign_mechanic(job, mechanic_id, user):
         job.mechanic_id = mechanic_id
         job.status = "Assigned"
         record_event(job, user, "assigned", from_status=old_status, to_status=job.status, note=f"Assigned to {mechanic.name}", previous_mechanic_id=previous)
+        copy_checklist(job)
         notify(mechanic_id, N_("New job assigned"), N_("{title} was assigned to you."), "job", title=job.title)
     else:
         job.mechanic_id = None
