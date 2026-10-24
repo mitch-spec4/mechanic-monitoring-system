@@ -1,0 +1,268 @@
+/* Offline mode: the sync pill and its list, the offline notice, "Update ready" and installing. */
+.syncPill {
+  position: fixed;
+  top: 22px;
+  /* Beside the "Location on" sign, which sits just before the language and profile buttons. */
+  inset-inline-end: 318px;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: auto;
+  min-height: 0;
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid #cfe0f3;
+  background: #f2f7fd;
+  color: #1264b9;
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: 0 4px 14px #1720330d;
+  cursor: pointer;
+}
+.syncPill.synced {
+  border-color: #bfe6cf;
+  background: #effbf4;
+  color: #15803d;
+}
+.syncPill.offline {
+  border-color: #d5dbe3;
+  background: #f4f6f9;
+  color: #3f4b5c;
+}
+.syncPill.attention {
+  border-color: #f3b4b4;
+  background: #fff1f1;
+  color: #b42318;
+}
+.syncPill .spin {
+  animation: sync-spin 1s linear infinite;
+}
+@keyframes sync-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.syncPanel {
+  display: grid;
+  gap: 12px;
+}
+.syncEmpty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #15803d;
+  font-weight: 700;
+}
+.syncList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.syncList li {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid #e1e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+.syncList li.failed {
+  border-color: #f3b4b4;
+  background: #fffafa;
+}
+.syncItemTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.syncItemTop strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #172033;
+  font-size: 14px;
+}
+.syncState {
+  flex: none;
+  color: #68768a;
+  font-size: 11px;
+  font-weight: 800;
+}
+.syncList li.failed .syncState {
+  color: #b42318;
+}
+.syncList small {
+  color: #68768a;
+  font-size: 12px;
+}
+.syncProblem {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+  color: #8f1d14;
+  font-size: 13px;
+}
+.syncProblem p {
+  margin: 0;
+}
+.syncProblem ul {
+  margin: 0;
+  padding-inline-start: 18px;
+}
+.syncActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.syncActions button {
+  width: auto;
+}
+.dangerText {
+  color: #b42318;
+}
+.syncWarning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #f6d79b;
+  background: #fff7e8;
+  color: #8a5300;
+  font-size: 13px;
+}
+
+.offlineNotice,
+.updateBanner {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 10px 19px 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.offlineNotice {
+  border: 1px solid #d5dbe3;
+  background: #f4f6f9;
+  color: #3f4b5c;
+}
+.offlineNotice svg,
+.updateBanner svg {
+  flex: none;
+}
+.updateBanner {
+  border: 1px solid #cfe0f3;
+  background: #f2f7fd;
+  color: #12407a;
+}
+.updateBanner span {
+  flex: 1;
+}
+.appMain .updateBanner button {
+  width: auto;
+  min-height: 36px;
+}
+
+.installCard {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 11px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid #cfe0f3;
+  background: linear-gradient(180deg, #f6faff, #fff);
+}
+.installIcon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: #e8f2ff;
+  color: #0969d7;
+}
+.installCard strong {
+  color: #172033;
+  font-size: 15px;
+}
+.installCard p {
+  margin: 3px 0 0;
+  color: #4b5a6e;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.installActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.appMain .installActions .primary {
+  width: auto;
+  min-height: 40px;
+}
+
+.waitingTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid #cfe0f3;
+  background: #f2f7fd;
+  color: #1264b9;
+  font-size: 10px;
+  font-weight: 800;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  /* On phones the sign sits at the bottom, across from "Location on", above the bottom bar. */
+  .syncPill {
+    top: auto;
+    bottom: 14px;
+    inset-inline-start: 14px;
+    inset-inline-end: auto;
+    padding: 8px 13px;
+    font-size: 12px;
+    box-shadow: 0 8px 24px #17203326;
+  }
+  .appShell.role-mechanic .syncPill {
+    bottom: calc(80px + env(safe-area-inset-bottom));
+  }
+  .appShell.role-mechanic.hasDemoBar .syncPill {
+    bottom: calc(176px + env(safe-area-inset-bottom));
+  }
+  /* Below the language and profile buttons in the top corner, so the page under it needs no room of its own. */
+  .offlineNotice,
+  .updateBanner {
+    margin: 66px 12px 0;
+  }
+  .updateBanner + .offlineNotice {
+    margin-top: 10px;
+  }
+  .appMain :is(.offlineNotice, .updateBanner) ~ #content .dashHeading {
+    margin-top: 12px;
+  }
+  .installCard {
+    grid-template-columns: auto 1fr;
+  }
+  .installActions {
+    grid-column: 1 / -1;
+    justify-content: space-between;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .syncPill .spin {
+    animation: none;
+  }
+}

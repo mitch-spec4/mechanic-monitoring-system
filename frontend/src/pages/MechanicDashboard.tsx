@@ -2,6 +2,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { CalendarClock, CheckCircle2, ClipboardList, FileText, MapPin, Play, Star, Wrench } from "lucide-react";
 import { ApiError, jobs, machines, reviews as fetchReviews, services, type User } from "../services/api";
 import { ClockCard, changeJobStatus, useShift } from "../components/Shift";
+import { InstallCard, Waiting } from "../components/Offline";
+import { offlineState } from "../offline";
 import SignatureModal, { type SignOff } from "../components/SignatureModal";
 import { errorMessage, formatDate, formatDay, greeting, toZoneInput } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
@@ -60,12 +62,19 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
   // When the customer's sign-off is all that's missing, the server says so and we ask for it.
   const [signing, setSigning] = useState<Job | null>(null);
   const change = async (id: number, status: string) => {
+    const job = jobList.find((candidate) => candidate.id === id);
+    if (!job) return;
+    // Offline the server can't say what's missing: completing asks for the customer's sign-off at once.
+    if (status === "Completed" && offlineState().active && !offlineState().online) {
+      setSigning(job);
+      return;
+    }
     setActionError("");
     setChanging(id);
     try {
-      await changeJobStatus(id, status, "mechanic");
+      await changeJobStatus(job, status, "mechanic");
     } catch (error) {
-      if (error instanceof ApiError && error.data?.needs_signature) setSigning(jobList.find((job) => job.id === id) ?? null);
+      if (error instanceof ApiError && error.data?.needs_signature) setSigning(job);
       else setActionError(errorMessage(error));
     } finally {
       setChanging(null);
@@ -82,6 +91,7 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
         </div>
       </div>
       <ClockCard />
+      <InstallCard />
       <TodaysJobs jobs={todaysJobs(activeJobs)} changing={changing} onChange={change} onOpenJob={onOpenJob} />
       <div className="kpiGrid">
         <Kpi icon={<FileText />} color="blue" number={activeJobs.length} label={t("Pending work")} detail={t("Needs attention")} />
@@ -118,6 +128,7 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
                     <strong>{job.title}</strong>
                   </button>
                   <span className={`jobStatus ${String(job.status).replace(/ /g, "").toLowerCase()}`}>{t(job.status)}</span>
+                  {job.pending_status && <Waiting />}
                 </div>
                 <p>{job.description}</p>
                 <small>
@@ -163,7 +174,7 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
           <SignatureModal
             jobTitle={signing.title}
             facts={[machineList.find((item) => item.id === signing.machine_id)?.name, signing.location].filter((fact): fact is string => Boolean(fact))}
-            onSubmit={(signOff: SignOff) => changeJobStatus(signing.id, "Completed", "mechanic", signOff)}
+            onSubmit={(signOff: SignOff) => changeJobStatus(signing, "Completed", "mechanic", signOff)}
             onDone={() => {
               setSigning(null);
               load();
@@ -227,6 +238,7 @@ function TodaysJobs({ jobs, changing, onChange, onOpenJob }: TodayProps) {
                 <strong>{job.title}</strong>
                 <small>
                   <span className={`jobStatus ${String(job.status).replace(/ /g, "").toLowerCase()}`}>{t(job.status)}</span>
+                  {job.pending_status && <Waiting />}
                   {job.location || t("No site")}
                   {job.due_date && job.due_date < today && <em className="overdue">{t("Overdue since {date}", { date: formatDate(job.due_date) })}</em>}
                   {job.due_date === today && <em>{t("Due today")}</em>}

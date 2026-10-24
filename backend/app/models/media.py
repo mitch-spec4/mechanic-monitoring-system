@@ -6,6 +6,8 @@ class JobFile(db.Model):
     """A photo, video or signature attached to a job. The bytes live in the storage layer
     (local disk or an S3-compatible bucket) under storage_key."""
 
+    __table_args__ = (db.UniqueConstraint("uploaded_by", "client_key", name="uq_job_file_uploaded_by_client_key"),)
+
     id = db.Column(db.Integer, primary_key=True)
     company_id = db.Column(db.Integer, db.ForeignKey("company.id"), nullable=False, index=True)
     job_id = db.Column(db.Integer, db.ForeignKey("job.id"), nullable=False, index=True)
@@ -18,3 +20,5 @@ class JobFile(db.Model):
     # Pending until the upload is confirmed; only ready files are shown or counted.
     status = db.Column(db.String(20), nullable=False, default="pending")
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+    # The phone's own ID for a queued photo or video, so sending it again never adds it twice.
+    client_key = db.Column(db.String(80))
