@@ -98,7 +98,30 @@ test("the technician taps On my way, and the customer sees it, then cancels", as
   await page.locator(".subPageList article", { hasText: SUBJECT }).getByRole("button", { name: SUBJECT }).click();
   const job = page.locator(".jobPage");
   await expect(job.locator(".jobMeta")).toContainText("Booked visit");
+  // The race a slow phone (or a Windows runner) hits: a read of the job answered just before the
+  // change is saved lands right after it was sent, and the reads after it land later still. The
+  // phone's copy must still end up with the change.
+  let sentAt = 0;
+  await page.route("**/api/jobs/*/on-the-way", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const response = await route.fetch();
+    sentAt = Date.now();
+    await route.fulfill({ response });
+  });
+  let reads = 0;
+  let landed = 0;
+  await page.route(/\/api\/jobs\/\d+$/, async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    const first = reads++ === 0;
+    const response = await route.fetch();
+    if (first) while (!sentAt) await new Promise((resolve) => setTimeout(resolve, 20));
+    await new Promise((resolve) => setTimeout(resolve, first ? 150 : 600));
+    await route.fulfill({ response });
+    landed++;
+  });
   await job.getByRole("button", { name: "On my way" }).click();
+  await expect.poll(() => landed).toBeGreaterThanOrEqual(3);
+  await page.unrouteAll({ behavior: "wait" });
   await expect(job.locator(".jobOnTheWay")).toContainText("On the way since");
   await expect(job.locator(".timeline")).toContainText("set off for the visit");
   await forget(page);
