@@ -126,6 +126,8 @@ def test_documents(client, data, auth, app):
     response = client.get(complete_free["url"], headers=mech(auth))
     assert response.status_code == 200 and response.data == b"%PDF-1.4 abc"
     assert "attachment" in response.headers["Content-Disposition"]
+    # Done with the file: Windows can't delete it (below) while a response holds it open.
+    response.close()
     assert client.get(complete_free["url"], headers=auth("mech2@acme.test")).status_code == 404
     assert client.get(complete_free["url"], headers=auth("boss@other.test")).status_code == 404
 

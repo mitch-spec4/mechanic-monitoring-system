@@ -145,8 +145,8 @@ jobs:
   windows:
     # Follows the Windows (PowerShell) steps in SETUP.md exactly.
     runs-on: windows-latest
-    # Usually about 12 minutes.
-    timeout-minutes: 30
+    # Usually 20 to 30 minutes: Windows runners take 13 to 20 minutes for the backend tests alone.
+    timeout-minutes: 45
     defaults:
       run:
         shell: pwsh
