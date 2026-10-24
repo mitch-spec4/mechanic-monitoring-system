@@ -26,8 +26,10 @@ def test_boss_updates_request_status(client, data, auth):
         "/api/customers/requests", headers=customer, json={"machine_id": data["machine"], "subject": "s", "description": "d"}
     ).get_json()["id"]
     assert client.patch(f"/api/customers/requests/{rid}", headers=boss(auth), json={"status": "Bogus"}).status_code == 400
-    assert client.patch(f"/api/customers/requests/{rid}", headers=boss(auth), json={"status": "Reviewing"}).status_code == 200
-    assert client.patch(f"/api/customers/requests/{rid}", headers=auth("boss@other.test"), json={"status": "Approved"}).status_code == 404
+    # The booked steps follow the visits; a manager sets the others by hand.
+    assert client.patch(f"/api/customers/requests/{rid}", headers=boss(auth), json={"status": "Repair booked"}).status_code == 400
+    assert client.patch(f"/api/customers/requests/{rid}", headers=boss(auth), json={"status": "Inspected"}).status_code == 200
+    assert client.patch(f"/api/customers/requests/{rid}", headers=auth("boss@other.test"), json={"status": "Declined"}).status_code == 404
 
 
 def test_review_validation(client, data, auth):

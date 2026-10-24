@@ -193,8 +193,10 @@ def create_app(overrides=None):
     from app.routes.legal import bp as legal
     from app.routes.machines import bp as machines
     from app.routes.media import bp as media
+    from app.routes.messages import bp as messages
     from app.routes.notifications import bp as notifications
     from app.routes.reports import bp as reports
+    from app.routes.requests import bp as requests
     from app.routes.reviews import bp as reviews
     from app.routes.services import bp as services
     from app.routes.shifts import bp as shifts
@@ -208,6 +210,8 @@ def create_app(overrides=None):
     app.register_blueprint(worksheet, url_prefix="/api/jobs")
     app.register_blueprint(checklists, url_prefix="/api/checklists")
     app.register_blueprint(customers, url_prefix="/api/customers")
+    app.register_blueprint(requests, url_prefix="/api/customers/requests")
+    app.register_blueprint(messages, url_prefix="/api/messages")
     app.register_blueprint(machines, url_prefix="/api/machines")
     app.register_blueprint(services, url_prefix="/api/services")
     app.register_blueprint(notifications, url_prefix="/api/notifications")
@@ -279,6 +283,18 @@ def create_app(overrides=None):
         removed = purge_old_requests()
         db.session.commit()
         print(f"Removed {removed} remembered change(s) older than 30 days.")
+
+    @app.cli.command("send-reminders")
+    def send_reminders():
+        """Visit reminders for tomorrow, "book the repair" reminders and follow-ups (run daily)."""
+        from app.services.booking import send_reminders as run
+
+        sent = run()
+        db.session.commit()
+        print(
+            f"Sent {sent['visit_reminders']} visit reminder(s), {sent['repair_reminders']} repair reminder(s) "
+            f"and {sent['follow_ups']} follow-up(s)."
+        )
 
     @app.cli.command("purge-activity")
     def purge_activity():

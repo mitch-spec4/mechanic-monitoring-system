@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bell, CalendarClock, ClipboardList, Clock, Cog, FileText, HelpCircle, LayoutGrid, MessageSquare, Star, type LucideIcon } from "lucide-react";
+import { Bell, CalendarClock, ClipboardList, Clock, Cog, FileText, HelpCircle, LayoutGrid, Star, type LucideIcon } from "lucide-react";
 import Modal from "./Modal";
 import { mark, t } from "../i18n";
 
@@ -17,7 +17,6 @@ const MORE: Item[] = [
   ["Assigned Jobs", mark("Assigned Jobs"), ClipboardList],
   ["Service Records", mark("Service Records"), FileText],
   ["Reviews", mark("Reviews"), Star],
-  ["Messages", mark("Messages"), MessageSquare],
   ["Settings", mark("Settings"), Cog],
   ["Help & Support", mark("Help & Support"), HelpCircle],
 ];

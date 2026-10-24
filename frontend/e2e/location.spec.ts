@@ -86,8 +86,8 @@ test("boss sees clocked-in mechanics on the map, shifts, and job locations", asy
   await expect(form).toHaveCount(0);
   await expect(page.locator(".shiftRow", { hasText: "Set by James Mwangi" })).toHaveCount(1);
 
-  await page.locator(".sidebarLink", { hasText: "Dashboard" }).click();
-  await page.locator(".job", { hasText: "Service Generator G-102" }).locator(".titleLink").click();
+  await openPage(page, "Jobs / Requests");
+  await page.locator(".subPageList article", { hasText: "Service Generator G-102" }).locator(".titleLink").click();
   await expect(page.locator(".jobCard", { hasText: "Locations" })).toContainText("Started or resumed work");
   noErrors();
 });

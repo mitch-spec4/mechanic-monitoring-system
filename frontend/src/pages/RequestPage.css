@@ -1,0 +1,288 @@
+/* A service request's page: its steps, the visits, and picking a time. The frame is the job page's. */
+.requestSteps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.requestSteps li {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 10px 4px;
+  border-radius: 12px;
+  color: #8592a6;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+.requestSteps .stepDot {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid #d5dde8;
+  background: #fff;
+  font-size: 12px;
+}
+.requestSteps li.done {
+  color: #15803d;
+}
+.requestSteps li.done .stepDot {
+  border-color: #16a34a;
+  background: #16a34a;
+  color: #fff;
+}
+.requestSteps li.current {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.requestSteps li.current .stepDot {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.requestClosed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #f3b4b4;
+  background: #fff1f1;
+  color: #8f1d14;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Visits */
+.visitList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.visitCard {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid #e1e8f0;
+  background: #fff;
+}
+.visitCard.onTheWay {
+  border-color: #9fc5eb;
+  box-shadow: inset 4px 0 0 #0969d7;
+}
+.visitHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.visitHead > div {
+  display: grid;
+  gap: 3px;
+}
+.visitHead strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+}
+.visitHead strong svg {
+  color: var(--accent);
+}
+.visitHead span:not(.jobStatusPill) {
+  color: #4b5a6e;
+  font-size: 13px;
+  font-weight: 600;
+}
+.visitLine {
+  margin: 0;
+  color: #4b5a6e;
+  font-size: 13px;
+}
+.visitLine.strong {
+  color: #a15c07;
+  font-weight: 700;
+}
+.visitOnTheWay {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: #eaf3ff;
+  color: #12407a;
+  font-size: 13px;
+  font-weight: 700;
+}
+.visitFindings {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f6f8fb;
+}
+.visitFindings dt {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #8592a6;
+}
+.visitFindings dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  white-space: pre-line;
+}
+.visitPhotos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.visitPhotos img {
+  display: block;
+  width: 88px;
+  height: 88px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid #e1e8f0;
+}
+.visitVideoNote {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #68768a;
+  font-size: 12px;
+}
+.visitCard > .link,
+.requestCancel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  width: auto;
+}
+
+/* Picking a time */
+.slotDays {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scroll-snap-type: x proximity;
+}
+.slotDays button {
+  flex: none;
+  display: grid;
+  gap: 2px;
+  width: auto;
+  min-width: 92px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #dce3eb;
+  background: #fff;
+  color: #172033;
+  text-align: center;
+  scroll-snap-align: start;
+}
+.slotDays button small {
+  color: #68768a;
+  font-size: 11px;
+}
+.slotDays button.chosen {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.slotTimes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+}
+.slotTimes button {
+  width: auto;
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid #dce3eb;
+  background: #fff;
+  color: #172033;
+  font-size: 15px;
+  font-weight: 700;
+}
+.slotTimes button:hover {
+  border-color: #9fc5eb;
+}
+.slotTimes button.chosen {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+.requestPage .slotPicker .slotBook {
+  min-height: 48px;
+  font-size: 15px;
+}
+.slotEmpty {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+.slotEmpty .secondary,
+.jobCard > .secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  justify-self: start;
+}
+.requestRepairLength {
+  display: grid;
+  gap: 8px;
+}
+.requestRepairLength button {
+  justify-self: start;
+  width: auto;
+}
+.requestCloseActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.requestCloseActions button {
+  width: auto;
+}
+.requestHint {
+  margin: 0;
+  font-size: 12px;
+}
+
+@media (min-width: 900px) {
+  .requestPage .jobGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .requestPage .jobCard.wide {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 560px) {
+  .requestSteps {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 2px;
+  }
+  .requestSteps li {
+    padding: 8px 0;
+    font-size: 10px;
+  }
+}

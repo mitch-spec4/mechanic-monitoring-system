@@ -50,6 +50,7 @@ import type {
   ServiceRequest,
 } from "../services/types";
 import ChecklistManager from "../components/ChecklistManager";
+import Messages from "../components/Messages";
 import MachinesByCustomer from "../components/MachinesByCustomer";
 import { machineSummary } from "./BossDashboard";
 import "./CustomerPage.css";
@@ -73,6 +74,9 @@ type Props = {
   user: User;
   onOpenJob?: (id: number) => void;
   onOpenCustomer?: (id: number) => void;
+  onOpenRequest?: (id: number) => void;
+  /** Messages: the customer whose chat to open (managers). */
+  chatCustomerId?: number | null;
   onUserChanged?: (user: User) => void;
 };
 type Icon = LucideIcon;
@@ -166,7 +170,7 @@ const resources: Record<string, Resource> = {
   },
   "Service Requests": {
     label: mark("Service requests"),
-    description: mark("Service you have requested and its current status."),
+    description: mark("Each request, where it is, and its booked visits."),
     icon: ClipboardList,
     list: () => requests().then((data) => data.requests),
   },
@@ -187,7 +191,7 @@ const resources: Record<string, Resource> = {
   },
 };
 
-export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, onUserChanged = () => {} }: Props) {
+export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, onOpenRequest, chatCustomerId, onUserChanged = () => {} }: Props) {
   const resource = resources[title] || resources.Profile;
   const Icon = resource.icon;
   const [items, setItems] = useState<ListItem[]>([]);
@@ -297,13 +301,7 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
       case "My Shifts":
         return <ShiftsView user={user} />;
       case "Messages":
-        return (
-          <EmptyState
-            icon={<MessageSquare size={26} />}
-            title={t("Messaging is not connected")}
-            text={t("Conversation storage and permissions will appear here when the messaging service is enabled.")}
-          />
-        );
+        return <Messages user={user} customerId={chatCustomerId} />;
       case "Activity":
         return <ActivityLog />;
       case "Settings":
@@ -328,7 +326,15 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
     return (
       <div className="subPageList">
         {(title === "Customers" ? sortByNeedsWork(filtered) : filtered).map((item) => (
-          <ResourceRow key={item.id} item={item} Icon={Icon} actions={rowActions(item)} onOpenJob={onOpenJob} onOpenCustomer={onOpenCustomer} />
+          <ResourceRow
+            key={item.id}
+            item={item}
+            Icon={Icon}
+            actions={rowActions(item)}
+            onOpenJob={onOpenJob}
+            onOpenCustomer={onOpenCustomer}
+            onOpenRequest={onOpenRequest}
+          />
         ))}
       </div>
     );
@@ -467,11 +473,19 @@ function describe(item: ListItem): Description {
   return { heading: item.name, detail: item.email };
 }
 
-type RowProps = { item: ListItem; Icon: Icon; actions: ReactNode; onOpenJob?: (id: number) => void; onOpenCustomer?: (id: number) => void };
+type RowProps = {
+  item: ListItem;
+  Icon: Icon;
+  actions: ReactNode;
+  onOpenJob?: (id: number) => void;
+  onOpenCustomer?: (id: number) => void;
+  onOpenRequest?: (id: number) => void;
+};
 
-function ResourceRow({ item, Icon, actions, onOpenJob, onOpenCustomer }: RowProps) {
+function ResourceRow({ item, Icon, actions, onOpenJob, onOpenCustomer, onOpenRequest }: RowProps) {
   const { heading, detail, status, badge, jobId } = describe(item);
   const customer = onOpenCustomer && "machine_count" in item ? item : null;
+  const request = onOpenRequest && "subject" in item ? item : null;
   return (
     <article>
       <span className="listIcon">
@@ -484,6 +498,10 @@ function ResourceRow({ item, Icon, actions, onOpenJob, onOpenCustomer }: RowProp
           </button>
         ) : customer && onOpenCustomer ? (
           <button className="titleLink" onClick={() => onOpenCustomer(customer.id)}>
+            <strong>{heading}</strong>
+          </button>
+        ) : request && onOpenRequest ? (
+          <button className="titleLink" onClick={() => onOpenRequest(request.id)}>
             <strong>{heading}</strong>
           </button>
         ) : (

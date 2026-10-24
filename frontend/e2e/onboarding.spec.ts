@@ -21,7 +21,7 @@ test("Try the demo opens a private company that can be seen as each role", async
   await chooser.getByRole("button", { name: /Try as Boss/ }).click();
   await expect(page.getByRole("heading", { name: /James\./ })).toBeVisible();
   await expect(demoBar(page)).toContainText("Demo company.");
-  await expect(page.locator(".job")).toHaveCount(6);
+  await expect(page.locator(".job")).toHaveCount(8);
   await expect(demoBar(page).getByRole("button", { name: "Boss" })).toHaveAttribute("aria-pressed", "true");
 
   await demoBar(page).getByRole("button", { name: "Technician", exact: true }).click();

@@ -701,3 +701,17 @@
   gap: 6px;
   text-decoration: none;
 }
+
+/* A booked visit the technician has set off for. */
+.jobOnTheWay {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: #eaf3ff;
+  color: #12407a;
+  font-size: 13px;
+  font-weight: 700;
+}

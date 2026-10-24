@@ -603,10 +603,10 @@ body {
 .appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus):is(.pending, .submitted) {
   --st: var(--st-pending);
 }
-.appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus):is(.assigned, .received, .reviewing, .mechanicassigned, .scheduled) {
+.appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus):is(.assigned, .received, .reviewing, .mechanicassigned, .scheduled, .inspectionbooked, .repairbooked) {
   --st: var(--st-assigned);
 }
-.appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus):is(.accepted, .approved) {
+.appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus):is(.accepted, .approved, .inspected) {
   --st: var(--st-accepted);
 }
 .appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus):is(.inprogress, .undermaintenance) {
@@ -618,7 +618,7 @@ body {
 .appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus, .statePill):is(.completed, .operational, .active) {
   --st: var(--st-done);
 }
-.appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus, .statePill):is(.cancelled, .retired, .expired) {
+.appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus, .statePill):is(.cancelled, .retired, .expired, .declined) {
   --st: var(--st-cancel);
 }
 .appShell .statePill.trialing {

@@ -7,7 +7,7 @@ from app.models.service_record import ServiceRecord
 from app.models.review import Review
 from app.models.notification import Notification
 from app.models.invitation import Invitation
-from app.models.request import ServiceRequest
+from app.models.request import CustomerMessage, ServiceRequest
 from app.models.security import AuditEvent, AuthAttempt, BackupCode, PasswordReset, TrustedDevice
 from app.models.worksheet import ChecklistTemplate, ChecklistTemplateItem, JobChecklistItem, JobEvent, JobPart, WorkEntry
 from app.models.location import LocationPoint, Shift

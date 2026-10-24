@@ -18,6 +18,15 @@ class Job(db.Model):
     machine_id = db.Column(db.Integer, db.ForeignKey("machine.id"), nullable=True, index=True)
     mechanic_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+    # A visit booked by a customer for their service request: an inspection or the repair after
+    # it, at a time they picked. The technician taps "On my way" before leaving for it; customers
+    # get a reminder the day before (reminder_sent_at).
+    request_id = db.Column(db.Integer, db.ForeignKey("service_request.id"), nullable=True, index=True)
+    visit = db.Column(db.String(20))
+    scheduled_start = db.Column(db.DateTime, index=True)
+    scheduled_end = db.Column(db.DateTime)
+    on_the_way_at = db.Column(db.DateTime)
+    reminder_sent_at = db.Column(db.DateTime)
     # Customer sign-off at completion: a signature (stored as a JobFile of kind "signature")
     # with the signer's name, or the reason nobody could sign.
     signed_by_name = db.Column(db.String(120))

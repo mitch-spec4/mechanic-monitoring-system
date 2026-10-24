@@ -5,6 +5,7 @@ import {
   clockIn,
   clockOut,
   deleteFile,
+  onTheWay,
   removePart,
   saveRecord,
   setLocationConsent,
@@ -71,6 +72,10 @@ export const queueEntryUpdate = (job: JobRef, entryId: number, data: Payload) =>
 
 export const queueRecord = (job: JobRef, data: Payload) =>
   submit<WithJob>({ kind: "record", method: "PUT", path: `/jobs/${job.id}/record`, body: data, jobId: job.id, title: job.title }, () => saveRecord(job.id, data));
+
+/** The technician sets off for a booked visit: the customer hears they're on the way. */
+export const queueOnTheWay = (job: JobRef) =>
+  submit<{ job: Job }>({ kind: "on_the_way", method: "POST", path: `/jobs/${job.id}/on-the-way`, jobId: job.id, title: job.title }, () => onTheWay(job.id));
 
 export const queueNote = (job: JobRef, note: string) =>
   submit<WithJob>(

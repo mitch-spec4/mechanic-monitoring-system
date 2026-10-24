@@ -6,10 +6,12 @@ from app.models.customer import Customer
 from app.models.job import Job
 from app.models.location import LocationPoint
 from app.models.machine import Machine
+from app.models.request import ServiceRequest
 from app.models.media import JobFile
 from app.models.user import User
 from app.models.worksheet import WorkEntry
 from app.services.billing import require_active
+from app.services.booking import tell_customer, visit_moved
 from app.services.location import shift_at, stamp_job
 from app.services.notifications import notify, notify_bosses
 from app.services.signature import SIGNATURE_FIELDS, SIGNATURE_PROBLEM, apply_signature, read_signature
@@ -73,6 +75,12 @@ def out(job):
         "customer_id": job.customer_id,
         "machine_id": job.machine_id,
         "mechanic_id": job.mechanic_id,
+        # A visit a customer booked: when, and whether the technician has set off.
+        "request_id": job.request_id,
+        "visit": job.visit,
+        "scheduled_start": job.scheduled_start.isoformat() if job.scheduled_start else None,
+        "scheduled_end": job.scheduled_end.isoformat() if job.scheduled_end else None,
+        "on_the_way_at": job.on_the_way_at.isoformat() if job.on_the_way_at else None,
     }
 
 
@@ -264,6 +272,43 @@ def change_status(job, user, new_status):
         stop_timer(job)
     if new_status == "Completed":
         fill_service_record(job)
+    # A visit a customer booked: their request moves on, and they're told.
+    visit_moved(job, old_status, new_status)
+
+
+ON_THE_WAY_STATUSES = {"Assigned", "Accepted"}
+
+
+@bp.post("/<int:jid>/on-the-way")
+@roles("mechanic")
+def on_the_way(jid):
+    """The technician sets off for a booked visit: the customer is told (in the app and by email)."""
+    user = current_user()
+    job = Job.query.filter_by(id=jid, company_id=user.company_id).first_or_404()
+    if job.mechanic_id != user.id:
+        left = handed_over(job, user)
+        if left:
+            raise reassigned_problem(job, left)
+        return jsonify(error=_("Forbidden")), 403
+    if job.on_the_way_at:
+        return jsonify(job=out(job))
+    if job.status not in ON_THE_WAY_STATUSES:
+        raise ValidationError(_("\"On my way\" is for a visit that hasn't started."), 409)
+    service_request = db.session.get(ServiceRequest, job.request_id) if job.request_id else None
+    job.on_the_way_at = happened_at()
+    record_event(job, user, "on_the_way")
+    if service_request:
+        tell_customer(
+            service_request,
+            N_("Technician on the way"),
+            N_("{name} is on the way for {subject}."),
+            "status",
+            button=N_("Follow your request"),
+            name=user.name,
+            subject=service_request.subject,
+        )
+    db.session.commit()
+    return jsonify(job=out(job))
 
 
 def check_mechanic_order(job):

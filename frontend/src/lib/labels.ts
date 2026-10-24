@@ -5,13 +5,11 @@ export const PRIORITIES = [mark("Low"), mark("Medium"), mark("High"), mark("Urge
 export const JOB_STATUSES = [mark("Pending"), mark("Assigned"), mark("Accepted"), mark("In Progress"), mark("Paused"), mark("Completed"), mark("Cancelled")];
 export const REQUEST_STATUSES = [
   mark("Submitted"),
-  mark("Received"),
-  mark("Reviewing"),
-  mark("Approved"),
-  mark("Mechanic Assigned"),
-  mark("Scheduled"),
-  mark("In Progress"),
+  mark("Inspection booked"),
+  mark("Inspected"),
+  mark("Repair booked"),
   mark("Completed"),
+  mark("Declined"),
   mark("Cancelled"),
 ];
 export const EQUIPMENT_STATUSES = [mark("Operational"), mark("Under Maintenance"), mark("Under Repair"), mark("Retired")];

@@ -38,7 +38,7 @@ test("technicians get a bottom bar on a phone, with everything else under More",
 
   await bar.getByRole("button", { name: "More" }).click();
   const more = page.getByRole("dialog", { name: "More" });
-  await expect(more.getByRole("button")).toContainText(["Assigned Jobs", "Service Records", "Reviews", "Messages", "Settings", "Help & Support"]);
+  await expect(more.getByRole("button")).toContainText(["Assigned Jobs", "Service Records", "Reviews", "Settings", "Help & Support"]);
   await more.getByRole("button", { name: "Settings" }).click();
   await expect(more).toHaveCount(0);
   await expect(page.locator(".subPage h1")).toHaveText("Settings");

@@ -137,6 +137,10 @@ export function overlayJob(server: JobDetail, items: QueueItem[], ctx: Context):
       case "note":
         job.history.push(event(item, ctx, { action: "note", note: String(body.note ?? "") }));
         break;
+      case "on_the_way":
+        job.on_the_way_at ??= at;
+        job.history.push(event(item, ctx, { action: "on_the_way" }));
+        break;
       case "media": {
         const file: JobFile = {
           id: item.temp ?? -1,
@@ -173,15 +177,18 @@ export function overlayJob(server: JobDetail, items: QueueItem[], ctx: Context):
 
 /** The job list with waiting starts, pauses and completions applied. */
 export function overlayJobs(jobs: Job[], items: QueueItem[]): Job[] {
-  const changes = live(items).filter((item) => item.kind === "status" || item.kind === "clock_out");
+  const changes = live(items).filter((item) => item.kind === "status" || item.kind === "clock_out" || item.kind === "on_the_way");
   if (!changes.length) return jobs;
   return jobs.map((job) => {
     let status = job.status;
+    let onTheWay = job.on_the_way_at;
     for (const item of changes) {
       if (item.kind === "clock_out" && status === "In Progress") status = "Paused";
       if (item.kind === "status" && item.jobId === job.id) status = String(item.body?.status);
+      if (item.kind === "on_the_way" && item.jobId === job.id) onTheWay ??= iso(item.at);
     }
-    return status === job.status ? job : { ...job, status, pending_status: true };
+    if (status === job.status && onTheWay === job.on_the_way_at) return job;
+    return { ...job, status, on_the_way_at: onTheWay, pending_status: status !== job.status || job.pending_status };
   });
 }
 

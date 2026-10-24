@@ -1,10 +1,11 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Building2, Languages, Moon, UserRound } from "lucide-react";
+import { Building2, CalendarClock, Languages, Moon, UserRound } from "lucide-react";
 import {
   changePassword,
   companySettings,
   saveCompanySettings,
   saveLanguage,
+  type BookingSettings,
   type CompanySettings,
   type CompanySettingsOptions,
   type User,
@@ -15,7 +16,7 @@ import LanguagePicker from "./LanguagePicker";
 import { toast } from "./Feedback";
 import { ROLE_NAMES } from "./Sidebar";
 import { setTheme, theme, THEMES, type Theme } from "../lib/theme";
-import { t } from "../i18n";
+import { mark, t } from "../i18n";
 import { Loading } from "./States";
 import { TwoFactorSettings } from "./TwoFactor";
 import { CompanyDataSettings } from "./CompanyData";
@@ -64,6 +65,7 @@ export default function SettingsPanel({ user, onUserChanged }: Props) {
       </section>
       <AppearancePicker />
       {user.role === "boss" && <CompanySettingsForm user={user} onUserChanged={onUserChanged} />}
+      {user.role === "boss" && <BookingSettingsForm />}
       {user.role === "mechanic" && <LocationSettings />}
       <ChangePassword />
       <TwoFactorSettings user={user} onUserChanged={onUserChanged} />
@@ -124,7 +126,8 @@ function CompanySettingsForm({ user, onUserChanged }: Props) {
     setError("");
     setBusy(true);
     try {
-      const data = await saveCompanySettings(settings);
+      const { booking: _booking, ...company } = settings;
+      const data = await saveCompanySettings(company);
       setSettings(data.settings);
       onUserChanged({ ...user, timezone: data.settings.timezone, units: data.settings.units });
       toast(t("Company settings saved"));
@@ -135,7 +138,7 @@ function CompanySettingsForm({ user, onUserChanged }: Props) {
     }
   };
 
-  const field = (key: keyof CompanySettings) => ({
+  const field = (key: Exclude<keyof CompanySettings, "booking">) => ({
     id: `field-${key}`,
     value: settings?.[key] ?? "",
     onChange: (event: { target: { value: string } }) => settings && setSettings({ ...settings, [key]: event.target.value }),
@@ -192,6 +195,106 @@ function CompanySettingsForm({ user, onUserChanged }: Props) {
           </div>
           <button className="primary" disabled={busy}>
             {busy ? t("Saving…") : t("Save company settings")}
+          </button>
+        </>
+      )}
+    </form>
+  );
+}
+
+// ISO weekdays: 1 is Monday.
+const WEEKDAYS: [number, string][] = [
+  [1, mark("Mon")],
+  [2, mark("Tue")],
+  [3, mark("Wed")],
+  [4, mark("Thu")],
+  [5, mark("Fri")],
+  [6, mark("Sat")],
+  [7, mark("Sun")],
+];
+type NumberSetting = Exclude<keyof BookingSettings, "days" | "start" | "end">;
+const BOOKING_NUMBERS: [NumberSetting, string, string, number, number, number][] = [
+  ["inspection_minutes", mark("Inspection length (minutes)"), mark("How long an inspection visit takes."), 15, 1440, 15],
+  ["repair_minutes", mark("Repair length (minutes)"), mark("The usual repair. You can change it for each request after the inspection."), 15, 1440, 15],
+  ["travel_minutes", mark("Travel time between visits (minutes)"), mark("Kept free before and after each visit of a technician."), 0, 240, 5],
+  ["notice_hours", mark("Notice needed (hours)"), mark("The earliest a customer can book, from now."), 0, 336, 1],
+  ["window_days", mark("How far ahead customers can book (days)"), mark("The latest a customer can book, from today."), 1, 90, 1],
+];
+
+/** When customers can book visits online, and how long visits take (managers). */
+function BookingSettingsForm() {
+  const [booking, setBooking] = useState<BookingSettings | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    companySettings()
+      .then((data) => setBooking(data.settings.booking))
+      .catch((problem) => setError(errorMessage(problem)));
+  }, []);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!booking) return;
+    setError("");
+    setBusy(true);
+    try {
+      const data = await saveCompanySettings({ booking });
+      setBooking(data.settings.booking);
+      toast(t("Booking settings saved"));
+    } catch (problem) {
+      setError(errorMessage(problem));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const toggleDay = (day: number) =>
+    booking && setBooking({ ...booking, days: booking.days.includes(day) ? booking.days.filter((d) => d !== day) : [...booking.days, day].sort() });
+
+  return (
+    <form className="form form-upgraded settingsSection" onSubmit={submit} aria-labelledby="settings-booking">
+      <h3 id="settings-booking">
+        <CalendarClock size={16} /> {t("Online booking")}
+      </h3>
+      <p className="muted">{t("Customers pick a time for each visit from these hours. A time is offered while a technician is free, with travel time between visits.")}</p>
+      {error && <div className="error">{error}</div>}
+      {!booking ? (
+        !error && <Loading />
+      ) : (
+        <>
+          <fieldset className="dayChoices">
+            <legend>{t("Days customers can book")}</legend>
+            {WEEKDAYS.map(([day, label]) => (
+              <label key={day} className={booking.days.includes(day) ? "chosen" : ""}>
+                <input type="checkbox" checked={booking.days.includes(day)} onChange={() => toggleDay(day)} />
+                {t(label)}
+              </label>
+            ))}
+          </fieldset>
+          <div className="row">
+            <Field label={t("Bookings start")}>
+              <input id="field-booking-start" type="time" step={900} value={booking.start} onChange={(e) => setBooking({ ...booking, start: e.target.value })} required />
+            </Field>
+            <Field label={t("Bookings end")}>
+              <input id="field-booking-end" type="time" step={900} value={booking.end} onChange={(e) => setBooking({ ...booking, end: e.target.value })} required />
+            </Field>
+          </div>
+          {BOOKING_NUMBERS.map(([key, label, hint, min, max, step]) => (
+            <Field key={key} label={t(label)} hint={t(hint)}>
+              <input
+                id={`field-booking-${key}`}
+                type="number"
+                min={min}
+                max={max}
+                step={step}
+                value={booking[key]}
+                onChange={(e) => setBooking({ ...booking, [key]: Number(e.target.value) })}
+                required
+              />
+            </Field>
+          ))}
+          <button className="primary" disabled={busy}>
+            {busy ? t("Saving…") : t("Save booking settings")}
           </button>
         </>
       )}

@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import {
   ArrowLeft,
+  CalendarClock,
   CheckCircle2,
   ClipboardCheck,
   Clock,
@@ -17,17 +18,28 @@ import {
   Plus,
   Share2,
   Trash2,
+  Truck,
   Wrench,
 } from "lucide-react";
 import { jobDetail, apiUrl, downloadReport } from "../services/api";
-import { queueCheck, queueEntry, queueEntryUpdate, queueMediaRemoval, queueNote, queuePart, queuePartRemoval, queueRecord } from "../offline/changes";
+import {
+  queueCheck,
+  queueEntry,
+  queueEntryUpdate,
+  queueMediaRemoval,
+  queueNote,
+  queueOnTheWay,
+  queuePart,
+  queuePartRemoval,
+  queueRecord,
+} from "../offline/changes";
 import { Waiting } from "../components/Offline";
 import { toast } from "../components/Feedback";
 import SignatureModal, { type SignOff } from "../components/SignatureModal";
 import { uploadMedia } from "../lib/media";
 import { changeJobStatus } from "../components/Shift";
 import { mapLink } from "../lib/location";
-import { asDate, errorMessage, formatDate, formatDay as dayOf, formatDistance, formatTime as timeOf, fromZoneInput } from "../lib/format";
+import { asDate, errorMessage, formatDate, formatDay as dayOf, formatDistance, formatTime as timeOf, formatVisit, fromZoneInput } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
 import type { User } from "../services/api";
 import type { ChecklistItem, JobDetail, JobEvent, JobFile, LocationPoint, Part, Payload, WorkEntry } from "../services/types";
@@ -74,12 +86,19 @@ const FILE_KINDS: Record<string, string> = {
   video: mark("a video"),
 };
 const after = (note: string, prefix: RegExp) => note.replace(prefix, "").trim();
+// A booked visit the technician can still set off for.
+const NOT_STARTED = ["Pending", "Assigned", "Accepted"];
 
 function historyText(event: JobEvent): string {
   const note: string = event.note || "";
   switch (event.action) {
     case "created":
-      return t("created the job");
+      // Booked by the customer (or a manager for them) at a time they picked.
+      return note === "booked" ? t("booked the visit") : t("created the job");
+    case "rescheduled":
+      return note ? t("moved the visit to {time}", { time: formatVisit(note) }) : t("moved the visit");
+    case "on_the_way":
+      return t("set off for the visit");
     case "assigned":
       return note ? t("assigned it to {name}", { name: after(note, /^Assigned to/) }) : t("assigned the job");
     case "unassigned":
@@ -259,7 +278,11 @@ export default function JobPage({ jobId, user, onBack }: Props) {
           {job.customer && <Meta label={t("Customer")} value={job.customer.name} />}
           {job.machine && <Meta label={t("Equipment")} value={`${job.machine.name} · ${job.machine.serial_no}`} />}
           <Meta label={t("Site")} value={job.location || t("Not set")} icon={<MapPin size={13} />} />
-          <Meta label={t("Due")} value={formatDate(job.due_date) || t("Not set")} />
+          {job.scheduled_start ? (
+            <Meta label={t("Booked visit")} value={formatVisit(job.scheduled_start, job.scheduled_end)} icon={<CalendarClock size={13} />} />
+          ) : (
+            <Meta label={t("Due")} value={formatDate(job.due_date) || t("Not set")} />
+          )}
           {!isMechanic && <Meta label={t("Technician")} value={job.mechanic?.name || t("Not assigned")} />}
         </dl>
 
@@ -274,8 +297,19 @@ export default function JobPage({ jobId, user, onBack }: Props) {
           </div>
         )}
 
+        {job.on_the_way_at && NOT_STARTED.includes(job.status) && (
+          <p className="jobOnTheWay" role="status">
+            <Truck size={15} /> {t("On the way since {time}", { time: timeOf(job.on_the_way_at) })}
+          </p>
+        )}
+
         {isMechanic && canEdit && (
           <div className="jobActions">
+            {job.visit && !job.on_the_way_at && NOT_STARTED.includes(job.status) && (
+              <button className="secondary" disabled={busy} onClick={() => run(() => queueOnTheWay(job))}>
+                <Truck size={16} /> {t("On my way")}
+              </button>
+            )}
             {job.status === "Assigned" && (
               <>
                 <button className="primary" disabled={busy} onClick={() => setStatus("In Progress")}>

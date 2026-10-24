@@ -9,7 +9,6 @@ import {
   requests,
   updateJob,
   deleteJob,
-  updateRequest,
 } from "../services/api";
 import Notifications from "../components/Notifications";
 import Modal from "../components/Modal";
@@ -22,18 +21,25 @@ import { AddMachine } from "../components/MachineForms";
 import { confirmAction, toast } from "../components/Feedback";
 import { errorMessage, formatDate, greeting } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
-import { PRIORITIES, REQUEST_STATUSES, statusClass } from "../lib/labels";
+import { PRIORITIES, statusClass } from "../lib/labels";
 import type { User } from "../services/api";
 import type { CustomerSummary, Job, Machine, Mechanic, ServiceRequest } from "../services/types";
 import { t } from "../i18n";
 import { PlanBanner } from "./BillingPage";
 import Field from "../components/Field";
 
-type Props = { u: User; onOpenJob: (id: number) => void; onOpenCustomer: (id: number) => void; onOpenBilling?: () => void; onUserChanged?: (user: User) => void };
+type Props = {
+  u: User;
+  onOpenJob: (id: number) => void;
+  onOpenCustomer: (id: number) => void;
+  onOpenRequest?: (id: number) => void;
+  onOpenBilling?: () => void;
+  onUserChanged?: (user: User) => void;
+};
 
-const FINISHED = ["Completed", "Cancelled"];
+const FINISHED = ["Completed", "Cancelled", "Declined"];
 
-export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBilling = () => {}, onUserChanged = () => {} }: Props) {
+export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenRequest = () => {}, onOpenBilling = () => {}, onUserChanged = () => {} }: Props) {
   const [data, setData] = useState<Job[]>([]);
   const [cs, setCs] = useState<CustomerSummary[]>([]);
   const [ms, setMs] = useState<Mechanic[]>([]);
@@ -72,7 +78,6 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBill
     }
     load();
   };
-  const changeRequestStatus = (id: number, status: string) => act(() => updateRequest(id, { status }));
   const activeRequestCount = rs.filter((x) => !FINISHED.includes(x.status)).length;
   const upcoming = data.filter((job) => !FINISHED.includes(job.status));
   return (
@@ -134,21 +139,18 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBill
             {rs.slice(0, 6).map((r) => (
               <div className="request" key={r.id}>
                 <div>
-                  <b>{r.subject}</b>
+                  <button className="titleLink" onClick={() => onOpenRequest(r.id)}>
+                    <b>{r.subject}</b>
+                  </button>
                   <span>{r.description}</span>
                 </div>
                 <div className="requestActions">
                   <span className="priority" data-level={statusClass(r.priority)}>{t(r.priority)}</span>
-                  <select aria-label={t("Status for {subject}", { subject: r.subject })} value={r.status} onChange={(e) => changeRequestStatus(r.id, e.target.value)}>
-                    {REQUEST_STATUSES.map((status) => (
-                      <option key={status} value={status}>
-                        {t(status)}
-                      </option>
-                    ))}
-                  </select>
+                  <span className={`status ${statusClass(r.status)}`}>{t(r.status)}</span>
                 </div>
               </div>
             ))}
+            {rs.length === 0 && <p className="muted">{t("No customer requests yet.")}</p>}
           </Panel>
         </div>
         <div className="panel">
