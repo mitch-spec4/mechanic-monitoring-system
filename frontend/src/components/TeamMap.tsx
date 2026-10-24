@@ -3,6 +3,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { MapPin } from "lucide-react";
 import { teamLocations } from "../services/api";
+import type { TeamMember } from "../services/types";
 import { ago, errorMessage, formatDistance } from "../lib/format";
 import { mapLink } from "../lib/location";
 import { usePolling } from "../lib/usePolling";
@@ -34,7 +35,7 @@ const textNode = (text: string) => {
 
 /** Managers: the last known position of every clocked-in technician. */
 export default function TeamMap({ onOpenJob }: { onOpenJob?: (id: number) => void }) {
-  const [team, setTeam] = useState<any[] | null>(null);
+  const [team, setTeam] = useState<TeamMember[] | null>(null);
   const [error, setError] = useState("");
   const holder = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
@@ -72,7 +73,7 @@ export default function TeamMap({ onOpenJob }: { onOpenJob?: (id: number) => voi
   useEffect(() => {
     if (!map.current || !layer.current || !team) return;
     layer.current.clearLayers();
-    const placed = team.filter((person) => person.last);
+    const placed = team.flatMap((person) => (person.last ? [{ ...person, last: person.last }] : []));
     for (const person of placed) {
       const { latitude, longitude, accuracy_m } = person.last;
       if (accuracy_m) L.circle([latitude, longitude], { radius: accuracy_m, color: "#0969d7", weight: 1, fillOpacity: 0.08 }).addTo(layer.current);
@@ -91,7 +92,7 @@ export default function TeamMap({ onOpenJob }: { onOpenJob?: (id: number) => voi
     }
   }, [team]);
 
-  const focus = (person: any) => {
+  const focus = (person: TeamMember) => {
     if (person.last && map.current) map.current.setView([person.last.latitude, person.last.longitude], 16, { animate: false });
   };
 
@@ -116,7 +117,7 @@ export default function TeamMap({ onOpenJob }: { onOpenJob?: (id: number) => voi
                 {person.last?.accuracy_m ? ` · ±${formatDistance(person.last.accuracy_m)}` : ""}
               </span>
               {person.job ? (
-                <button className="titleLink" onClick={() => onOpenJob?.(person.job.id)}>
+                <button className="titleLink" onClick={() => person.job && onOpenJob?.(person.job.id)}>
                   {t("Working on {title}", { title: person.job.title })}
                 </button>
               ) : (

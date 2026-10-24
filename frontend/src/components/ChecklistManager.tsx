@@ -7,6 +7,7 @@ import { confirmAction, toast } from "./Feedback";
 import { t } from "../i18n";
 import "./ChecklistManager.css";
 import { EmptyState } from "./States";
+import Field from "./Field";
 
 type Item = { label: string; required: boolean };
 type Template = { id: number; job_type: string; items: Item[] };
@@ -80,7 +81,12 @@ export default function ChecklistManager() {
                 <button className="listAction" onClick={() => setEditing(template)}>
                   {t("Edit")}
                 </button>
-                <button className="iconButton delete" title={t("Delete checklist")} aria-label={t("Delete the {name} checklist", { name: template.job_type })} onClick={() => remove(template)}>
+                <button
+                  className="iconButton delete"
+                  title={t("Delete checklist")}
+                  aria-label={t("Delete the {name} checklist", { name: template.job_type })}
+                  onClick={() => remove(template)}
+                >
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -125,10 +131,9 @@ function ChecklistEditor({ template, onClose, onSaved }: { template: Template | 
     <Modal title={template ? t("Edit the {name} checklist", { name: template.job_type }) : t("New checklist")} icon={<ListChecks size={20} />} onClose={onClose}>
       <form className="form form-upgraded checklistEditor" onSubmit={save}>
         {error && <div className="error">{error}</div>}
-        <div className="formGroup">
-          <label htmlFor="field-job_type">{t("Job type")}</label>
+        <Field label={t("Job type")}>
           <input id="field-job_type" value={jobType} onChange={(e) => setJobType(e.target.value)} placeholder={t("e.g. {example}", { example: t("Repair") })} required />
-        </div>
+        </Field>
         <div className="formGroup">
           <span className="editorLabel">{t("Items")}</span>
           {items.map((item, index) => (

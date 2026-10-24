@@ -64,11 +64,19 @@ async function enterSignInCode(page: Page, email: string, landed: string) {
 
 /** After "Sign in" is pressed: type a code if one is asked for, then wait for the page that comes
  *  next (the app, unless `landed` says otherwise). Works in any language. */
-export async function finishSignIn(page: Page, email: string, landed = ".sidebar") {
+export async function finishSignIn(page: Page, email: string, landed = ".appShell") {
   const codeStep = page.locator("main.login:not(.twoFactorPage) .codeInput");
   await expect(page.locator(landed).or(codeStep)).toBeVisible();
   if (await codeStep.isVisible()) await enterSignInCode(page, email, landed);
   await expect(page.locator(landed)).toBeVisible();
+}
+
+/** Sign out of this browser completely: the next visit is a stranger's (a remembered device too). */
+export async function forget(page: Page) {
+  await page.evaluate(() => localStorage.clear());
+  await page.context().clearCookies();
+  await page.goto("/#/signin");
+  await page.reload();
 }
 
 export async function signIn(page: Page, email: string, password = DEMO_PASSWORD) {
@@ -100,8 +108,20 @@ export async function setUpTwoFactor(page: Page, email: string) {
   return codes;
 }
 
+/** Go to a page by its English name, in any language: from the sidebar on computers, or on a
+ *  technician's phone from the bottom bar (or its More sheet). */
+export async function goTo(page: Page, name: string) {
+  const shown = page.locator(`.sidebarLink[data-page="${name}"]:visible, .bottomNav [data-page="${name}"]:visible`);
+  if (await shown.count()) {
+    await shown.first().click();
+  } else {
+    await page.locator('.bottomNav [data-page="more"]').click();
+    await page.locator(`.moreLinks [data-page="${name}"]`).click();
+  }
+}
+
 export async function openPage(page: Page, label: string) {
-  await page.locator(".sidebarLink", { hasText: label }).click();
+  await goTo(page, label);
   await expect(page.locator(".subPage h1")).toHaveText(label);
 }
 

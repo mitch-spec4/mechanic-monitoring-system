@@ -100,10 +100,10 @@ def send_password_reset(user):
 
 
 def send_invitation(invitation, inviter):
-    """In the inviter's language: the person invited has no account (or language) yet."""
+    """In the company's language: the person invited has no account (or language) yet."""
     company = db.session.get(Company, invitation.company_id)
     link = app_link("/join?" + urlencode({"code": invitation.code, "email": invitation.email}))
-    with speaking(inviter.language):
+    with speaking(company.language):
         expires = local_time(invitation.expires_at, company.timezone, with_time=False)
         paragraphs = [
             _("Hi {name},", name=invitation.customer_name),

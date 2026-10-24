@@ -4,9 +4,11 @@ import { usePricing, type Interval, type Plan, type Pricing } from "../component
 import { startDemo, type User } from "../services/api";
 import { errorMessage } from "../lib/format";
 import LanguagePicker from "../components/LanguagePicker";
+import LanguageSuggestion from "../components/LanguageSuggestion";
 import { mark, t } from "../i18n";
 import { Trans } from "../i18n/Trans";
 import "./Home.css";
+import { ForwardArrow } from "../components/Arrows";
 
 const SECTIONS = [
   ["features", mark("Features")],
@@ -362,7 +364,7 @@ export default function Home({ onDemo }: { onDemo: (user: User) => void }) {
           <p>{t("Manage jobs, technicians, equipment, parts, service history and customers without drowning in paperwork.")}</p>
           <div className="heroButtons">
             <button className="btn primary" onClick={() => go("/signup")}>
-              {t("Start now")} →
+              {t("Start now")} <ForwardArrow />
             </button>
             <button className="btn outline" onClick={() => setChoosing(true)}>
               {t("Try the demo")}
@@ -415,7 +417,13 @@ export default function Home({ onDemo }: { onDemo: (user: User) => void }) {
                   ))}
                 </ul>
                 <button className="roleTry" disabled={!!demo.opening} onClick={() => demo.open(role)}>
-                  {demo.opening === role ? t("Opening the demo…") : `${t("Try it as {role}", { role: t(label) })} →`}
+                  {demo.opening === role ? (
+                    t("Opening the demo…")
+                  ) : (
+                    <>
+                      {t("Try it as {role}", { role: t(label) })} <ForwardArrow />
+                    </>
+                  )}
                 </button>
               </article>
             ))}
@@ -488,7 +496,7 @@ export default function Home({ onDemo }: { onDemo: (user: User) => void }) {
             <h2>{t("Stop managing service work in spreadsheets.")}</h2>
             <p>{t("Bring your jobs, technicians, equipment and customers into one organized system.")}</p>
             <button className="btn primary" onClick={() => go("/signup")}>
-              {t("Create your account")} →
+              {t("Create your account")} <ForwardArrow />
             </button>
           </div>
         </div>
@@ -509,6 +517,7 @@ export default function Home({ onDemo }: { onDemo: (user: User) => void }) {
           <span>{t("Built for service teams.")}</span>
         </div>
       </footer>
+      <LanguageSuggestion />
     </div>
   );
 }

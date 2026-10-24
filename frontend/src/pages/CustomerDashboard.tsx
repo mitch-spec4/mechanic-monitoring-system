@@ -8,10 +8,11 @@ import { errorMessage } from "../lib/format";
 import { PRIORITIES, statusClass } from "../lib/labels";
 import { usePolling } from "../lib/usePolling";
 import { mark, t } from "../i18n";
+import Field from "../components/Field";
+import type { Job, Machine, Review, ServiceRecord, ServiceRequest } from "../services/types";
 
-// Lists from the API, read loosely: each panel uses a few fields.
-type Row = Record<string, any>;
-type ModalState = null | "request" | Row;
+// The request form, or the review form for one service visit.
+type ModalState = null | "request" | ServiceRecord;
 
 const FINISHED = ["Completed", "Cancelled"];
 const RATINGS: [number, string][] = [
@@ -23,11 +24,11 @@ const RATINGS: [number, string][] = [
 ];
 
 export default function CustomerDashboard({ u, onOpenJob }: { u: User; onOpenJob: (id: number) => void }) {
-  const [jobList, setJobList] = useState<Row[]>([]);
-  const [equipment, setEquipment] = useState<Row[]>([]);
-  const [records, setRecords] = useState<Row[]>([]);
-  const [reviewList, setReviewList] = useState<Row[]>([]);
-  const [requestList, setRequestList] = useState<Row[]>([]);
+  const [jobList, setJobList] = useState<Job[]>([]);
+  const [equipment, setEquipment] = useState<Machine[]>([]);
+  const [records, setRecords] = useState<ServiceRecord[]>([]);
+  const [reviewList, setReviewList] = useState<Review[]>([]);
+  const [requestList, setRequestList] = useState<ServiceRequest[]>([]);
   const [modal, setModalState] = useState<ModalState>(null);
   const [formError, setFormError] = useState("");
   const load = () =>
@@ -58,7 +59,7 @@ export default function CustomerDashboard({ u, onOpenJob }: { u: User; onOpenJob
     }
   };
   const openJobs = jobList.filter((x) => !FINISHED.includes(x.status));
-  const activeRequests = requestList.filter((x) => !FINISHED.includes(x.status)).length;
+  const activeRequests = requestList.filter((x) => !FINISHED.includes(x.status));
   return (
     <>
       <Header u={u} />
@@ -83,7 +84,7 @@ export default function CustomerDashboard({ u, onOpenJob }: { u: User; onOpenJob
           <div className="stat">
             <ClipboardList />
             <div>
-              <b>{activeRequests}</b>
+              <b>{activeRequests.length}</b>
               <span>{t("Active requests")}</span>
             </div>
           </div>
@@ -127,12 +128,12 @@ export default function CustomerDashboard({ u, onOpenJob }: { u: User; onOpenJob
           <section className="panel">
             <div className="panelHead">
               <h2>{t("Active requests")}</h2>
-              <span className="pill">{t("{count} open", { count: activeRequests })}</span>
+              <span className="pill">{t("{count} open", { count: activeRequests.length })}</span>
             </div>
-            {requestList.length === 0 ? (
+            {activeRequests.length === 0 ? (
               <p className="muted">{t("No active service requests.")}</p>
             ) : (
-              requestList.slice(0, 5).map((request) => (
+              activeRequests.slice(0, 5).map((request) => (
                 <div className="request" key={request.id}>
                   <div>
                     <b>{request.subject}</b>
@@ -174,7 +175,7 @@ export default function CustomerDashboard({ u, onOpenJob }: { u: User; onOpenJob
               <div className="record" key={x.id}>
                 <div>
                   {x.job_id ? (
-                    <button className="titleLink" onClick={() => onOpenJob(x.job_id)}>
+                    <button className="titleLink" onClick={() => x.job_id && onOpenJob(x.job_id)}>
                       <b>{x.service_type}</b>
                     </button>
                   ) : (
@@ -202,23 +203,31 @@ export default function CustomerDashboard({ u, onOpenJob }: { u: User; onOpenJob
           <form className="form" onSubmit={submit(createRequest, t("Request sent"))}>
             {formError && <div className="error">{formError}</div>}
             {equipment.length === 0 && <p className="muted">{t("No equipment is registered to your account yet. Ask your service company to add it.")}</p>}
-            <select name="machine_id" aria-label={t("Equipment")} required>
-              <option value="">{t("Select equipment")}</option>
-              {equipment.map((x) => (
-                <option key={x.id} value={x.id}>
-                  {x.name}
-                </option>
-              ))}
-            </select>
-            <input name="subject" placeholder={t("What do you need?")} aria-label={t("What do you need?")} required />
-            <textarea name="description" placeholder={t("Describe the issue")} aria-label={t("Describe the issue")} required />
-            <select name="priority" defaultValue="Medium" aria-label={t("Priority")}>
-              {PRIORITIES.map((priority) => (
-                <option key={priority} value={priority}>
-                  {t(priority)}
-                </option>
-              ))}
-            </select>
+            <Field label={t("Equipment")}>
+              <select name="machine_id" required>
+                <option value="">{t("Select equipment")}</option>
+                {equipment.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label={t("What do you need?")}>
+              <input name="subject" placeholder={t("What do you need?")} required />
+            </Field>
+            <Field label={t("Describe the issue")}>
+              <textarea name="description" placeholder={t("Describe the issue")} required />
+            </Field>
+            <Field label={t("Priority")}>
+              <select name="priority" defaultValue="Medium">
+                {PRIORITIES.map((priority) => (
+                  <option key={priority} value={priority}>
+                    {t(priority)}
+                  </option>
+                ))}
+              </select>
+            </Field>
             <button className="primary">{t("Send request")}</button>
           </form>
         </Modal>
@@ -228,15 +237,21 @@ export default function CustomerDashboard({ u, onOpenJob }: { u: User; onOpenJob
           <form className="form" onSubmit={submit(createReview, t("Thanks for your review"))}>
             {formError && <div className="error">{formError}</div>}
             <input type="hidden" name="service_record_id" value={modal.id} />
-            <select name="rating" aria-label={t("Rating")}>
-              {RATINGS.map(([stars, label]) => (
-                <option key={stars} value={stars}>
-                  {"★".repeat(stars)} {t(label)}
-                </option>
-              ))}
-            </select>
-            <textarea name="comment" placeholder={t("Tell us about the service")} aria-label={t("Tell us about the service")} />
-            <textarea name="advice" placeholder={t("Advice for the technician or company")} aria-label={t("Advice for the technician or company")} />
+            <Field label={t("Rating")}>
+              <select name="rating">
+                {RATINGS.map(([stars, label]) => (
+                  <option key={stars} value={stars}>
+                    {"★".repeat(stars)} {t(label)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label={t("Tell us about the service")} optional>
+              <textarea name="comment" placeholder={t("Tell us about the service")} />
+            </Field>
+            <Field label={t("Advice for the technician or company")} optional>
+              <textarea name="advice" placeholder={t("Advice for the technician or company")} />
+            </Field>
             <button className="primary">{t("Submit review")}</button>
           </form>
         </Modal>

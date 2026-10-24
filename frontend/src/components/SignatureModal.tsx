@@ -3,6 +3,7 @@ import { Check, CheckCircle2, Eraser, PenLine, Undo2, UserX, X } from "lucide-re
 import { errorMessage, formatDay } from "../lib/format";
 import { mark, t } from "../i18n";
 import "./SignatureModal.css";
+import Field from "./Field";
 
 export type SignOff = { signature: { name: string; image: string } } | { no_signature_reason: string };
 
@@ -276,10 +277,15 @@ export default function SignatureModal({ jobTitle, facts = [], onSubmit, onDone,
           {!absent ? (
             <>
               <p className="signHint">{t("Hand the phone to the customer to confirm the work.")}</p>
-              <label className="signField">
-                <span>{t("Name of the person signing")}</span>
-                <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder={t("e.g. {example}", { example: "Grace Wanjiru" })} disabled={busy} />
-              </label>
+              <Field wrap className="signField" label={<span>{t("Name of the person signing")}</span>}>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  autoComplete="name"
+                  placeholder={t("e.g. {example}", { example: "Grace Wanjiru" })}
+                  disabled={busy}
+                />
+              </Field>
               <div className={`signPaper ${hasInk ? "inked" : ""}`}>
                 <canvas
                   ref={canvas}
@@ -337,15 +343,14 @@ export default function SignatureModal({ jobTitle, facts = [], onSubmit, onDone,
             </>
           ) : (
             <>
-              <label className="signField">
-                <span>{t("Why couldn't the customer sign?")}</span>
+              <Field wrap className="signField" label={<span>{t("Why couldn't the customer sign?")}</span>}>
                 <textarea
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   placeholder={t("e.g. {example}", { example: t("Site manager had left; equipment handed over to security") })}
                   disabled={busy}
                 />
-              </label>
+              </Field>
               <div className="signReasons">
                 {REASONS.map((option) => (
                   <button key={option} type="button" className={reason === t(option) ? "active" : ""} onClick={() => setReason(t(option))} disabled={busy}>

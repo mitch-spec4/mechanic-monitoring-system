@@ -15,6 +15,10 @@ export default defineConfig({
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: "http://localhost:5173",
+    // The same clock and language everywhere: tests that need another set their own.
+    // (Africa/Nairobi would offer Kiswahili on first visits, see languages.spec.ts.)
+    timezoneId: "UTC",
+    locale: "en-US",
     screenshot: "only-on-failure",
     // A fixed phone position (Nairobi) with location allowed; location.spec.ts also tests it blocked.
     geolocation: { latitude: -1.2995, longitude: 36.79, accuracy: 20 },

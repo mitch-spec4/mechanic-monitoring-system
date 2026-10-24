@@ -82,7 +82,16 @@ export function ago(value: string, now = Date.now()) {
 // How far the company's zone is ahead of UTC at a moment, in milliseconds.
 function zoneOffset(moment: number) {
   const found = Object.fromEntries(
-    new Intl.DateTimeFormat("en-GB", { timeZone: zone, year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric", hourCycle: "h23" })
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: zone,
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+      second: "numeric",
+      hourCycle: "h23",
+    })
       .formatToParts(new Date(moment))
       .map((part) => [part.type, Number(part.value)]),
   );

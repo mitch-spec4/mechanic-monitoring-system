@@ -95,12 +95,12 @@
   z-index: -1;
   top: 4px;
   bottom: 4px;
-  left: 4px;
+  inset-inline-start: 4px;
   width: calc(50% - 4px);
   border-radius: 11px;
   background: #fff;
   box-shadow: 0 4px 12px -6px rgba(15, 29, 51, 0.4);
-  transform: translateX(calc(var(--pos) * 100%));
+  transform: translateX(calc(var(--pos) * 100% * var(--inline-direction)));
   transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .intervalSwitch button {
@@ -118,7 +118,7 @@
   font-style: normal;
   font-size: 11px;
   color: #168b4b;
-  margin-left: 4px;
+  margin-inline-start: 4px;
 }
 .planGrid {
   display: grid;
@@ -147,7 +147,7 @@
 .planBadge {
   position: absolute;
   top: -13px;
-  left: 50%;
+  left: 50%; /* physical: centred, the same in both directions */
   transform: translateX(-50%);
   padding: 5px 12px;
   border-radius: 999px;
@@ -241,7 +241,7 @@
   color: var(--role-color, #0969d7);
 }
 .meterHead b {
-  margin-left: auto;
+  margin-inline-start: auto;
   color: #0f1d33;
 }
 .meterTrack {
@@ -266,15 +266,17 @@
   font-size: 14px;
 }
 .paymentTable th {
-  text-align: left;
+  text-align: start;
   font-size: 12px;
   font-weight: 700;
   color: #64748b;
-  padding: 0 10px 8px 0;
+  padding-block: 0 8px;
+  padding-inline: 0 10px;
   border-bottom: 1px solid #e3e9f1;
 }
 .paymentTable td {
-  padding: 12px 10px 12px 0;
+  padding-block: 12px;
+  padding-inline: 0 10px;
   border-bottom: 1px solid #eef2f6;
 }
 .paidPill {

@@ -2,13 +2,14 @@ import { useState } from "react";
 import { MachineCard } from "../pages/CustomerPage";
 import { CreateJobModal } from "./JobForms";
 import { EditMachine } from "./MachineForms";
+import type { Customer, EquipmentSummary, Machine } from "../services/types";
 import { t } from "../i18n";
 import { EmptyState } from "./States";
 import { Wrench } from "lucide-react";
 
 type Props = {
-  machines: any[];
-  customers: any[];
+  machines: EquipmentSummary[];
+  customers: Customer[];
   query: string;
   onOpenJob?: (id: number) => void;
   onOpenCustomer?: (id: number) => void;
@@ -18,8 +19,8 @@ type Props = {
 /** Managers: all equipment under its customer, with a filter for the pieces needing work. */
 export default function MachinesByCustomer({ machines, customers, query, onOpenJob, onOpenCustomer, onChanged }: Props) {
   const [onlyNeedsWork, setOnlyNeedsWork] = useState(false);
-  const [creatingFor, setCreatingFor] = useState<any>(null);
-  const [editing, setEditing] = useState<any>(null);
+  const [creatingFor, setCreatingFor] = useState<Machine | null>(null);
+  const [editing, setEditing] = useState<Machine | null>(null);
   const needle = query.toLowerCase();
   const visible = machines.filter(
     (machine) => (!onlyNeedsWork || machine.needs_work) && JSON.stringify(machine).toLowerCase().includes(needle),

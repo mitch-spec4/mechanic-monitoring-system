@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { failOnPageErrors, signIn, signAndComplete } from "./helpers";
+import { failOnPageErrors, openPage, signIn, signAndComplete } from "./helpers";
 
 // PR 2 "done when": a mechanic fills a worksheet and completes a job; the boss sees the full history.
 test.describe.configure({ mode: "serial" });
@@ -56,7 +56,9 @@ test("mechanic fills in the worksheet and completes the job", async ({ page }) =
 
 test("boss sees the full history, parts and checklist", async ({ page }) => {
   await signIn(page, "james@mechanicpro.test");
-  await page.locator(".job", { hasText: "Service Generator G-102" }).locator(".titleLink").click();
+  // From the full list: the dashboard only shows the newest jobs.
+  await openPage(page, "Jobs / Requests");
+  await page.locator(".subPageList article", { hasText: "Service Generator G-102" }).locator(".titleLink").click();
   const sheet = page.locator(".jobPage");
   await expect(sheet.locator(".jobStatusPill")).toHaveText("Completed");
   const history = sheet.locator(".timeline");

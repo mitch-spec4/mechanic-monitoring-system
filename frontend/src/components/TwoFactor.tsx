@@ -6,6 +6,7 @@ import { Loading } from "./States";
 import { enableTwoFactor, renewBackupCodes, startTwoFactorSetup, twoFactorStatus, type User } from "../services/api";
 import { errorMessage } from "../lib/format";
 import { t } from "../i18n";
+import Field from "./Field";
 
 type SetupDetails = { setup_token: string; secret_grouped: string; otpauth_uri: string; qr_svg: string };
 
@@ -115,7 +116,7 @@ export function TwoFactorSetupSteps({ onEnabled }: { onEnabled: (user: User) => 
           {error}
         </div>
       )}
-      <ol className="setupSteps">
+      <ol className="twoFactorStepList">
         <li>
           <strong>{t("Install an authenticator app")}</strong>
           <span>{t("Google Authenticator, Microsoft Authenticator, or any app that shows 6-digit codes.")}</span>
@@ -138,8 +139,7 @@ export function TwoFactorSetupSteps({ onEnabled }: { onEnabled: (user: User) => 
           )}
         </li>
         <li>
-          <label>
-            <strong>{t("Type the 6-digit code the app shows")}</strong>
+          <Field wrap label={<strong>{t("Type the 6-digit code the app shows")}</strong>}>
             <input
               className="codeInput"
               value={code}
@@ -150,7 +150,7 @@ export function TwoFactorSetupSteps({ onEnabled }: { onEnabled: (user: User) => 
               maxLength={7}
               required
             />
-          </label>
+          </Field>
         </li>
       </ol>
       <button className="primary" disabled={busy || !details}>
@@ -292,8 +292,7 @@ function RenewBackupCodes({ onClose }: { onClose: () => void }) {
         <form className="form form-upgraded" onSubmit={submit}>
           <p>{t("Your old backup codes stop working once you make new ones.")}</p>
           {error && <div className="error">{error}</div>}
-          <div className="formGroup">
-            <label htmlFor="field-backup-password">{t("Current password")}</label>
+          <Field label={t("Current password")}>
             <input
               id="field-backup-password"
               type="password"
@@ -302,7 +301,7 @@ function RenewBackupCodes({ onClose }: { onClose: () => void }) {
               autoComplete="current-password"
               required
             />
-          </div>
+          </Field>
           <button className="primary" disabled={busy}>
             {t("Make new backup codes")}
           </button>

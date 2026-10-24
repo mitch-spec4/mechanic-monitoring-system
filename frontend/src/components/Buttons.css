@@ -88,7 +88,7 @@
   transition: transform 0.3s var(--btn-ease);
 }
 :is(.appShell, .login) :is(.primary, .primary-sm, .blueAction, .secondary):hover:not(:disabled) svg {
-  transform: translateX(2px);
+  transform: translateX(calc(2px * var(--inline-direction)));
 }
 :is(.appShell, .login) :is(.primary, .primary-sm, .blueAction, .secondary):hover:not(:disabled) svg.lucide-plus {
   transform: rotate(90deg) scale(1.1);
@@ -256,7 +256,7 @@
   background: none;
   color: inherit;
   font: inherit;
-  text-align: left;
+  text-align: start;
   cursor: pointer;
   background-image: linear-gradient(var(--btn), var(--btn));
   background-repeat: no-repeat;

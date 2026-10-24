@@ -1,8 +1,23 @@
 * {
   box-sizing: border-box;
 }
+/* Layouts use logical sides (inline-start/end), so they mirror in right-to-left languages.
+   Movement along the line that logical properties can't express (translateX) is multiplied
+   by --inline-direction: 1 left to right, -1 right to left. */
 :root {
   color-scheme: light;
+  --inline-direction: 1;
+}
+[dir="rtl"] {
+  --inline-direction: -1;
+}
+/* Icons and arrows that point along the line face the other way in right-to-left languages.
+   `scale` leaves `transform` free for hover effects. */
+[dir="rtl"] :is(.lucide-arrow-left, .lucide-arrow-right, .lucide-undo, .lucide-log-in, .lucide-log-out, .flipInRtl) {
+  scale: -1 1;
+}
+.flipInRtl {
+  display: inline-block;
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -146,7 +161,7 @@ header {
 }
 .iconBtn b {
   position: absolute;
-  right: -5px;
+  inset-inline-end: -5px;
   top: -5px;
   background: #e53935;
   color: white;
@@ -156,7 +171,7 @@ header {
 }
 .dropdown {
   position: absolute;
-  right: 0;
+  inset-inline-end: 0;
   top: 35px;
   width: 360px;
   background: white;
@@ -198,7 +213,7 @@ header {
 }
 .note button {
   position: absolute;
-  right: 6px;
+  inset-inline-end: 6px;
   top: 8px;
   border: 0;
   background: none;
@@ -658,7 +673,7 @@ header {
 }
 .customer-info {
   flex: 1;
-  text-align: left;
+  text-align: start;
 }
 .customer-info b {
   display: block;
@@ -1152,7 +1167,7 @@ body {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  margin-right: 4px;
+  margin-inline-end: 4px;
 }
 .legendCompleted {
   background: var(--role-color, #0969d7);
@@ -1457,7 +1472,7 @@ body {
 .skipLink {
   position: fixed;
   top: 8px;
-  left: 8px;
+  inset-inline-start: 8px;
   z-index: 1000;
   padding: 10px 14px;
   border: 0;
@@ -1529,25 +1544,25 @@ body {
   margin: 0;
   font-size: 18px;
 }
-.setupSteps {
+.twoFactorStepList {
   display: grid;
   gap: 16px;
   margin: 0;
   padding: 0;
   list-style: none;
-  counter-reset: setup;
+  counter-reset: twofactor;
 }
-.setupSteps > li {
+.twoFactorStepList > li {
   position: relative;
   display: grid;
   gap: 8px;
   padding-inline-start: 38px;
   font-size: 13px;
   color: #4b5a70;
-  counter-increment: setup;
+  counter-increment: twofactor;
 }
-.setupSteps > li::before {
-  content: counter(setup);
+.twoFactorStepList > li::before {
+  content: counter(twofactor);
   position: absolute;
   inset-inline-start: 0;
   top: -2px;
@@ -1561,11 +1576,11 @@ body {
   font-size: 13px;
   font-weight: 800;
 }
-.setupSteps strong {
+.twoFactorStepList strong {
   color: #172033;
   font-size: 14px;
 }
-.setupSteps label {
+.twoFactorStepList label {
   display: grid;
   gap: 8px;
 }
@@ -1724,3 +1739,69 @@ body {
   flex: 1 1 240px;
 }
 
+
+/* ---------- Offering Kiswahili on a first visit from East Africa ---------- */
+.languageSuggestion {
+  position: fixed;
+  inset-inline: 16px;
+  bottom: 16px;
+  z-index: 60;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 14px;
+  max-width: 620px;
+  margin-inline: auto;
+  padding-block: 14px;
+  padding-inline: 16px 44px;
+  border: 1px solid #c9dcf2;
+  border-radius: 16px;
+  background: #fff;
+  color: #172033;
+  box-shadow: 0 24px 60px -20px #0b1f3a73;
+  animation: profile-in 0.25s ease-out;
+}
+.languageSuggestion > svg {
+  flex: none;
+  color: #0969d7;
+}
+.languageSuggestion > div:first-of-type {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 220px;
+}
+.languageSuggestion strong {
+  font-size: 15px;
+}
+.languageSuggestion small {
+  color: #68768a;
+  font-size: 12px;
+}
+.languageSuggestionActions {
+  display: flex;
+  gap: 8px;
+}
+.languageSuggestionActions button {
+  white-space: nowrap;
+}
+.languageSuggestionClose {
+  position: absolute;
+  top: 8px;
+  inset-inline-end: 8px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #68768a;
+}
+.languageSuggestionClose:hover {
+  background: #eef3f9;
+}
+@media (prefers-reduced-motion: reduce) {
+  .languageSuggestion {
+    animation: none;
+  }
+}

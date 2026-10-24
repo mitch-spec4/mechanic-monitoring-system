@@ -1,32 +1,41 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { CheckCircle2, ClipboardList, FileText, MapPin, Star, Wrench } from "lucide-react";
+import { CalendarClock, CheckCircle2, ClipboardList, FileText, MapPin, Play, Star, Wrench } from "lucide-react";
 import { ApiError, jobs, machines, reviews as fetchReviews, services, type User } from "../services/api";
 import { ClockCard, changeJobStatus, useShift } from "../components/Shift";
 import SignatureModal, { type SignOff } from "../components/SignatureModal";
-import { errorMessage, formatDate, formatDay, greeting } from "../lib/format";
+import { errorMessage, formatDate, formatDay, greeting, toZoneInput } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
 import { t } from "../i18n";
 import { EmptyState } from "../components/States";
+import type { Job, Machine, Review as CustomerReview, ServiceRecord } from "../services/types";
 
 type Props = { u: User; onOpenJob: (id: number) => void };
-// Lists from the API, read loosely: each panel uses a few fields.
-type Row = Record<string, any>;
 
 const FINISHED = ["Completed", "Cancelled"];
+// Today's jobs come first: the one being worked on, then paused ones, then by due date.
+const TODAY_ORDER: Record<string, number> = { "In Progress": 0, Paused: 1 };
+
+/** Jobs for today: in progress, paused, or due today or earlier. */
+function todaysJobs(jobs: Job[]) {
+  const today = toZoneInput(new Date()).slice(0, 10);
+  return jobs
+    .filter((job) => job.status in TODAY_ORDER || (job.due_date && job.due_date <= today))
+    .sort((a, b) => (TODAY_ORDER[a.status] ?? 2) - (TODAY_ORDER[b.status] ?? 2) || String(a.due_date).localeCompare(String(b.due_date)));
+}
 
 export default function MechanicDashboard({ u, onOpenJob }: Props) {
-  const [jobList, setJobList] = useState<Row[]>([]);
-  const [serviceList, setServiceList] = useState<Row[]>([]);
-  const [machineList, setMachineList] = useState<Row[]>([]);
-  const [reviewList, setReviewList] = useState<Row[]>([]);
+  const [jobList, setJobList] = useState<Job[]>([]);
+  const [serviceList, setServiceList] = useState<ServiceRecord[]>([]);
+  const [machineList, setMachineList] = useState<Machine[]>([]);
+  const [reviewList, setReviewList] = useState<CustomerReview[]>([]);
   const [actionError, setActionError] = useState("");
   const load = () =>
     Promise.all([jobs(), services(), machines(), fetchReviews()])
       .then(([jobData, serviceData, machineData, reviewData]) => {
-        setJobList(jobData.jobs || []);
-        setServiceList(serviceData.records || []);
-        setMachineList(machineData.machines || []);
-        setReviewList(reviewData.reviews || []);
+        setJobList(jobData.jobs);
+        setServiceList(serviceData.records);
+        setMachineList(machineData.machines);
+        setReviewList(reviewData.reviews);
       })
       .catch(() => {});
   usePolling(load, 30000, true);
@@ -35,7 +44,7 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
   useEffect(() => setActionError(""), [shiftId]);
   const activeJobs = jobList.filter((job) => !FINISHED.includes(job.status));
   // Equipment this technician works on: from their jobs and their own service records.
-  const myMachineIds = new Set<number>([...jobList.map((job) => job.machine_id), ...serviceList.map((record) => record.machine_id)].filter(Boolean));
+  const myMachineIds = new Set([...jobList.map((job) => job.machine_id), ...serviceList.map((record) => record.machine_id)]);
   const myMachines = machineList.filter((item) => myMachineIds.has(item.id));
   const focusJob = activeJobs.find((job) => job.machine_id);
   const focusMachineId = focusJob?.machine_id ?? serviceList[0]?.machine_id;
@@ -43,13 +52,13 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
   const machineRecords = machine ? serviceList.filter((record) => record.machine_id === machine.id) : [];
   const completed = jobList.filter((job) => job.status === "Completed").length;
   const ratingAverage = reviewList.length
-    ? (reviewList.reduce((total, review) => total + Number(review.rating || 0), 0) / reviewList.length).toFixed(1)
+    ? (reviewList.reduce((total, review) => total + review.rating, 0) / reviewList.length).toFixed(1)
     : "—";
   const latestService = serviceList[0] || null;
   // Start, Resume and Complete wait for a GPS fix, so the job's buttons are disabled meanwhile.
   const [changing, setChanging] = useState<number | null>(null);
   // When the customer's sign-off is all that's missing, the server says so and we ask for it.
-  const [signing, setSigning] = useState<Row | null>(null);
+  const [signing, setSigning] = useState<Job | null>(null);
   const change = async (id: number, status: string) => {
     setActionError("");
     setChanging(id);
@@ -73,6 +82,7 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
         </div>
       </div>
       <ClockCard />
+      <TodaysJobs jobs={todaysJobs(activeJobs)} changing={changing} onChange={change} onOpenJob={onOpenJob} />
       <div className="kpiGrid">
         <Kpi icon={<FileText />} color="blue" number={activeJobs.length} label={t("Pending work")} detail={t("Needs attention")} />
         <Kpi icon={<CheckCircle2 />} color="green" number={completed} label={t("Completed")} detail={t("Total all time")} />
@@ -152,7 +162,7 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
         {signing && (
           <SignatureModal
             jobTitle={signing.title}
-            facts={[machineList.find((item) => item.id === signing.machine_id)?.name, signing.location].filter(Boolean)}
+            facts={[machineList.find((item) => item.id === signing.machine_id)?.name, signing.location].filter((fact): fact is string => Boolean(fact))}
             onSubmit={(signOff: SignOff) => changeJobStatus(signing.id, "Completed", "mechanic", signOff)}
             onDone={() => {
               setSigning(null);
@@ -194,6 +204,51 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
   );
 }
 
+type TodayProps = { jobs: Job[]; changing: number | null; onChange: (id: number, status: string) => void; onOpenJob: (id: number) => void };
+
+/** The day's work, one big button each: Open the job being worked on, Resume a paused one, or Start. */
+function TodaysJobs({ jobs, changing, onChange, onOpenJob }: TodayProps) {
+  const today = toZoneInput(new Date()).slice(0, 10);
+  return (
+    <section className="todayPanel" aria-labelledby="todays-jobs">
+      <div className="dashPanelTitle">
+        <h2 id="todays-jobs">
+          <CalendarClock size={14} /> {t("Today's jobs")}
+        </h2>
+        <span className="pendingCount">{jobs.length}</span>
+      </div>
+      {jobs.length === 0 ? (
+        <p className="todayEmpty">{t("Nothing due today. Your other jobs are below.")}</p>
+      ) : (
+        <ol className="todayList">
+          {jobs.map((job) => (
+            <li key={job.id} className="todayJob">
+              <div>
+                <strong>{job.title}</strong>
+                <small>
+                  <span className={`jobStatus ${String(job.status).replace(/ /g, "").toLowerCase()}`}>{t(job.status)}</span>
+                  {job.location || t("No site")}
+                  {job.due_date && job.due_date < today && <em className="overdue">{t("Overdue since {date}", { date: formatDate(job.due_date) })}</em>}
+                  {job.due_date === today && <em>{t("Due today")}</em>}
+                </small>
+              </div>
+              {job.status === "In Progress" ? (
+                <button className="primary todayAction" onClick={() => onOpenJob(job.id)}>
+                  <ClipboardList size={16} /> {t("Open")}
+                </button>
+              ) : (
+                <button className="primary todayAction" disabled={changing === job.id} onClick={() => onChange(job.id, "In Progress")}>
+                  <Play size={16} /> {job.status === "Paused" ? t("Resume") : t("Start work")}
+                </button>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
 function Kpi({ icon, color, number, label, detail }: { icon: ReactNode; color: string; number: ReactNode; label: string; detail: string }) {
   return (
     <div className={`kpi ${color}`}>
@@ -224,7 +279,7 @@ function Panel({ id, title, icon, children, className = "", action }: PanelProps
   );
 }
 
-function Schedule({ jobs, machines }: { jobs: Row[]; machines: Row[] }) {
+function Schedule({ jobs, machines }: { jobs: Job[]; machines: Machine[] }) {
   const scheduled = jobs.filter((job) => !FINISHED.includes(job.status)).slice(0, 4);
   if (!scheduled.length) return <p className="muted">{t("No active jobs are scheduled yet.")}</p>;
   return (
@@ -249,7 +304,7 @@ function Schedule({ jobs, machines }: { jobs: Row[]; machines: Row[] }) {
   );
 }
 
-function RecentWork({ jobs }: { jobs: Row[] }) {
+function RecentWork({ jobs }: { jobs: Job[] }) {
   const items = jobs.filter((job) => job.status === "Completed").slice(0, 4);
   if (!items.length) return <p className="muted">{t("Completed jobs will appear here.")}</p>;
   return (
@@ -268,7 +323,7 @@ function RecentWork({ jobs }: { jobs: Row[] }) {
   );
 }
 
-function MachineHistory({ machine, records }: { machine: Row | null; records: Row[] }) {
+function MachineHistory({ machine, records }: { machine: Machine | null; records: ServiceRecord[] }) {
   const items = records.slice(0, 4);
   return (
     <>
@@ -326,10 +381,10 @@ function MachineHistory({ machine, records }: { machine: Row | null; records: Ro
   );
 }
 
-function Review({ reviews }: { reviews: Row[] }) {
+function Review({ reviews }: { reviews: CustomerReview[] }) {
   const review = reviews[0];
   if (!review) return <p className="muted">{t("Customer feedback will appear here after a review is submitted.")}</p>;
-  const stars = Number(review.rating) || 0;
+  const stars = review.rating;
   return (
     <div className="reviewContent">
       <div className="stars">
@@ -340,7 +395,7 @@ function Review({ reviews }: { reviews: Row[] }) {
       <blockquote>{review.comment || t("No written comment was provided.")}</blockquote>
       {review.advice && (
         <>
-          <label>{t("Advice or request for the next visit")}</label>
+          <strong className="reviewAdviceLabel">{t("Advice or request for the next visit")}</strong>
           <p>{review.advice}</p>
         </>
       )}
@@ -348,7 +403,7 @@ function Review({ reviews }: { reviews: Row[] }) {
   );
 }
 
-function Advice({ service }: { service: Row | null }) {
+function Advice({ service }: { service: ServiceRecord | null }) {
   if (!service || (!service.advice && !service.solution)) {
     return <p className="muted">{t("Advice and follow-up notes will appear after a service record is saved.")}</p>;
   }

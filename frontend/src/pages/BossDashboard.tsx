@@ -24,39 +24,27 @@ import { errorMessage, formatDate, greeting } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
 import { PRIORITIES, REQUEST_STATUSES, statusClass } from "../lib/labels";
 import type { User } from "../services/api";
+import type { CustomerSummary, Job, Machine, Mechanic, ServiceRequest } from "../services/types";
 import { t } from "../i18n";
 import { PlanBanner } from "./BillingPage";
+import Field from "../components/Field";
 
 type Props = { u: User; onOpenJob: (id: number) => void; onOpenCustomer: (id: number) => void; onOpenBilling?: () => void; onUserChanged?: (user: User) => void };
-type Job = {
-  id: number;
-  title: string;
-  description: string;
-  status: string;
-  priority: string;
-  location?: string | null;
-  due_date?: string | null;
-  mechanic_id?: number | null;
-  customer_id?: number | null;
-  machine_id?: number | null;
-  job_type?: string | null;
-};
-type Person = { id: number; name: string; email: string };
 
 const FINISHED = ["Completed", "Cancelled"];
 
 export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBilling = () => {}, onUserChanged = () => {} }: Props) {
   const [data, setData] = useState<Job[]>([]);
-  const [cs, setCs] = useState<any[]>([]);
-  const [ms, setMs] = useState<Person[]>([]);
-  const [rs, setRs] = useState<any[]>([]);
-  const [machineList, setMachineList] = useState<any[]>([]);
+  const [cs, setCs] = useState<CustomerSummary[]>([]);
+  const [ms, setMs] = useState<Mechanic[]>([]);
+  const [rs, setRs] = useState<ServiceRequest[]>([]);
+  const [machineList, setMachineList] = useState<Machine[]>([]);
   const [modal, setModalState] = useState("");
   const [formError, setFormError] = useState("");
   const [notice, setNotice] = useState("");
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [jobTypes, setJobTypes] = useState<string[]>([]);
-  const [selectedMechanic, setSelectedMechanic] = useState<Person | null>(null);
+  const [selectedMechanic, setSelectedMechanic] = useState<Mechanic | null>(null);
   const load = () =>
     Promise.all([jobs(), customers(), mechanics(), requests(), machines(), checklists()])
       .then(([j, c, m, r, mc, cl]) => {
@@ -65,7 +53,7 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBill
         setMs(m.mechanics);
         setRs(r.requests);
         setMachineList(mc.machines);
-        setJobTypes(cl.checklists.map((template: { job_type: string }) => template.job_type));
+        setJobTypes(cl.checklists.map((template) => template.job_type));
       })
       .catch(() => {});
   usePolling(load, 30000);
@@ -252,30 +240,46 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenBill
             }}
           >
             {formError && <div className="error">{formError}</div>}
-            <input name="title" defaultValue={editingJob.title} placeholder={t("Job title")} aria-label={t("Job title")} required />
-            <textarea name="description" defaultValue={editingJob.description} placeholder={t("Problem / job description")} aria-label={t("Problem / job description")} required />
+            <Field label={t("Job title")}>
+              <input name="title" defaultValue={editingJob.title} placeholder={t("Job title")} required />
+            </Field>
+            <Field label={t("Problem / job description")}>
+              <textarea name="description" defaultValue={editingJob.description} placeholder={t("Problem / job description")} required />
+            </Field>
             <div className="row">
-              <select name="priority" defaultValue={editingJob.priority} aria-label={t("Priority")}>
-                {PRIORITIES.map((priority) => (
-                  <option key={priority} value={priority}>
-                    {t(priority)}
-                  </option>
-                ))}
-              </select>
-              <input name="location" defaultValue={editingJob.location || ""} placeholder={t("Site")} aria-label={t("Site")} />
-            </div>
-            <div className="row">
-              <select name="machine_id" defaultValue={editingJob.machine_id || ""} aria-label={t("Equipment")}>
-                <option value="">{t("No equipment")}</option>
-                {machineList
-                  .filter((m) => !editingJob.customer_id || m.customer_id === editingJob.customer_id)
-                  .map((m) => (
-                    <option key={m.id} value={m.id}>{m.name} ({m.serial_no})</option>
+              <Field label={t("Priority")}>
+                <select name="priority" defaultValue={editingJob.priority}>
+                  {PRIORITIES.map((priority) => (
+                    <option key={priority} value={priority}>
+                      {t(priority)}
+                    </option>
                   ))}
-              </select>
-              <input name="due_date" type="date" defaultValue={editingJob.due_date || ""} aria-label={t("Due date")} title={t("Due date")} />
+                </select>
+              </Field>
+              <Field label={t("Site")} optional>
+                <input name="location" defaultValue={editingJob.location || ""} placeholder={t("Site")} />
+              </Field>
             </div>
-            <JobTypeSelect types={jobTypes} value={editingJob.job_type} />
+            <div className="row">
+              <Field label={t("Equipment")}>
+                <select name="machine_id" defaultValue={editingJob.machine_id || ""}>
+                  <option value="">{t("No equipment")}</option>
+                  {machineList
+                    .filter((m) => !editingJob.customer_id || m.customer_id === editingJob.customer_id)
+                    .map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} ({m.serial_no})
+                      </option>
+                    ))}
+                </select>
+              </Field>
+              <Field label={t("Due date")} optional>
+                <input name="due_date" type="date" defaultValue={editingJob.due_date || ""} />
+              </Field>
+            </div>
+            <Field label={t("Job type")}>
+              <JobTypeSelect types={jobTypes} value={editingJob.job_type} />
+            </Field>
             <button className="primary">{t("Save changes")}</button>
           </form>
         </Modal>
@@ -349,7 +353,7 @@ const DELETABLE = ["Pending", "Assigned"];
 const CANCELLABLE = ["Pending", "Assigned", "Accepted", "In Progress", "Paused"];
 type JobProps = {
   j: Job;
-  mechanics: Person[];
+  mechanics: Mechanic[];
   onAssign: (id: number, mechanicId: number) => void;
   onDelete: (id: number) => void;
   onCancel: (id: number) => void;
@@ -372,7 +376,11 @@ function JobRow({ j, mechanics, onAssign, onDelete, onCancel, onEdit, onOpen }: 
           📍 {j.location || t("No site")} · {t("Due {date}", { date: formatDate(j.due_date) || t("Not set") })}
         </small>
       </div>
-      <select value={j.mechanic_id || ""} aria-label={t("Technician for {title}", { title: j.title })} onChange={(e) => e.target.value && onAssign(j.id, Number(e.target.value))}>
+      <select
+        value={j.mechanic_id || ""}
+        aria-label={t("Technician for {title}", { title: j.title })}
+        onChange={(e) => e.target.value && onAssign(j.id, Number(e.target.value))}
+      >
         <option value="">{t("Assign")}</option>
         {mechanics.map((m) => (
           <option key={m.id} value={m.id}>

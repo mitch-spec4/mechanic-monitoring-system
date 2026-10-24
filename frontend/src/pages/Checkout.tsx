@@ -1,18 +1,20 @@
 import { useEffect, useState } from "react";
 import { checkoutDetail, payTestCheckout, type User } from "../services/api";
+import type { Payment, Subscription } from "../services/types";
 import { go, money } from "../lib/route";
 import { errorMessage, formatDay } from "../lib/format";
 import { Trans } from "../i18n/Trans";
 import { t } from "../i18n";
 import { SiteNav } from "./Home";
 import "./Home.css";
+import Field from "../components/Field";
 
 type Props = { reference: string; user: User | null; onDone: () => void };
 
 /** The test payment provider's card page. No real card is charged in test mode. */
 export default function Checkout({ reference, user, onDone }: Props) {
-  const [detail, setDetail] = useState<any>(null);
-  const [subscription, setSubscription] = useState<any>(null);
+  const [detail, setDetail] = useState<{ payment: Payment; company: string; email: string } | null>(null);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -28,7 +30,7 @@ export default function Checkout({ reference, user, onDone }: Props) {
     setBusy(true);
     try {
       const result = await payTestCheckout(reference, outcome);
-      setDetail({ ...detail, payment: result.payment });
+      setDetail((current) => current && { ...current, payment: result.payment });
       setSubscription(result.subscription);
     } catch (problem) {
       setError(errorMessage(problem));
@@ -106,19 +108,16 @@ export default function Checkout({ reference, user, onDone }: Props) {
                 pay("success");
               }}
             >
-              <label>
-                {t("Card number")}
+              <Field wrap label={t("Card number")}>
                 <input defaultValue="4242 4242 4242 4242" inputMode="numeric" autoComplete="off" />
-              </label>
+              </Field>
               <div className="cardRow">
-                <label>
-                  {t("Expiry")}
+                <Field wrap label={t("Expiry")}>
                   <input defaultValue="12 / 34" autoComplete="off" />
-                </label>
-                <label>
-                  CVC
+                </Field>
+                <Field wrap label="CVC">
                   <input defaultValue="123" autoComplete="off" />
-                </label>
+                </Field>
               </div>
               <button className="btn primary wide" disabled={busy}>
                 <span aria-hidden="true">🔒</span> {busy ? t("Processing…") : t("Pay {amount}", { amount: money(payment.amount_cents, payment.currency) })}

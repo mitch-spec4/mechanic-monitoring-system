@@ -110,7 +110,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-left: auto;
+  margin-inline-start: auto;
   font-size: 13px;
   font-weight: 800;
   color: #172033;
@@ -221,6 +221,6 @@
     justify-content: flex-start;
   }
   .shiftTotal {
-    margin-left: 0;
+    margin-inline-start: 0;
   }
 }

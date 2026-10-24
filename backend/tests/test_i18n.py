@@ -89,14 +89,51 @@ def test_new_accounts_start_in_the_language_the_app_is_in(client):
 def test_company_settings(client, data, auth):
     boss = auth("boss@acme.test")
     settings = client.get("/api/company/settings", headers=boss).get_json()
-    assert settings["settings"] == {"timezone": "Africa/Nairobi", "currency": "KES", "units": "metric"}
+    assert settings["settings"] == {"timezone": "Africa/Nairobi", "currency": "KES", "units": "metric", "language": "en"}
     assert "Africa/Dar_es_Salaam" in settings["timezones"] and "TZS" in settings["currencies"]
-    changed = client.patch("/api/company/settings", headers=boss, json={"timezone": "Africa/Dar_es_Salaam", "currency": "TZS", "units": "imperial"})
-    assert changed.get_json()["settings"] == {"timezone": "Africa/Dar_es_Salaam", "currency": "TZS", "units": "imperial"}
+    assert settings["languages"] == [{"code": "en", "name": "English"}, {"code": "sw", "name": "Kiswahili"}]
+    changed = client.patch(
+        "/api/company/settings", headers=boss, json={"timezone": "Africa/Dar_es_Salaam", "currency": "TZS", "units": "imperial", "language": "sw"}
+    )
+    assert changed.get_json()["settings"] == {"timezone": "Africa/Dar_es_Salaam", "currency": "TZS", "units": "imperial", "language": "sw"}
     assert db.session.get(Company, data["acme"]).timezone == "Africa/Dar_es_Salaam"
     assert client.patch("/api/company/settings", headers=boss, json={"timezone": "Mars/Olympus"}).status_code == 400
     assert client.patch("/api/company/settings", headers=boss, json={"currency": "BTC"}).status_code == 400
+    assert client.patch("/api/company/settings", headers=boss, json={"language": "xx"}).status_code == 400
     assert client.get("/api/company/settings", headers=auth("mech@acme.test")).status_code == 403
+
+
+def test_invitations_are_written_in_the_company_language(app, client, data, auth):
+    """The person invited has no account yet, so the company's language is used, not the inviter's."""
+    app.extensions["email"].outbox.clear()
+    db.session.get(Company, data["acme"]).language = "sw"
+    db.session.commit()
+    client.post("/api/customers/invite", headers=auth("boss@acme.test"), json={"name": "Neema", "email": "neema@buyer.test"})
+    assert app.extensions["email"].outbox[-1]["Subject"] == "Boss One amekualika kwenye Acme Service katika MechanicPro"
+
+
+def test_new_members_start_in_the_company_language_unless_they_chose_one(client, data, auth):
+    db.session.get(Company, data["acme"]).language = "sw"
+    db.session.commit()
+    boss = auth("boss@acme.test")
+    joined = {}
+    for email, chosen in (("first@buyer.test", None), ("second@buyer.test", "en")):
+        code = client.post("/api/customers/invite", headers=boss, json={"name": "Member", "email": email}).get_json()["code"]
+        body = {"code": code, "name": "Member", "email": email, "password": "long-enough", "accept_terms": True}
+        if chosen:
+            body["language"] = chosen
+        assert client.post("/api/auth/accept-invitation", json=body).status_code == 201
+        joined[email] = User.query.filter_by(email=email).one().language
+    assert joined == {"first@buyer.test": "sw", "second@buyer.test": "en"}
+
+
+def test_a_new_company_starts_in_its_owners_language(client):
+    client.post(
+        "/api/signup",
+        json={"company_name": "Ziwa Motors", "name": "Baraka", "email": "baraka@ziwa.test", "password": "a-long-password", "accept_terms": True},
+        headers=SWAHILI,
+    )
+    assert Company.query.filter_by(name="Ziwa Motors").one().language == "sw"
 
 
 def test_times_are_shown_in_the_company_time_zone():

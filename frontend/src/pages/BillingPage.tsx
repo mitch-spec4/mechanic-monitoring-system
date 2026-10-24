@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { AlertTriangle, CreditCard, HardDrive, Receipt, Sparkles, Users } from "lucide-react";
-import { billing, startCheckout } from "../services/api";
+import { billing, startCheckout, type Billing } from "../services/api";
+import type { Subscription } from "../services/types";
 import { go, money } from "../lib/route";
 import { errorMessage, formatBytes, formatDay } from "../lib/format";
 import { IntervalSwitch, PlanCards, type Interval, type Plan } from "../components/Plans";
@@ -10,19 +11,9 @@ import { Loading } from "../components/States";
 
 const STATE_LABEL: Record<string, string> = { trialing: mark("Free trial"), active: mark("Active"), expired: mark("Ended") };
 
-type Subscription = {
-  plan: string;
-  plan_name: string;
-  interval: Interval;
-  state: "trialing" | "active" | "expired";
-  days_left: number;
-  trial_ends_at: string | null;
-  current_period_end: string | null;
-};
-
 function statusLine(subscription: Subscription) {
   if (subscription.state === "trialing")
-    return subscription.days_left === 1 ? t("1 day left in your free trial.") : t("{count} days left in your free trial.", { count: subscription.days_left });
+    return subscription.days_left === 1 ? t("1 day left in your free trial.") : t("{count} days left in your free trial.", { count: subscription.days_left ?? 0 });
   if (subscription.state === "expired")
     return subscription.trial_ends_at && !subscription.current_period_end
       ? t("Your free trial has ended. Choose a plan to keep adding jobs and inviting people.")
@@ -51,7 +42,7 @@ type Props = { focus?: { plan: string; interval: Interval } };
 /** The boss's plan, usage against its limits, choosing or renewing a plan, and past payments.
  * Coming from the homepage, the plan chosen there is picked out. */
 export default function BillingPage({ focus }: Props) {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<Billing | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [interval, setPeriod] = useState<Interval>(focus?.interval || "month");
@@ -184,7 +175,7 @@ export default function BillingPage({ focus }: Props) {
               </tr>
             </thead>
             <tbody>
-              {payments.map((payment: any) => (
+              {payments.map((payment) => (
                 <tr key={payment.reference}>
                   <td>{formatDay(payment.paid_at)}</td>
                   <td>

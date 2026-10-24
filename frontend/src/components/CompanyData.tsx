@@ -6,6 +6,7 @@ import { confirmAction, toast } from "./Feedback";
 import { EmptyState, Loading } from "./States";
 import { saveFile } from "./TwoFactor";
 import { mark, t } from "../i18n";
+import Field from "./Field";
 
 // The server logs short codes; each reader sees them in their own language.
 const ACTIONS: Record<string, string> = {
@@ -123,10 +124,9 @@ function ExportData() {
         )}
       </p>
       {error && <div className="error">{error}</div>}
-      <div className="formGroup">
-        <label htmlFor="field-export-password">{t("Current password")}</label>
+      <Field label={t("Current password")}>
         <input id="field-export-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required />
-      </div>
+      </Field>
       <button className="primary" disabled={busy}>
         <Download size={15} /> {busy ? t("Preparing your file…") : t("Download my data")}
       </button>
@@ -190,14 +190,12 @@ function DeleteCompany({ user, onUserChanged }: { user: User; onUserChanged: (us
         )}
       </p>
       {error && <div className="error">{error}</div>}
-      <div className="formGroup">
-        <label htmlFor="field-delete-name">{t("Type {company} to confirm", { company: companyName })}</label>
+      <Field label={t("Type {company} to confirm", { company: companyName })}>
         <input id="field-delete-name" value={typed} onChange={(event) => setTyped(event.target.value)} autoComplete="off" required />
-      </div>
-      <div className="formGroup">
-        <label htmlFor="field-delete-password">{t("Current password")}</label>
+      </Field>
+      <Field label={t("Current password")}>
         <input id="field-delete-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required />
-      </div>
+      </Field>
       <button className="dangerButton" disabled={busy || !companyName || typed.trim().toLowerCase() !== companyName.trim().toLowerCase()}>
         <Trash2 size={15} /> {t("Delete my company")}
       </button>

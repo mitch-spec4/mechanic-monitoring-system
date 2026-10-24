@@ -1,8 +1,27 @@
 import { useState } from "react";
-import { reports } from "../services/api";
+import { reports, type User } from "../services/api";
+import type { Report, Role } from "../services/types";
 import { usePolling } from "../lib/usePolling";
 import { mark, t } from "../i18n";
-import { BarChart3, Bell, ClipboardList, Clock, Cog, CreditCard, FileText, Gauge, HelpCircle, History, ListChecks, Map as MapIcon, MessageSquare, Star, UserRound, Users, Wrench } from "lucide-react";
+import {
+  BarChart3,
+  Bell,
+  ClipboardList,
+  Clock,
+  Cog,
+  CreditCard,
+  FileText,
+  Gauge,
+  HelpCircle,
+  History,
+  ListChecks,
+  Map as MapIcon,
+  MessageSquare,
+  Star,
+  UserRound,
+  Users,
+  Wrench,
+} from "lucide-react";
 
 function BellIcon() {
   return <Bell size={16} />;
@@ -49,23 +68,37 @@ const utilityLinks = [
   [Cog, mark("Settings")],
   [HelpCircle, mark("Help & Support")],
 ] as const;
-export const ROLE_NAMES: Record<string, string> = { boss: mark("Boss"), mechanic: mark("Technician"), customer: mark("Customer") };
+export const ROLE_NAMES: Record<Role, string> = { boss: mark("Boss"), mechanic: mark("Technician"), customer: mark("Customer") };
 
-type Stats = { jobs: { completed: number }; totals?: Record<string, number>; rating?: number | null };
-
-function sidebarRows(role: string, stats: Stats): [string, number][] {
-  const totals = stats.totals || {};
-  if (role === "customer") return [[t("Services completed"), stats.jobs.completed], [t("Equipment"), totals.machines ?? 0], [t("Open requests"), totals.open_requests ?? 0]];
-  if (role === "mechanic") return [[t("Jobs completed"), stats.jobs.completed], [t("Customers served"), totals.customers ?? 0], [t("Equipment serviced"), totals.machines ?? 0]];
-  return [[t("Jobs completed"), stats.jobs.completed], [t("Customers"), totals.customers ?? 0], [t("Equipment"), totals.machines ?? 0]];
+function sidebarRows(role: Role, stats: Report): [string, number][] {
+  const { totals } = stats;
+  if (role === "customer") {
+    return [
+      [t("Services completed"), stats.jobs.completed],
+      [t("Equipment"), totals.machines ?? 0],
+      [t("Open requests"), totals.open_requests ?? 0],
+    ];
+  }
+  if (role === "mechanic") {
+    return [
+      [t("Jobs completed"), stats.jobs.completed],
+      [t("Customers served"), totals.customers ?? 0],
+      [t("Equipment serviced"), totals.machines ?? 0],
+    ];
+  }
+  return [
+    [t("Jobs completed"), stats.jobs.completed],
+    [t("Customers"), totals.customers ?? 0],
+    [t("Equipment"), totals.machines ?? 0],
+  ];
 }
 
-type SidebarProps = { user: any; active: string; onNavigate: (label: string) => void };
+type SidebarProps = { user: User; active: string; onNavigate: (label: string) => void };
 
 export default function Sidebar({ user, active, onNavigate }: SidebarProps) {
-  const [stats, setStats] = useState<Stats | null>(null);
+  const [stats, setStats] = useState<Report | null>(null);
   usePolling(() => reports().then(setStats).catch(() => {}), 60000, true);
-  const visibleLinks = [...commonLinks, ...(roleLinks[user.role as keyof typeof roleLinks] || roleLinks.customer), ...utilityLinks];
+  const visibleLinks = [...commonLinks, ...roleLinks[user.role], ...utilityLinks];
   const select = (label: string) => {
     if (label === "Profile") document.querySelector<HTMLButtonElement>(".profileTrigger")?.click();
     else onNavigate(label);
@@ -85,6 +118,7 @@ export default function Sidebar({ user, active, onNavigate }: SidebarProps) {
           <button
             className={`sidebarLink ${active === label ? "active" : ""}`}
             key={label}
+            data-page={label}
             onClick={() => select(label)}
             aria-current={active === label ? "page" : undefined}
             title={t(label)}
@@ -98,7 +132,7 @@ export default function Sidebar({ user, active, onNavigate }: SidebarProps) {
         <span className="sidebarAvatar">{user.name[0].toUpperCase()}</span>
         <div>
           <strong>{user.name}</strong>
-          <small>{t(ROLE_NAMES[user.role] ?? user.role)}</small>
+          <small>{t(ROLE_NAMES[user.role])}</small>
         </div>
         {stats?.rating != null && <span className="sidebarRating">★ {stats.rating.toFixed(1)}</span>}
         {stats && (

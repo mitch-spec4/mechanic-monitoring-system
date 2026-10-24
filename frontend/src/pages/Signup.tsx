@@ -5,9 +5,12 @@ import { usePricing, type Interval } from "../components/Plans";
 import { PeriodToggle, SiteNav } from "./Home";
 import { errorMessage } from "../lib/format";
 import LanguagePicker from "../components/LanguagePicker";
+import LanguageSuggestion from "../components/LanguageSuggestion";
 import { TermsAgreement } from "../components/Legal";
 import { t } from "../i18n";
 import "./Home.css";
+import Field from "../components/Field";
+import { ForwardArrow } from "../components/Arrows";
 
 type Props = { query: URLSearchParams; onSignedIn: (user: User, checkoutUrl?: string) => void };
 type Busy = "" | "creating" | "checkout";
@@ -69,22 +72,18 @@ export default function Signup({ query, onSignedIn }: Props) {
             </div>
           )}
           {failed && <div className="error">{t("Plans couldn't be loaded. Refresh the page to try again.")}</div>}
-          <label>
-            {t("Company name")}
+          <Field wrap label={t("Company name")}>
             <input {...field("company_name")} required maxLength={150} placeholder={t("e.g. {example}", { example: "Rift Valley Power Services" })} />
-          </label>
-          <label>
-            {t("Your name")}
+          </Field>
+          <Field wrap label={t("Your name")}>
             <input {...field("name")} required maxLength={120} autoComplete="name" />
-          </label>
-          <label>
-            {t("Work email")}
+          </Field>
+          <Field wrap label={t("Work email")}>
             <input {...field("email")} type="email" required autoComplete="email" />
-          </label>
-          <label>
-            {t("Password")}
+          </Field>
+          <Field wrap label={t("Password")}>
             <input {...field("password")} type="password" required minLength={8} autoComplete="new-password" placeholder={t("At least 8 characters")} />
-          </label>
+          </Field>
           {pricing && (
             <>
               <fieldset className="planPicker">
@@ -105,7 +104,13 @@ export default function Signup({ query, onSignedIn }: Props) {
           )}
           <TermsAgreement checked={agreed} onChange={setAgreed} />
           <button className="btn primary wide" disabled={!!busy || !chosen}>
-            {busy === "creating" ? t("Creating your account…") : `${t("Start {days}-day free trial", { days: trialDays })} →`}
+            {busy === "creating" ? (
+              t("Creating your account…")
+            ) : (
+              <>
+                {t("Start {days}-day free trial", { days: trialDays })} <ForwardArrow />
+              </>
+            )}
           </button>
           {pricing?.payment_provider && (
             <button type="button" className="btn outline wide" disabled={!!busy} onClick={(event) => event.currentTarget.form?.reportValidity() && submit(true)}>
@@ -143,6 +148,7 @@ export default function Signup({ query, onSignedIn }: Props) {
           </aside>
         )}
       </main>
+      <LanguageSuggestion />
     </div>
   );
 }
