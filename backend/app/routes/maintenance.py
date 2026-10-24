@@ -1,4 +1,4 @@
-"""The daily clean-up and the day's booking reminders, for a scheduler (Vercel Cron, a host's cron job...) to call once a day.
+"""The daily clean-up, the day's reminders and plan renewals, for a scheduler (Vercel Cron, a host's cron job...) to call once a day.
 
 GET or POST /api/cron/daily with the header "Authorization: Bearer <CRON_SECRET>". Without a
 CRON_SECRET the URL doesn't exist; the same jobs also run as `flask` commands.
@@ -9,6 +9,7 @@ from flask import Blueprint, abort, current_app, jsonify, request
 
 from app import db
 from app.services.audit import purge_old_events
+from app.services.billing import renew_due
 from app.services.booking import send_reminders
 from app.services.equipment import send_due_reminders
 from app.services.company_data import delete_due_companies
@@ -33,6 +34,8 @@ def run_daily():
     # Planned maintenance coming due: its job and the reminders (app/services/equipment.py).
     removed["maintenance"] = send_due_reminders()
     db.session.commit()
+    # Plans: renewals with the saved card, and reminders of trials and plans ending (commits).
+    removed["billing"] = renew_due()
     # Companies whose 30 days after "Delete my company" are up (commits each one).
     removed["deleted_companies"] = delete_due_companies()
     return removed

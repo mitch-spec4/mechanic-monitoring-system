@@ -5,6 +5,7 @@ from flask import Blueprint, jsonify, request
 from app import db
 from app.models.company import Company
 from app.models.user import User
+from app.services.billing import require_feature
 from app.services.equipment import company_today, written_date
 from app.services.notifications import notify
 from app.services.routing import apply_order, plan_day
@@ -32,6 +33,7 @@ def plan():
     """The suggested order of a technician's jobs for a day (?mechanic_id=&date=), with the drive
     it saves against the order they're in now."""
     user = current_user()
+    require_feature(user.company_id, "routes")
     company = db.session.get(Company, user.company_id)
     person = technician(company.id, integer(request.args, "mechanic_id", "Technician", required=True))
     return jsonify(plan=plan_day(company, person, day_asked(company, request.args)))
@@ -42,6 +44,7 @@ def plan():
 def save():
     """Save an order for the day ({mechanic_id, date, job_ids}): the technician's list follows it."""
     user = current_user()
+    require_feature(user.company_id, "routes")
     company = db.session.get(Company, user.company_id)
     data = json_body()
     person = technician(company.id, integer(data, "mechanic_id", "Technician", required=True))
@@ -73,5 +76,6 @@ def save():
 def mine():
     """A technician's own route for a day: the saved order, with where each stop is."""
     user = current_user()
+    require_feature(user.company_id, "routes")
     company = db.session.get(Company, user.company_id)
     return jsonify(plan=plan_day(company, user, day_asked(company, request.args)))

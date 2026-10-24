@@ -351,23 +351,41 @@ export type Subscription = {
   plan: string;
   plan_name: string;
   interval: "month" | "year";
-  state: "trialing" | "active" | "expired";
+  /** Technicians bought on top of the plan's own. */
+  extra_mechanics: number;
+  /** past_due: the paid period is over and its renewal unpaid, within the grace days. */
+  state: "trialing" | "active" | "past_due" | "expired";
   trial_ends_at: string | null;
   current_period_end: string | null;
   days_left: number | null;
+  /** Off once the manager cancels: the plan then ends with its paid period. */
+  auto_renew: boolean;
+  /** The saved card or wallet renewals charge, e.g. "Visa •••• 4081". */
+  payment_method: string | null;
+  /** A renewal is unpaid (declined, or nothing saved to charge): pay by grace_ends_at. */
+  payment_problem: boolean;
+  grace_ends_at: string | null;
 };
+
+/** What a plan can include beyond the basics (see backend/app/services/plans.py). */
+export type Feature = "insights" | "maintenance" | "routes" | "costing";
 
 export type Payment = {
   reference: string;
+  /** checkout (the manager paid) or renewal (the saved card was charged). */
+  kind: "checkout" | "renewal";
   plan: string;
   plan_name: string;
   interval: "month" | "year";
+  extra_mechanics: number;
   amount_cents: number;
   currency: string;
   provider: string;
-  status: string;
+  status: "pending" | "paid" | "failed";
+  failure_reason: string | null;
   created_at: string;
   paid_at: string | null;
+  failed_at: string | null;
 };
 
 export type Usage = { mechanics: number; mechanic_limit: number | null; storage_bytes: number; storage_limit_bytes: number | null };
@@ -399,8 +417,17 @@ export type SetupStepKey = "verify" | "customer" | "machine" | "mechanic" | "job
 export type SetupStepState = { key: SetupStepKey; done: boolean; waiting?: boolean };
 
 export type Interval = "month" | "year";
-export type Plan = { key: string; name: string; mechanics: number; storage_gb: number; prices: Record<Interval, number> };
-export type Pricing = { plans: Plan[]; currency: string; trial_days: number; yearly_months: number; payment_provider: string | null };
+export type Plan = { key: string; name: string; mechanics: number; storage_gb: number; features: Feature[]; prices: Record<Interval, number> };
+export type Pricing = {
+  plans: Plan[];
+  currency: string;
+  trial_days: number;
+  yearly_months: number;
+  /** Each technician beyond a plan's own, a month (a year costs yearly_months of it). */
+  extra_mechanic_cents: number;
+  max_extra_mechanics: number;
+  payment_provider: string | null;
+};
 
 /** Where a page of a long list sits. */
 export type Paging = { page: number; per_page: number; total: number; pages: number };
@@ -434,7 +461,7 @@ export type Insights = {
   by_type: { job_type: string; count: number }[];
   technicians: TechnicianInsight[];
   repeat_faults: { machine_id: number; name: string; equipment_type: string | null; customer: string | null; faults: number; last_fault: string | null }[];
-  /** The completed jobs' costing, in cents. */
+  /** The completed jobs' costing, in cents (null on plans without job costing). */
   money: {
     currency: string;
     labour_cents: number;
@@ -444,7 +471,7 @@ export type Insights = {
     charged_cents: number;
     margin_cents: number | null;
     incomplete_jobs: number;
-  };
+  } | null;
 };
 
 /** What a job cost and made (managers only), in cents of the company's currency. */

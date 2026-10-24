@@ -6,7 +6,7 @@ Built with React + TypeScript (Vite) on the frontend and Flask, SQLAlchemy, Alem
 
 ## Features
 
-- **A public homepage with plans.** Companies sign up themselves and start a 14-day free trial; plans (Starter, Professional and Business, priced in Kenyan shillings) set how many technicians and how much storage they get. Payment runs in test mode until a real payment provider is connected.
+- **A public homepage with plans.** Companies sign up themselves and start a 14-day free trial; plans (Starter, Professional and Business, priced in Kenyan shillings) set how many technicians and how much storage they get, and which extras: insights and planned maintenance from Professional, route planning and job costing on Business. Extra technicians can be added to any plan. Paid plans renew with the saved card; a failed payment gets 7 days' grace before new work waits, and nothing is ever deleted. Payment runs in test mode (the app's own test checkout, or Paystack's test mode for cards and M-Pesa) until live payments are switched on. See [SETUP.md](SETUP.md#plans-and-payments).
 - **Role-based dashboards** for managers (boss), technicians and customers, with every query scoped to the user's company.
 - **Invite-only team accounts.** Managers issue single-use invitation codes for their technicians and customers that expire after 7 days.
 - **A job workflow with enforced statuses:** Pending → Assigned → Accepted → In Progress ⇄ Paused → Completed. Technicians can't decline or cancel jobs.

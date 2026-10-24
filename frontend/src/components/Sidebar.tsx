@@ -3,6 +3,8 @@ import { reports, type User } from "../services/api";
 import type { Report, Role } from "../services/types";
 import { usePolling } from "../lib/usePolling";
 import { mark, t } from "../i18n";
+import { can } from "../lib/plan";
+import type { Feature } from "../services/types";
 import {
   BarChart3,
   Bell,
@@ -16,6 +18,7 @@ import {
   HelpCircle,
   History,
   ListChecks,
+  Lock,
   Map as MapIcon,
   MessageSquare,
   Route as RouteIcon,
@@ -72,6 +75,8 @@ const utilityLinks = [
   [Cog, mark("Settings")],
   [HelpCircle, mark("Help & Support")],
 ] as const;
+// Pages that need a feature the plan may not include: they show a lock, and an upgrade card when opened.
+const PAGE_FEATURES: Record<string, Feature> = { Routes: "routes" };
 export const ROLE_NAMES: Record<Role, string> = { boss: mark("Boss"), mechanic: mark("Technician"), customer: mark("Customer") };
 
 function sidebarRows(role: Role, stats: Report): [string, number][] {
@@ -130,6 +135,7 @@ export default function Sidebar({ user, active, onNavigate }: SidebarProps) {
           >
             <Icon size={16} />
             <span>{t(label)}</span>
+            {label in PAGE_FEATURES && !can(user, PAGE_FEATURES[label]) && <Lock size={12} className="sidebarLock" aria-label={t("Not on your plan")} />}
           </button>
         ))}
       </nav>

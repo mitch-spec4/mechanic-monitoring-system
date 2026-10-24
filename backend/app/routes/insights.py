@@ -7,6 +7,7 @@ from flask import Blueprint, jsonify, request, send_file
 from app import db
 from app.models.company import Company
 from app.services import audit
+from app.services.billing import has_feature, require_feature
 from app.services.equipment import company_today
 from app.services.insights import MAX_DAYS, insights
 from app.services.insights_export import to_pdf, to_xlsx
@@ -25,6 +26,7 @@ FORMATS = {
 
 def report_for(user):
     """The range asked for (?start=&end=, both days in the company's zone), or the last 30 days."""
+    require_feature(user.company_id, "insights")
     company = db.session.get(Company, user.company_id)
     today = company_today(company)
     end = iso_date(request.args, "end", "To") or today
@@ -33,7 +35,11 @@ def report_for(user):
         raise ValidationError(_("The start date must be on or before the end date."))
     if (end - start).days + 1 > MAX_DAYS:
         raise ValidationError(_("Choose at most {days} days.", days=MAX_DAYS))
-    return company, insights(company, start, end)
+    data = insights(company, start, end)
+    # What jobs cost and made is on plans with job costing.
+    if not has_feature(company.id, "costing"):
+        data["money"] = None
+    return company, data
 
 
 @bp.get("")

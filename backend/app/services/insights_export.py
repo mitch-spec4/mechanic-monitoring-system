@@ -48,7 +48,7 @@ def amount(cents_value, currency):
 
 def summary_rows(data):
     jobs, hours, money = data["jobs"], data["hours"], data["money"]
-    return [
+    rows = [
         (_("Jobs created"), jobs["created"]),
         (_("Jobs completed"), jobs["completed"]),
         (_("Jobs cancelled"), jobs["cancelled"]),
@@ -58,10 +58,15 @@ def summary_rows(data):
         (_("Hours clocked in"), hours["clocked"]),
         (_("Hours on jobs"), hours["on_jobs"]),
         (_("Equipment with a repeat fault"), len(data["repeat_faults"])),
-        (_("Cost of completed jobs"), amount(money["cost_cents"], money["currency"])),
-        (_("Charged for {count} of them", count=money["charged_jobs"]), amount(money["charged_cents"], money["currency"])),
-        (_("Margin on the jobs charged"), amount(money["margin_cents"], money["currency"])),
     ]
+    # Money only on plans with job costing.
+    if money:
+        rows += [
+            (_("Cost of completed jobs"), amount(money["cost_cents"], money["currency"])),
+            (_("Charged for {count} of them", count=money["charged_jobs"]), amount(money["charged_cents"], money["currency"])),
+            (_("Margin on the jobs charged"), amount(money["margin_cents"], money["currency"])),
+        ]
+    return rows
 
 
 def technician_headings():
@@ -114,11 +119,13 @@ def to_xlsx(data, company):
     def local(moment):
         return moment.replace(tzinfo=timezone.utc).astimezone(zone).replace(tzinfo=None)
 
+    money = data["money"] is not None
     completed = sheet(
         _("Completed jobs"),
         [
             _("Job"), _("Title"), _("Customer"), _("Equipment"), _("Technician"), _("Job type"), _("Created"), _("Completed"),
-            _("Hours to complete"), _("Hours worked"), _("Labour cost"), _("Parts cost"), _("Charged"), _("Margin"),
+            _("Hours to complete"), _("Hours worked"),
+            *([_("Labour cost"), _("Parts cost"), _("Charged"), _("Margin")] if money else []),
         ],
         [
             [
@@ -134,7 +141,7 @@ def to_xlsx(data, company):
                 round(item["hours_worked"], 1),
                 *[
                     item["costing"][key] / 100 if item["costing"][key] is not None else None
-                    for key in ("labour_cents", "parts_cents", "charged_cents", "margin_cents")
+                    for key in (("labour_cents", "parts_cents", "charged_cents", "margin_cents") if money else ())
                 ],
             ]
             for item in data["_completed_jobs"]
@@ -145,7 +152,7 @@ def to_xlsx(data, company):
         for cell in completed[column][1:]:
             cell.number_format = "yyyy-mm-dd hh:mm"
     # Money in the company's currency, as numbers Excel can add up.
-    for column in ("K", "L", "M", "N"):
+    for column in ("K", "L", "M", "N") if money else ():
         for cell in completed[column][1:]:
             cell.number_format = "#,##0.00"
 

@@ -14,6 +14,12 @@ export function go(target: string) {
   window.scrollTo({ top: 0 });
 }
 
+/** A checkout: the test provider's page in this app ("#/checkout/..."), or a real provider's site. */
+export function openCheckout(url: string) {
+  if (url.startsWith("#")) go(url);
+  else window.location.assign(url);
+}
+
 export function useRoute() {
   const [route, setRoute] = useState(readRoute);
   useEffect(() => {

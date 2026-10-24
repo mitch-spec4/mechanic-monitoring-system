@@ -15,7 +15,7 @@ from app.models.user import User
 from app.routes.machines import out as machine_out
 from app.routes.services import out as record_out
 from app.services import equipment
-from app.services.billing import check_storage
+from app.services.billing import check_storage, require_feature
 from app.services.storage import storage
 from app.services.sync import happened_at
 from app.utils.auth import current_user, roles
@@ -294,6 +294,7 @@ def boss_plan(pid):
 @roles("boss")
 def create_plan(mid):
     user = current_user()
+    require_feature(user.company_id, "maintenance")
     machine = visible_machine(mid)
     plan = MaintenancePlan(company_id=machine.company_id, machine_id=machine.id, **read_plan(json_body()))
     db.session.add(plan)
@@ -306,6 +307,7 @@ def create_plan(mid):
 def update_plan(pid):
     """Change a plan, or mark it done without a job (done outside the app): `done_on`."""
     user = current_user()
+    require_feature(user.company_id, "maintenance")
     plan = boss_plan(pid)
     data = json_body()
     for key, value in read_plan(data, plan).items():
@@ -339,6 +341,7 @@ def delete_plan(pid):
 def create_plan_job(pid):
     """The job for the next due date, now rather than when it comes due."""
     user = current_user()
+    require_feature(user.company_id, "maintenance")
     plan = boss_plan(pid)
     if equipment.open_job(plan):
         raise ValidationError(_("This plan already has a job that isn't finished."), 409)

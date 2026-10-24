@@ -22,6 +22,7 @@ from app.models.job import Job
 from app.models.machine import Machine
 from app.models.service_record import ServiceRecord
 from app.models.user import User
+from app.services.billing import has_feature
 from app.services.email import app_link, layout, send_email
 from app.services.notifications import notify
 from app.services.worksheet import record_event
@@ -174,6 +175,9 @@ def send_due_reminders(now=None):
     sent = {"maintenance_jobs": 0, "service_due_reminders": 0}
     for plan in MaintenancePlan.query.filter(MaintenancePlan.active.is_(True)).all():
         company = db.session.get(Company, plan.company_id)
+        # Plans wait while the company's plan doesn't include planned maintenance.
+        if not has_feature(company.id, "maintenance"):
+            continue
         today = (now.replace(tzinfo=timezone.utc).astimezone(ZoneInfo(company.timezone)).date()) if now else company_today(company)
         if plan_state(plan, today) not in ("due", "overdue") or plan.reminded_for == plan.next_due:
             continue

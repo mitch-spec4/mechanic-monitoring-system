@@ -142,7 +142,7 @@ export default function Insights({ onOpenMachine }: { onOpenMachine?: (id: numbe
               note={t("Equipment fixed twice or more in 90 days")}
               warn={data.repeat_faults.length > 0}
             />
-            <MarginTile money={data.money} />
+            {data.money && <MarginTile money={data.money} />}
           </div>
 
           <div className="insightsGrid">
@@ -170,7 +170,7 @@ function Tile({ icon, label, value, note, warn }: { icon: ReactNode; label: stri
 }
 
 /** What the completed jobs made: what was charged less labour (hours × pay rate) and parts. */
-function MarginTile({ money: totals }: { money: Data["money"] }) {
+function MarginTile({ money: totals }: { money: NonNullable<Data["money"]> }) {
   const value = totals.margin_cents == null ? "–" : money(totals.margin_cents, totals.currency);
   const note =
     totals.charged_jobs === 0

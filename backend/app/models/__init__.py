@@ -13,5 +13,5 @@ from app.models.security import AuditEvent, AuthAttempt, BackupCode, PasswordRes
 from app.models.worksheet import ChecklistTemplate, ChecklistTemplateItem, JobChecklistItem, JobEvent, JobPart, WorkEntry
 from app.models.location import LocationPoint, Shift
 from app.models.media import JobFile
-from app.models.billing import Payment, Subscription
+from app.models.billing import BillingEvent, Payment, Subscription
 from app.models.sync import ClientRequest

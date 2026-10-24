@@ -225,7 +225,8 @@ All backend settings live in `backend/.env` (see `backend/.env.example`).
 | `MAX_PHOTO_MB` / `MAX_VIDEO_MB` | `10` / `50` | Largest photo and video accepted |
 | `MAX_DOCUMENT_MB` | `25` | Largest equipment document (manual, certificate) accepted |
 | `MAX_VIDEO_SECONDS` | `60` | Longest video the phone will upload |
-| `BILLING_PROVIDER` | `test` | Leave unset: `none` (free trials only). `test` is refused in production. See [Plans and payments](#plans-and-payments) |
+| `BILLING_PROVIDER` | `test` | Leave unset: `none` (free trials only). `test` is refused in production; `paystack` takes test keys only. See [Plans and payments](#plans-and-payments) |
+| `PAYSTACK_SECRET_KEY` | | With `paystack`: the **test** secret key (`sk_test_...`) from the Paystack dashboard |
 | `APP_URL` | the first `CORS_ORIGINS` entry | **Required**: your site's `https://` address. Links in emails point here |
 | `EMAIL_BACKEND` | `log` (emails are written to the log) | `smtp` (the default, and required). See [Email](#email) |
 | `EMAIL_FROM` | `MechanicPro <no-reply@mechanicpro.test>` | **Required**, e.g. `MechanicPro <no-reply@yourdomain.com>`, on a domain your provider has verified |
@@ -276,10 +277,10 @@ If sending fails, the request still succeeds and the error is logged: signup car
 
 ## Daily clean-up
 
-Once a day, six things should be cleared away: demo companies whose 24 hours are up, uploads that were started but never finished, live positions older than 30 days, activity-log entries older than 12 months, the IDs of changes sent from phones' offline queues more than 30 days ago, and companies whose 30 days after a deletion request are up (with all their files). The same run sends the booking reminders: for visits today or tomorrow (in the company's time zone) not reminded yet, for repairs not booked 3 days after the inspection, and the follow-up a day after the work is done. It also creates the jobs for maintenance plans coming due, with their reminders. Each is sent once. Either:
+Once a day, six things should be cleared away: demo companies whose 24 hours are up, uploads that were started but never finished, live positions older than 30 days, activity-log entries older than 12 months, the IDs of changes sent from phones' offline queues more than 30 days ago, and companies whose 30 days after a deletion request are up (with all their files). The same run sends the booking reminders: for visits today or tomorrow (in the company's time zone) not reminded yet, for repairs not booked 3 days after the inspection, and the follow-up a day after the work is done. It also creates the jobs for maintenance plans coming due, with their reminders, and renews paid plans ending within a day with the saved card (see [Plans and payments](#plans-and-payments)), with reminders of trials and cancelled plans ending soon. Each is sent once. Either:
 
 - call `GET /api/cron/daily` with the header `Authorization: Bearer <CRON_SECRET>` from your host's scheduler (Vercel Cron sends exactly this header when `CRON_SECRET` is set), or
-- run `flask --app run.py purge-demos`, `purge-uploads`, `purge-locations`, `purge-activity`, `purge-sync-requests`, `delete-due-companies`, `send-reminders` and `send-service-due` from cron.
+- run `flask --app run.py purge-demos`, `purge-uploads`, `purge-locations`, `purge-activity`, `purge-sync-requests`, `delete-due-companies`, `send-reminders`, `send-service-due` and `renew-plans` from cron.
 
 Run it in the morning, company time, so "tomorrow's visit" reminders arrive the day before.
 
@@ -319,24 +320,44 @@ Photos in a format the phone's browser can't open (for example HEIC in most brow
 
 ## Plans and payments
 
-The homepage (`/`) shows the plans; **Get started** (or **Choose** on a plan) creates a new company with its owner as the manager. Plans and prices are set in `backend/app/services/plans.py`, in Kenyan shillings; the homepage, signup and checkout all read them from there:
+The homepage (`/`) shows the plans; **Get started** (or **Choose** on a plan) creates a new company with its owner as the manager. Plans, prices and what each plan includes are set in `backend/app/services/plans.py`, in Kenyan shillings; the homepage, signup, Billing and checkout all read them from there:
 
-| Plan | Monthly | Yearly | Technicians | Storage |
-| --- | --- | --- | --- | --- |
-| Starter | KSh 1,500 | KSh 15,000 | 3 | 2 GB |
-| Professional | KSh 4,500 | KSh 45,000 | 10 | 20 GB |
-| Business | KSh 12,000 | KSh 120,000 | 30 | 100 GB |
+| Plan | Monthly | Yearly | Technicians | Storage | Also includes |
+| --- | --- | --- | --- | --- | --- |
+| Starter | KSh 1,500 | KSh 15,000 | 3 | 2 GB | Everything else in the app |
+| Professional | KSh 4,500 | KSh 45,000 | 10 | 20 GB | Insights and exports; planned maintenance and reminders |
+| Business | KSh 12,000 | KSh 120,000 | 30 | 100 GB | Also route planning; job costing and margins |
 
-Yearly billing charges ten months (two months free). Today every plan includes every feature that's built; plans differ in team size and storage. The extra features the homepage lists for Professional and Business are marked **Planned** until they exist (their wording is in `frontend/src/pages/Home.tsx`). Every new company starts with a 14-day free trial; no card is needed. During the trial and once paid, the plan's limits apply: inviting a technician is refused once the team (plus open invitations) reaches the limit, and uploads are refused once storage is full. When a trial or paid period runs out, nothing is deleted and work in progress carries on, but creating jobs and inviting people waits until the manager pays under **Billing**. Companies created before plans existed get the Business plan with no end date.
+**Extra technicians**, on any plan, are KSh 500 a month each (KSh 5,000 a year), chosen on Billing before paying. Yearly billing charges ten months (two months free).
 
-Payment goes through a provider set by `BILLING_PROVIDER`:
+**What every plan includes**: jobs, worksheets (time, parts, checklists, notes), equipment and customers, photos, videos, the customer's sign-off and PDF reports, clock-in and the team map, customer requests with booking and chat, offline mode, two languages, and everything in Settings.
 
-- **`test`** (the default in development) shows the app's own checkout page with a test card. No real money is taken, and the server refuses to start with it in production.
+**Features a plan doesn't include** are locked for that company: the API refuses them (403, saying which plan has it), the sidebar shows a lock, and the page shows what it is with a **See plans** button. Nothing already made is lost by moving to a smaller plan: existing maintenance plans stay listed but stop creating jobs; costs, pay rates and planned routes stay saved, out of view. A smaller plan must still fit the team (technicians plus open invitations) and the files, or checkout says what to change. Companies created before plans existed have no limits and every feature.
+
+**Trials.** Every new company starts with a 14-day free trial of the plan it chose; no card is needed. Managers see the days left in a banner on every page, and get a reminder (in the app and by email) three days before it ends.
+
+**Renewals.** Paying saves the card or wallet with the payment provider (the app stores only the provider's token and "Visa •••• 4081"). A day before a paid period ends, the daily run (`flask --app run.py renew-plans`, or `/api/cron/daily`) charges it for the next period and emails a receipt. If the charge is declined, it's retried once a day (three tries in all), and the managers get a notification and an email. With no saved card, they're asked to pay under **Billing**.
+
+**When payment fails or a plan is cancelled.** After an unpaid period ends, everything keeps working for 7 more days (the banner says until when). After that the company is limited like an ended trial: work in progress carries on (technicians finish jobs, customers sign), but creating jobs and inviting people waits until a plan is paid. Nothing is deleted. **Cancel renewal** on Billing stops renewals; the plan then ends with its paid period, without the 7 days. **Turn renewal back on** undoes it before then.
+
+### Payment providers
+
+Payment goes through a provider set by `BILLING_PROVIDER`, behind one interface in `backend/app/services/billing.py` (start a checkout, charge the saved card, confirm a checkout, read webhooks). Whatever a provider reports becomes a "paid", "failed", "cancelled" or "plan changed" event, handled the same way for every provider, and each webhook event counts once however often it's resent.
+
+- **`test`** (the default in development) shows the app's own checkout page with test cards: one that pays, **Try a declined card**, and **Pay with a card that will decline at renewal**. On Billing, **Renew now (test)** charges the saved test card straight away, to try a renewal (or a failed one) without waiting a month. No real money is taken, and the server refuses to start with it in production.
+- **`paystack`**: [Paystack](https://paystack.com), for cards and M-Pesa in Kenyan shillings. **Test keys only**: the server refuses to start with a live key (`sk_live_...`) until live payments are deliberately switched on.
 - **`none`** (the default in production) turns online payment off, so companies can only start free trials.
 
-A real provider (for example Paystack or Flutterwave for cards and mobile money in Kenya, or Paddle) needs an account in your name and API keys. It plugs in behind the same interface in `backend/app/services/billing.py`; that's planned work (PR 13 in the plan), together with renewals and receipts by email.
+To try Paystack in test mode:
 
-To try it locally: open http://localhost:5173, choose a plan, and sign up with a new email. **Pay now and skip the trial** goes to the test checkout; **Try a declined card** shows what happens when a card fails.
+1. Create a Paystack account. Test mode works at once; live payments need Paystack to approve your business, so check that it accepts businesses in your country (it lists Kenya among its countries).
+2. In the Paystack dashboard, **Settings → API Keys & Webhooks**: copy the **test secret key** into `PAYSTACK_SECRET_KEY`, and set `BILLING_PROVIDER=paystack`.
+3. Set the **test webhook URL** to `https://<your API>/api/billing/webhooks/paystack`. Paystack signs each webhook with your secret key; the app refuses any that isn't signed. Locally, Paystack can't reach `localhost`: payments still complete when the manager comes back from Paystack's page (the app asks Paystack how it went), but renewals declined after the fact need the webhook.
+4. Pay from **Billing** with one of Paystack's [test cards](https://paystack.com/docs/payments/test-payments/) or test mobile money numbers.
+
+Before switching to live payments: confirm Paystack (or another provider) accepts your business, agree the fees, and **ask an accountant about VAT and receipts** for selling subscriptions in Kenya. The app's receipts are payment confirmations, not tax invoices. Another provider (Flutterwave, Paddle, Lemon Squeezy...) plugs in by implementing the same four methods.
+
+To try it locally with the test provider: open http://localhost:5173, choose a plan, and sign up with a new email. **Pay now and skip the trial** goes to the test checkout; **Try a declined card** shows what happens when a card fails.
 
 ## Offline mode and the installable app
 

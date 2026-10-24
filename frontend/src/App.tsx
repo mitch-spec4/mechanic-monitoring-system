@@ -13,7 +13,7 @@ import Home from "./pages/Home";
 import Signup from "./pages/Signup";
 import Checkout from "./pages/Checkout";
 import BillingPage from "./pages/BillingPage";
-import { go, readRoute, useRoute } from "./lib/route";
+import { go, openCheckout, readRoute, useRoute } from "./lib/route";
 import type { Interval } from "./components/Plans";
 import Profile from "./components/Profile";
 import Sidebar from "./components/Sidebar";
@@ -27,6 +27,7 @@ import { startOffline, stopOffline, unsynced } from "./offline";
 import { LegalPage } from "./components/Legal";
 import TwoFactorSetupPage from "./components/TwoFactor";
 import { DeletionBanner } from "./components/CompanyData";
+import PlanBanner from "./components/PlanBanner";
 import { clearSession, logout as endSession, me, saveSession, SESSION_EXPIRED_EVENT, TWO_FACTOR_SETUP_EVENT, type User } from "./services/api";
 import { setCurrency, setTimeZone, setUnits } from "./lib/format";
 import { LANGUAGE_CHANGED_EVENT, setLanguage, t } from "./i18n";
@@ -46,7 +47,7 @@ export default function App() {
 }
 
 // Links into the signed-in app, sent in emails.
-const APP_LINK = /^\/(requests\/\d+|equipment\/\d+|messages)$/;
+const APP_LINK = /^\/(requests\/\d+|equipment\/\d+|messages|billing)$/;
 
 function storedUser(): User | null {
   try {
@@ -89,6 +90,8 @@ function Screens() {
   // The customer whose chat Messages opens on (managers).
   const [chatCustomerId, setChatCustomerId] = useState<number | null>(null);
   const [billingFocus, setBillingFocus] = useState<{ plan: string; interval: Interval }>();
+  // Back from the payment provider's page ("/billing?paid=<reference>"): the payment to confirm.
+  const [paidReference, setPaidReference] = useState<string>();
   const route = useRoute();
   const navigate = (label: string) => {
     setOpenJobId(null);
@@ -188,12 +191,18 @@ function Screens() {
     go(next.startsWith("/checkout/") ? next : APP_LINK.test(route.path) ? route.path : "/");
   };
 
-  // Links from emails: "/requests/12" opens that request, "/equipment/4" that equipment, "/messages" the chat.
+  // Links from emails: "/requests/12" opens that request, "/equipment/4" that equipment, "/messages"
+  // the chat, "/billing" (managers) the Billing page.
   useEffect(() => {
     if (!user || !APP_LINK.test(route.path)) return;
     const request = /^\/requests\/(\d+)$/.exec(route.path);
     const machine = /^\/equipment\/(\d+)$/.exec(route.path);
-    if (request) openRequest(Number(request[1]));
+    if (route.path === "/billing") {
+      if (user.role === "boss") {
+        navigate("Billing");
+        setPaidReference(route.query.get("paid") || undefined);
+      }
+    } else if (request) openRequest(Number(request[1]));
     else if (machine) {
       navigate("Dashboard");
       openMachine(Number(machine[1]));
@@ -211,6 +220,14 @@ function Screens() {
     window.addEventListener(SESSION_EXPIRED_EVENT, expired);
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, expired);
   }, []);
+
+  // The saved profile is brought up to date once a session starts (the plan may have changed).
+  useEffect(() => {
+    if (!user) return;
+    me()
+      .then((data) => updateUser(data.user))
+      .catch(() => {});
+  }, [user?.id]);
 
   // The server asked for two-step sign-in to be set up first (e.g. a manager reset it): reload
   // the profile, which brings up the setup screen.
@@ -275,7 +292,8 @@ function Screens() {
           onSignedIn={(newUser, checkoutUrl) => {
             saveSession(newUser);
             signedIn(newUser);
-            go(checkoutUrl || "/");
+            if (checkoutUrl) openCheckout(checkoutUrl);
+            else go("/");
           }}
         />
       );
@@ -315,7 +333,7 @@ function Screens() {
       onOpenMessages={openMessages}
     />
   ) : active === "Billing" && user.role === "boss" ? (
-    <BillingPage focus={billingFocus} />
+    <BillingPage focus={billingFocus} paid={paidReference} onUserChanged={updateUser} />
   ) : active !== "Dashboard" && active !== "Profile" ? (
     <WorkspacePage
       title={active}
@@ -333,7 +351,6 @@ function Screens() {
       onOpenJob={openJob}
       onOpenCustomer={openCustomer}
       onOpenRequest={openRequest}
-      onOpenBilling={() => navigate("Billing")}
       onUserChanged={updateUser}
     />
   ) : user.role === "mechanic" ? (
@@ -355,6 +372,7 @@ function Screens() {
           <Profile user={user} onLogout={logout} />
         </div>
         <DeletionBanner user={user} onUserChanged={updateUser} />
+        {user.role === "boss" && active !== "Billing" && <PlanBanner subscription={user.subscription} />}
         {user.role === "mechanic" && <LocationIndicator />}
         {user.role === "mechanic" && <SyncPill />}
         <UpdateBanner />

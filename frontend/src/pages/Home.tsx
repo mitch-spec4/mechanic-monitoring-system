@@ -81,18 +81,17 @@ const PLAN_COPY: Record<string, { desc: string; team: string; features: string[]
   professional: {
     desc: mark("Organize the work across a growing team."),
     team: mark("Growing teams"),
-    features: [mark("Everything in Starter")],
-    planned: [mark("Custom statuses and fields"), mark("Reminders and approvals"), mark("Workload and job timelines"), mark("More detailed dashboard analytics")],
+    features: [mark("Everything in Starter"), mark("Insights with Excel and PDF exports"), mark("Planned maintenance and reminders")],
+    planned: [mark("Custom statuses and fields"), mark("Approvals"), mark("Workload and job timelines")],
     best: mark("Teams ready for more structure and fewer manual follow-ups."),
   },
   business: {
     desc: mark("Run a larger operation, with room to grow."),
     team: mark("Larger operations"),
-    features: [mark("Everything in Professional")],
+    features: [mark("Everything in Professional"), mark("Route planning for each technician's day"), mark("Job costing and margins")],
     planned: [
       mark("Branch, team and technician views"),
       mark("Bulk actions and saved views"),
-      mark("Costing and operational analytics"),
       mark("Advanced roles and permissions"),
       mark("Escalations and assignment rules"),
     ],
@@ -110,10 +109,15 @@ const COMPARE: [string, (plan: Plan) => string][] = [
   [mark("Technician app, checklists & parts"), () => "Included"],
   [mark("Photos, sign-off & PDF reports"), () => "Included"],
   [mark("Team map, shifts & reviews"), () => "Included"],
+  [mark("Customer requests, booking & chat"), () => "Included"],
+  // What a plan includes comes from the server (backend/app/services/plans.py).
+  [mark("Insights & Excel/PDF exports"), (plan) => (plan.features.includes("insights") ? "Included" : "—")],
+  [mark("Planned maintenance & reminders"), (plan) => (plan.features.includes("maintenance") ? "Included" : "—")],
+  [mark("Route planning"), (plan) => (plan.features.includes("routes") ? "Included" : "—")],
+  [mark("Job costing & margins"), (plan) => (plan.features.includes("costing") ? "Included" : "—")],
   [mark("Custom statuses & fields"), (plan) => (plan.key === "starter" ? "—" : "Planned")],
-  [mark("Reminders & approvals"), (plan) => (plan.key === "starter" ? "—" : "Planned")],
-  [mark("Integrations"), (plan) => (plan.key === "starter" ? "—" : "Planned")],
-  [mark("Branches, roles & costing"), (plan) => (plan.key === "business" ? "Planned" : "—")],
+  [mark("Approvals & integrations"), (plan) => (plan.key === "starter" ? "—" : "Planned")],
+  [mark("Branches & advanced roles"), (plan) => (plan.key === "business" ? "Planned" : "—")],
 ];
 
 const scrollToSection = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -479,7 +483,8 @@ export default function Home({ onDemo }: { onDemo: (user: User) => void }) {
                 {t(
                   "Prices in Kenyan shillings. Every plan starts with a {days}-day free trial, no card needed. When a trial ends nothing is deleted, and jobs in progress can still be finished. Planned features are on the way and not available yet.",
                   { days: trialDays },
-                )}
+                )}{" "}
+                {t("More technicians can be added to any plan for {price} a month each.", { price: money(pricing.extra_mechanic_cents, pricing.currency) })}
                 {pricing.payment_provider === "test" && ` ${t("Payments on this server are in test mode: no real money is taken.")}`}
                 {!pricing.payment_provider && ` ${t("Online payment isn't switched on yet, so every company starts on the free trial.")}`}
               </p>

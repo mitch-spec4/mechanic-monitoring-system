@@ -143,9 +143,10 @@ def build_config():
         "ROUTING_PROVIDER": os.getenv("ROUTING_PROVIDER", "openrouteservice").strip().lower(),
         "ROUTING_API_KEY": os.getenv("ROUTING_API_KEY", "").strip(),
         "ROUTE_AVERAGE_KMH": float(os.getenv("ROUTE_AVERAGE_KMH", "25")),
-        # Taking payment for plans: "test" (a pretend card page, development only) or "none"
-        # (free trials only) until a real provider is connected. See SETUP.md.
+        # Taking payment for plans: "test" (a pretend card page, development only), "paystack"
+        # (test keys only for now) or "none" (free trials only). See SETUP.md.
         "BILLING_PROVIDER": os.getenv("BILLING_PROVIDER", "none" if is_production else "test").strip().lower(),
+        "PAYSTACK_SECRET_KEY": os.getenv("PAYSTACK_SECRET_KEY", "").strip(),
         # Two-step sign-in for everyone (demo copies excepted). Only the API tests turn it off.
         "TWO_FACTOR_REQUIRED": os.getenv("TWO_FACTOR_REQUIRED", "1") != "0" or is_production,
         # Sessions live in httpOnly cookies (unreadable by page scripts), with CSRF protection
@@ -316,6 +317,15 @@ def create_app(overrides=None):
         sent = send_due_reminders()
         db.session.commit()
         print(f"Created {sent['maintenance_jobs']} maintenance job(s) and sent {sent['service_due_reminders']} service-due reminder(s).")
+
+    @app.cli.command("renew-plans")
+    def renew_plans():
+        """Charge saved cards for plans ending within a day, and remind managers of trials and
+        plans ending soon (run daily)."""
+        from app.services.billing import renew_due
+
+        done = renew_due()
+        print(f"Renewed {done['charged']} plan(s); {done['failed']} payment(s) failed; sent {done['reminded']} reminder(s).")
 
     @app.cli.command("purge-activity")
     def purge_activity():

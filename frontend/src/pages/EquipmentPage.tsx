@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { apiUrl, createPlan, createPlanJob, deleteDocument, deletePlan, machineDetail, updatePlan, uploadDocument, type User } from "../services/api";
 import type { EquipmentDetail, MaintenancePlan } from "../services/types";
+import { can } from "../lib/plan";
+import PlanLocked from "../components/PlanLocked";
 import { confirmAction, toast } from "../components/Feedback";
 import { EditMachine } from "../components/MachineForms";
 import Modal from "../components/Modal";
@@ -157,7 +159,7 @@ export default function EquipmentPage({ machineId, user, onBack, onOpenJob, onOp
       )}
 
       <div className="jobGrid">
-        {(machine.can_edit || machine.plans.length > 0) && <PlansCard machine={machine} onChanged={setMachine} onOpenJob={onOpenJob} openable={openable} />}
+        {(machine.can_edit || machine.plans.length > 0) && <PlansCard machine={machine} user={user} onChanged={setMachine} onOpenJob={onOpenJob} openable={openable} />}
         <DocumentsCard machine={machine} user={user} onChanged={setMachine} />
         {machine.faults.length > 0 && (
           <section className="jobCard">
@@ -299,13 +301,16 @@ function BackButton({ onBack }: { onBack: () => void }) {
 
 type PlansProps = {
   machine: EquipmentDetail;
+  user: User;
   onChanged: (machine: EquipmentDetail) => void;
   onOpenJob: (id: number) => void;
   openable: Set<number>;
 };
 
 /** Service it needs on a schedule. The daily run creates each job ahead of its due date; a manager can create it early. */
-function PlansCard({ machine, onChanged, onOpenJob, openable }: PlansProps) {
+function PlansCard({ machine, user, onChanged, onOpenJob, openable }: PlansProps) {
+  // On plans without planned maintenance, plans made before stay listed, paused.
+  const editable = machine.can_edit && can(user, "maintenance");
   const [editing, setEditing] = useState<MaintenancePlan | "new" | null>(null);
   const [doneFor, setDoneFor] = useState<MaintenancePlan | null>(null);
   const [busy, setBusy] = useState(false);
@@ -326,14 +331,15 @@ function PlansCard({ machine, onChanged, onOpenJob, openable }: PlansProps) {
         <h2>
           <CalendarClock size={16} /> {t("Maintenance plan")}
         </h2>
-        {machine.can_edit && (
+        {editable && (
           <button className="primary-sm" onClick={() => setEditing("new")}>
             <Plus size={14} /> {t("Add plan")}
           </button>
         )}
       </div>
+      {machine.can_edit && !editable && <PlanLocked feature="maintenance" user={user} compact />}
       {machine.plans.length === 0 ? (
-        <p className="muted jobEmpty">{t("No planned maintenance. Add a plan, and its job is created ahead of each due date.")}</p>
+        editable && <p className="muted jobEmpty">{t("No planned maintenance. Add a plan, and its job is created ahead of each due date.")}</p>
       ) : (
         <ul className="planList">
           {machine.plans.map((plan) => (
@@ -370,7 +376,7 @@ function PlansCard({ machine, onChanged, onOpenJob, openable }: PlansProps) {
                   )}
                 </p>
               )}
-              {machine.can_edit && (
+              {editable && (
                 <div className="machineCardActions">
                   {!plan.open_job_id && plan.active && (
                     <button className="listAction" disabled={busy} onClick={() => jobNow(plan)}>
