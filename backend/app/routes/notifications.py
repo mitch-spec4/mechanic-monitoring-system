@@ -1,8 +1,9 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 
 from app import db
 from app.models.notification import Notification
 from app.utils.auth import current_user, roles
+from app.utils.pages import listing, searched
 
 bp = Blueprint("notifications", __name__)
 
@@ -21,13 +22,11 @@ def out(notification):
 @bp.get("")
 @roles("boss", "mechanic", "customer")
 def notifications():
-    rows = (
-        Notification.query.filter_by(user_id=current_user().id)
-        .order_by(Notification.id.desc())
-        .limit(100)
-        .all()
-    )
-    return jsonify(notifications=[out(row) for row in rows])
+    query = searched(Notification.query.filter_by(user_id=current_user().id), [Notification.title, Notification.message]).order_by(Notification.id.desc())
+    # The bell shows the newest 100; the Notifications page goes back page by page.
+    if "page" not in request.args:
+        query = query.limit(100)
+    return listing(query, "notifications", out)
 
 
 @bp.patch("/read-all")

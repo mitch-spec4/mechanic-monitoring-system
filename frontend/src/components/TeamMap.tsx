@@ -4,7 +4,7 @@ import "leaflet/dist/leaflet.css";
 import { MapPin } from "lucide-react";
 import { teamLocations } from "../services/api";
 import type { TeamMember } from "../services/types";
-import { ago, errorMessage, formatDistance } from "../lib/format";
+import { ago, asDate, errorMessage, formatDistance, formatTime } from "../lib/format";
 import { mapLink } from "../lib/location";
 import { usePolling } from "../lib/usePolling";
 import { mark, t } from "../i18n";
@@ -18,6 +18,11 @@ const SEEN: Record<string, string> = {
   job_complete: mark("Seen {ago} completing a job"),
   live: mark("Seen {ago} while working"),
 };
+// How often the map asks again, and when a position counts as old (the phone stopped sending).
+const REFRESH_MS = 15_000;
+const STALE_MINUTES = 15;
+const isStale = (recordedAt: string, now: number) => now - asDate(recordedAt).getTime() > STALE_MINUTES * 60_000;
+
 // Letters and digits only: initials go into the marker's HTML.
 const initials = (name: string) =>
   name
@@ -33,10 +38,12 @@ const textNode = (text: string) => {
   return span;
 };
 
-/** Managers: the last known position of every clocked-in technician. */
+/** Managers: the last known position of every clocked-in technician, kept up to date every 15 seconds.
+ *  A position older than 15 minutes is faded: the technician's phone has stopped sending. */
 export default function TeamMap({ onOpenJob }: { onOpenJob?: (id: number) => void }) {
   const [team, setTeam] = useState<TeamMember[] | null>(null);
   const [error, setError] = useState("");
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const holder = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const layer = useRef<L.LayerGroup | null>(null);
@@ -47,10 +54,11 @@ export default function TeamMap({ onOpenJob }: { onOpenJob?: (id: number) => voi
       teamLocations()
         .then((data) => {
           setTeam(data.team);
+          setUpdatedAt(new Date().toISOString());
           setError("");
         })
         .catch((e) => setError(errorMessage(e))),
-    60000,
+    REFRESH_MS,
   );
 
   useEffect(() => {
@@ -73,12 +81,14 @@ export default function TeamMap({ onOpenJob }: { onOpenJob?: (id: number) => voi
   useEffect(() => {
     if (!map.current || !layer.current || !team) return;
     layer.current.clearLayers();
+    const now = Date.now();
     const placed = team.flatMap((person) => (person.last ? [{ ...person, last: person.last }] : []));
     for (const person of placed) {
       const { latitude, longitude, accuracy_m } = person.last;
-      if (accuracy_m) L.circle([latitude, longitude], { radius: accuracy_m, color: "#0969d7", weight: 1, fillOpacity: 0.08 }).addTo(layer.current);
+      const stale = isStale(person.last.recorded_at, now);
+      if (accuracy_m && !stale) L.circle([latitude, longitude], { radius: accuracy_m, color: "#0969d7", weight: 1, fillOpacity: 0.08 }).addTo(layer.current);
       L.marker([latitude, longitude], {
-        icon: L.divIcon({ className: "teamMarker", html: `<span>${initials(person.name)}</span>`, iconSize: [34, 34], iconAnchor: [17, 17] }),
+        icon: L.divIcon({ className: stale ? "teamMarker stale" : "teamMarker", html: `<span>${initials(person.name)}</span>`, iconSize: [34, 34], iconAnchor: [17, 17] }),
         title: person.name,
       })
         .bindTooltip(textNode(`${person.name} · ${ago(person.last.recorded_at)}`))
@@ -101,14 +111,18 @@ export default function TeamMap({ onOpenJob }: { onOpenJob?: (id: number) => voi
       {error && <div className="error">{error}</div>}
       <div className="teamMapCanvas" ref={holder} aria-label={t("Map of clocked-in technicians")} />
       <div className="teamList">
+        <p className="teamLive" role="status">
+          <i aria-hidden="true" /> {updatedAt ? t("Live: updated at {time}", { time: formatTime(updatedAt) }) : t("Live")}
+        </p>
         <p className="muted">
-          {t("Only technicians who are clocked in are shown. Positions update while a job is in progress and the technician has the app open.")}
+          {t("Only technicians who are clocked in are shown. Positions update while a job is in progress and the technician has the app open.")}{" "}
+          {t("A faded marker hasn't moved for {minutes} minutes or more.", { minutes: STALE_MINUTES })}
         </p>
         {team && team.length === 0 && (
           <EmptyState icon={<MapPin size={26} />} title={t("Nobody is clocked in")} text={t("Technicians appear here when they clock in.")} />
         )}
         {team?.map((person) => (
-          <article className="teamRow" key={person.user_id}>
+          <article className={`teamRow ${person.last && isStale(person.last.recorded_at, Date.now()) ? "stale" : ""}`} key={person.user_id}>
             <span className="teamAvatar">{initials(person.name)}</span>
             <div>
               <strong>{person.name}</strong>

@@ -33,6 +33,7 @@ ACTIONS = {
     "machine_deleted",
     "plan_paid",
     "data_exported",
+    "report_exported",
     "deletion_requested",
     "deletion_cancelled",
 }

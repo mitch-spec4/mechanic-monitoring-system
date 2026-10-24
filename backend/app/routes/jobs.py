@@ -32,6 +32,7 @@ from app.services.worksheet import (
     stop_timer,
 )
 from app.utils.auth import current_user, roles
+from app.utils.pages import listing, matches
 from app.utils.validation import ValidationError, choice, integer, iso_date, json_body, text
 from app.i18n import N_, _, local_time
 from app.services import audit
@@ -111,7 +112,13 @@ def list_jobs():
         query = query.filter_by(mechanic_id=user.id)
     if user.role == "customer":
         query = query.filter_by(customer_id=user.customer_id)
-    return jsonify(jobs=[out(job) for job in query.order_by(Job.id.desc()).all()])
+    match = matches([Job.title, Job.description, Job.location, Job.job_type, Job.status])
+    if match is not None:
+        # A search also finds jobs by their customer's or equipment's name.
+        customers = db.select(Customer.id).where(Customer.company_id == user.company_id, matches([Customer.name]))
+        machines = db.select(Machine.id).where(Machine.company_id == user.company_id, matches([Machine.name, Machine.serial_no]))
+        query = query.filter(db.or_(match, Job.customer_id.in_(customers), Job.machine_id.in_(machines)))
+    return listing(query.order_by(Job.id.desc()), "jobs", out)
 
 
 @bp.post("")

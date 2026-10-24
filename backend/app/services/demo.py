@@ -165,6 +165,8 @@ def populate(company, tag=None, password=None):
     def worksheet(record, entries=(), parts=(), ticked=0, statuses=()):
         """A job's history, time entries, parts and checklist."""
         stamp = now - timedelta(days=4)
+        # Created when its history says, so "time to complete" in Insights is real.
+        record.created_at = stamp
         db.session.add(JobEvent(job_id=record.id, user_id=boss.id, action="created", to_status="Pending", created_at=stamp))
         if record.mechanic_id:
             assignee = db.session.get(User, record.mechanic_id)
