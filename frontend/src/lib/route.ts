@@ -25,7 +25,8 @@ export function useRoute() {
 }
 
 /** Plan prices are in cents. Shillings are written the Kenyan way, "KSh 4,500", the same in every browser. */
-export function money(cents: number, currency = "KES") {
+export function money(cents: number, currency = "KES"): string {
+  if (cents < 0) return `−${money(-cents, currency)}`;
   const digits = cents % 100 ? 2 : 0;
   if (currency === "KES") {
     return `KSh ${new Intl.NumberFormat("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(cents / 100)}`;

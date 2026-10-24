@@ -9,6 +9,8 @@ of days in the company's time zone.
   timers count up to now.
 - Repeat faults are the equipment that needed fixing twice or more in the 90 days up to the
   range's last day (see app/services/equipment.py).
+- Money is the completed jobs' costing (app/services/costing.py): their cost, and for the jobs with
+  an amount charged, what they made. Jobs with no charge yet don't count towards the margin.
 """
 from datetime import datetime, time, timedelta, timezone
 from statistics import median
@@ -24,6 +26,7 @@ from app.models.service_record import ServiceRecord
 from app.models.user import User
 from app.models.worksheet import JobEvent, WorkEntry
 from app.services import equipment
+from app.services.costing import job_costing
 from app.utils.time import utcnow
 
 # Longer ranges are shown a week at a time.
@@ -168,6 +171,20 @@ def insights(company, start, end, now=None):
         key=lambda row: (-row["faults"], row["name"]),
     )
 
+    costings = {job_id: job_costing(job, now) for job_id, job in job_by_id.items()}
+    charged = [c for c in costings.values() if c["charged_cents"] is not None]
+    money = {
+        "currency": company.currency,
+        "labour_cents": sum(c["labour_cents"] for c in costings.values()),
+        "parts_cents": sum(c["parts_cents"] for c in costings.values()),
+        "cost_cents": sum(c["cost_cents"] for c in costings.values()),
+        "charged_jobs": len(charged),
+        "charged_cents": sum(c["charged_cents"] for c in charged),
+        "margin_cents": sum(c["margin_cents"] for c in charged) if charged else None,
+        # Totals leave out technicians with no pay rate and parts with no cost: say how many.
+        "incomplete_jobs": sum(1 for c in costings.values() if c["missing_rates"] or c["missing_costs"]),
+    }
+
     all_waits = list(waits.values())
     worked = [worked_on.get(job_id, 0) for job_id in waits]
     return {
@@ -188,9 +205,10 @@ def insights(company, start, end, now=None):
         "by_type": [{"job_type": key, "count": count} for key, count in sorted(by_type.items(), key=lambda item: (-item[1], item[0]))],
         "technicians": team,
         "repeat_faults": repeat_rows,
+        "money": money,
         # For the exports' list of jobs.
         "_completed_jobs": [
-            {"job": job_by_id[job_id], "completed_at": at, "hours_to_complete": waits.get(job_id), "hours_worked": worked_on.get(job_id, 0)}
+            {"job": job_by_id[job_id], "completed_at": at, "hours_to_complete": waits.get(job_id), "hours_worked": worked_on.get(job_id, 0), "costing": costings[job_id]}
             for job_id, at in sorted(completed_at.items(), key=lambda item: item[1])
             if job_id in job_by_id
         ],

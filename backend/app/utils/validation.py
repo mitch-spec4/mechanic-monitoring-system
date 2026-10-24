@@ -1,5 +1,6 @@
 import re
 from datetime import date
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from flask import request
 
@@ -101,3 +102,38 @@ def iso_date(data, field, label=None):
         return date.fromisoformat(str(value).strip())
     except ValueError:
         raise ValidationError(_("{label} must be a date in YYYY-MM-DD format", label=label)) from None
+
+
+MAX_MONEY_CENTS = 10_000_000_000  # 100 million in the currency: no real job costs more.
+
+
+def money(data, field, label=None):
+    """An amount of money ("18000", 18000.5, "18,000.50") as cents; blank or null means None."""
+    label = _(label or default_label(field))
+    value = data.get(field)
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        raise ValidationError(_("{label} must be an amount, like 1500 or 1500.50", label=label))
+    try:
+        amount = Decimal(str(value).replace(",", "").strip())
+    except InvalidOperation:
+        raise ValidationError(_("{label} must be an amount, like 1500 or 1500.50", label=label)) from None
+    if not amount.is_finite() or amount < 0 or amount * 100 > MAX_MONEY_CENTS:
+        raise ValidationError(_("{label} must be an amount, like 1500 or 1500.50", label=label))
+    return int((amount * 100).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+
+
+def coordinates(data, field="position", label=None):
+    """A map pin {"latitude": .., "longitude": ..} as a pair of floats; null clears it."""
+    value = data.get(field)
+    if value is None:
+        return None, None
+    label = _(label or default_label(field))
+    try:
+        latitude, longitude = float(value["latitude"]), float(value["longitude"])
+    except (TypeError, KeyError, ValueError):
+        raise ValidationError(_("{label} must be a point on the map", label=label)) from None
+    if not (-90 <= latitude <= 90 and -180 <= longitude <= 180) or latitude != latitude or longitude != longitude:
+        raise ValidationError(_("{label} must be a point on the map", label=label))
+    return round(latitude, 6), round(longitude, 6)

@@ -138,6 +138,11 @@ def build_config():
         "MAX_VIDEO_MB": int(os.getenv("MAX_VIDEO_MB", "50")),
         "MAX_DOCUMENT_MB": int(os.getenv("MAX_DOCUMENT_MB", "25")),
         "MAX_VIDEO_SECONDS": int(os.getenv("MAX_VIDEO_SECONDS", "60")),
+        # Planning technicians' routes (app/services/routing.py): drive times from OpenRouteService
+        # with a key, else straight lines driven at this average speed.
+        "ROUTING_PROVIDER": os.getenv("ROUTING_PROVIDER", "openrouteservice").strip().lower(),
+        "ROUTING_API_KEY": os.getenv("ROUTING_API_KEY", "").strip(),
+        "ROUTE_AVERAGE_KMH": float(os.getenv("ROUTE_AVERAGE_KMH", "25")),
         # Taking payment for plans: "test" (a pretend card page, development only) or "none"
         # (free trials only) until a real provider is connected. See SETUP.md.
         "BILLING_PROVIDER": os.getenv("BILLING_PROVIDER", "none" if is_production else "test").strip().lower(),
@@ -199,6 +204,7 @@ def create_app(overrides=None):
     from app.routes.notifications import bp as notifications
     from app.routes.reports import bp as reports
     from app.routes.insights import bp as insights
+    from app.routes.routes import bp as routes
     from app.routes.requests import bp as requests
     from app.routes.reviews import bp as reviews
     from app.routes.services import bp as services
@@ -222,6 +228,7 @@ def create_app(overrides=None):
     app.register_blueprint(users, url_prefix="/api/users")
     app.register_blueprint(reports, url_prefix="/api/reports")
     app.register_blueprint(insights, url_prefix="/api/insights")
+    app.register_blueprint(routes, url_prefix="/api/routes")
     app.register_blueprint(media, url_prefix="/api")
     app.register_blueprint(equipment, url_prefix="/api")
     app.register_blueprint(shifts, url_prefix="/api/shifts")

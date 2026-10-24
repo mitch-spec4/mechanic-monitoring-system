@@ -1,0 +1,201 @@
+/* Route planner: who and which day, a summary line, then the map beside the numbered stops. */
+.routePlanner {
+  display: grid;
+  gap: 14px;
+  padding: 14px 18px 18px;
+}
+.routeFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.routeFilters label {
+  display: grid;
+  gap: 4px;
+  min-width: 180px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+}
+.routeBody {
+  display: grid;
+  gap: 14px;
+  transition: opacity 0.2s ease;
+}
+.routeBody.refreshing {
+  opacity: 0.6;
+}
+.routeSummary {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--role-soft, #eaf3ff);
+  font-size: 13px;
+  color: #334155;
+}
+.routeSummary strong {
+  font-size: 15px;
+  color: #172033;
+  font-variant-numeric: tabular-nums;
+}
+.routeSummary small {
+  color: #5b6b80;
+}
+.routeLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr);
+  gap: 16px;
+}
+.routeMap {
+  min-height: 420px;
+  border-radius: 14px;
+  border: 1px solid #e1e8f0;
+  overflow: hidden;
+  z-index: 0;
+}
+.routeStops {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.routeStops li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #e1e8f0;
+  background: #fff;
+}
+.routeStops li > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  font-size: 12px;
+  color: #68768a;
+}
+.routeStops strong {
+  font-size: 14px;
+  color: #172033;
+}
+.routeStops .titleLink {
+  justify-self: start;
+}
+.routeLeg {
+  font-variant-numeric: tabular-nums;
+}
+.appShell .routeStops .listAction {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.routeNumber,
+.routeMarker span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--role-color, #0969d7);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.routeMarker span {
+  width: 30px;
+  height: 30px;
+  border: 3px solid #fff;
+  box-shadow: 0 4px 12px #17203340;
+}
+.routeMarker.start span {
+  background: #172033;
+  font-size: 15px;
+}
+.routeActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.appShell .routeActions .listAction {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  font-size: 12px;
+  text-decoration: none;
+}
+.appShell .routeSave {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.routeSaved {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a7f37;
+}
+.routeOther {
+  display: grid;
+  gap: 6px;
+}
+.routeOther h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 14px;
+}
+.routeOther p {
+  margin: 0;
+  font-size: 12px;
+}
+.routeOther ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.routeOther li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 13px;
+}
+.routeOther small {
+  color: #68768a;
+}
+
+@media (max-width: 860px) {
+  .routePlanner {
+    padding: 12px;
+  }
+  .routeLayout {
+    grid-template-columns: 1fr;
+  }
+  .routeMap {
+    min-height: 300px;
+  }
+  .routeFilters label {
+    flex: 1 1 160px;
+    min-width: 0;
+  }
+}

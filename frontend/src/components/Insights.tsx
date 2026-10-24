@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { BarChart3, Clock, Download, FileSpreadsheet, FileText, Repeat, Timer } from "lucide-react";
+import { BarChart3, Clock, Coins, Download, FileSpreadsheet, FileText, Repeat, Timer } from "lucide-react";
 import { downloadInsights, insights as loadInsights } from "../services/api";
 import type { Insights as Data, TechnicianInsight } from "../services/types";
 import { errorMessage, formatDate, formatDay, toZoneInput } from "../lib/format";
+import { money } from "../lib/route";
 import { mark, t } from "../i18n";
 import { toast } from "./Feedback";
 import { Loading } from "./States";
@@ -141,6 +142,7 @@ export default function Insights({ onOpenMachine }: { onOpenMachine?: (id: numbe
               note={t("Equipment fixed twice or more in 90 days")}
               warn={data.repeat_faults.length > 0}
             />
+            <MarginTile money={data.money} />
           </div>
 
           <div className="insightsGrid">
@@ -165,6 +167,22 @@ function Tile({ icon, label, value, note, warn }: { icon: ReactNode; label: stri
       <small>{note}</small>
     </div>
   );
+}
+
+/** What the completed jobs made: what was charged less labour (hours × pay rate) and parts. */
+function MarginTile({ money: totals }: { money: Data["money"] }) {
+  const value = totals.margin_cents == null ? "–" : money(totals.margin_cents, totals.currency);
+  const note =
+    totals.charged_jobs === 0
+      ? t("Add what you charged on a job's page to see the margin")
+      : totals.incomplete_jobs > 0
+        ? totals.incomplete_jobs === 1
+          ? t("1 job is missing a pay rate or a part cost")
+          : t("{count} jobs are missing a pay rate or a part cost", { count: totals.incomplete_jobs })
+        : totals.charged_jobs === 1
+          ? t("{charged} charged on 1 job", { charged: money(totals.charged_cents, totals.currency) })
+          : t("{charged} charged on {jobs} jobs", { charged: money(totals.charged_cents, totals.currency), jobs: totals.charged_jobs });
+  return <Tile icon={<Coins size={16} />} label={t("Margin")} value={value} note={note} warn={(totals.margin_cents ?? 0) < 0 || totals.incomplete_jobs > 0} />;
 }
 
 /** One column a day (a week for long ranges); the busiest is labelled, every column says its value on hover or focus. */

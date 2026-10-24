@@ -19,6 +19,8 @@ import type {
   Mechanic,
   Notification,
   Paging,
+  Position,
+  RoutePlan,
   Payload,
   Payment,
   Pricing,
@@ -68,6 +70,7 @@ export type User = {
   language: string;
   timezone: string;
   units: string;
+  currency?: string;
   two_factor_enabled: boolean;
   two_factor_setup_needed: boolean;
   /** Set while the company waits to be deleted: when it happens. */
@@ -232,7 +235,7 @@ export type BookingSettings = {
   notice_hours: number;
   window_days: number;
 };
-export type CompanySettings = { timezone: string; currency: string; units: string; language: string; booking: BookingSettings };
+export type CompanySettings = { timezone: string; currency: string; units: string; language: string; booking: BookingSettings; base: Position | null };
 export type CompanySettingsOptions = { timezones: string[]; currencies: string[]; units: string[]; languages: { code: string; name: string }[] };
 export const companySettings = () => api<{ settings: CompanySettings } & CompanySettingsOptions>("/company/settings");
 export const saveCompanySettings = (settings: Partial<Omit<CompanySettings, "booking">> & { booking?: Partial<BookingSettings> }) =>
@@ -267,6 +270,14 @@ export const mechanics = () => api<{ mechanics: Mechanic[] }>("/users/mechanics"
 export const reviews = () => api<{ reviews: Review[] }>("/reviews");
 export const requests = () => api<{ requests: ServiceRequest[] }>("/customers/requests");
 export const reports = () => api<Report>("/reports");
+
+// Technicians' routes and job costing (managers; technicians see their own route)
+export const routePlan = (mechanicId: number, date: string) => api<{ plan: RoutePlan }>(`/routes?mechanic_id=${mechanicId}&date=${date}`);
+export const saveRoute = (mechanicId: number, date: string, jobIds: number[]) => post<{ plan: RoutePlan }>("/routes", { mechanic_id: mechanicId, date, job_ids: jobIds });
+export const myRoute = (date: string) => api<{ plan: RoutePlan }>(`/routes/mine?date=${date}`);
+export const saveCosting = (jobId: number, data: { charged?: string | null; parts?: { id: number; unit_cost: string | null }[] }) =>
+  patch<{ job: JobDetail }>(`/jobs/${jobId}/costing`, data);
+export const setPayRate = (userId: number, payRate: string | null) => patch<{ user: unknown }>(`/users/${userId}`, { pay_rate: payRate });
 
 // Long lists a page at a time (?page=, ?q= to search); without a page the whole list comes back.
 export const PAGE_SIZE = 25;

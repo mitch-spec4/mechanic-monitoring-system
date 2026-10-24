@@ -84,6 +84,9 @@ def out(job):
         "scheduled_start": job.scheduled_start.isoformat() if job.scheduled_start else None,
         "scheduled_end": job.scheduled_end.isoformat() if job.scheduled_end else None,
         "on_the_way_at": job.on_the_way_at.isoformat() if job.on_the_way_at else None,
+        # Its place in the technician's planned route for that day.
+        "route_date": job.route_date.isoformat() if job.route_date else None,
+        "route_order": job.route_order,
     }
 
 

@@ -22,6 +22,9 @@ export type Job = {
   scheduled_start?: string | null;
   scheduled_end?: string | null;
   on_the_way_at?: string | null;
+  /** Its place in the technician's planned route for route_date. */
+  route_date?: string | null;
+  route_order?: number | null;
   /** Changed on this phone, not yet on the server. */
   pending_status?: boolean;
 };
@@ -54,7 +57,10 @@ export type Machine = {
 };
 
 /** A place a customer has equipment. */
-export type Site = { id: number; customer_id?: number; name: string; address: string | null; notes: string | null; machine_count?: number };
+/** A pin on the map. */
+export type Position = { latitude: number; longitude: number };
+
+export type Site = { id: number; customer_id?: number; name: string; address: string | null; notes: string | null; position?: Position | null; machine_count?: number };
 
 /** Service a piece of equipment needs every N days, weeks or months. */
 export type MaintenancePlan = {
@@ -201,7 +207,7 @@ export type Review = {
 
 export type Notification = { id: number; title: string; message: string; type: string; is_read: boolean; created_at: string };
 
-export type Mechanic = { id: number; name: string; email: string; two_factor_enabled: boolean };
+export type Mechanic = { id: number; name: string; email: string; two_factor_enabled: boolean; pay_rate_cents?: number | null };
 
 export type Company = { id: number; name: string; location: string | null; contacts: { name: string; email: string }[] };
 
@@ -326,6 +332,10 @@ export type JobDetail = {
   timer_running?: boolean;
   history?: JobEvent[];
   locations?: LocationPoint[];
+  /** Where it is (its equipment's site), for directions. */
+  position?: Position | null;
+  /** Managers only: what it cost and made. */
+  costing?: Costing;
   can_edit?: boolean;
   can_upload?: boolean;
   media_limits?: MediaLimits;
@@ -375,7 +385,7 @@ export type ErrorBody = {
 };
 
 /** What forms send: their fields as typed. */
-export type Payload = Record<string, FormDataEntryValue | string | number | boolean | null | undefined>;
+export type Payload = Record<string, FormDataEntryValue | string | number | boolean | Position | null | undefined>;
 
 // ---------- Accounts, settings and plans ----------
 
@@ -424,4 +434,61 @@ export type Insights = {
   by_type: { job_type: string; count: number }[];
   technicians: TechnicianInsight[];
   repeat_faults: { machine_id: number; name: string; equipment_type: string | null; customer: string | null; faults: number; last_fault: string | null }[];
+  /** The completed jobs' costing, in cents. */
+  money: {
+    currency: string;
+    labour_cents: number;
+    parts_cents: number;
+    cost_cents: number;
+    charged_jobs: number;
+    charged_cents: number;
+    margin_cents: number | null;
+    incomplete_jobs: number;
+  };
+};
+
+/** What a job cost and made (managers only), in cents of the company's currency. */
+export type Costing = {
+  labour: { mechanic_id: number; name: string | null; hours: number; rate_cents: number | null; cost_cents: number | null }[];
+  parts: { id: number; name: string; quantity: number; unit_cost_cents: number | null; cost_cents: number | null }[];
+  labour_cents: number;
+  parts_cents: number;
+  cost_cents: number;
+  charged_cents: number | null;
+  margin_cents: number | null;
+  margin_percent: number | null;
+  missing_rates: (string | null)[];
+  missing_costs: string[];
+};
+
+export type RouteStop = {
+  job_id: number;
+  title: string;
+  customer: string | null;
+  location: string | null;
+  status: string;
+  priority: string;
+  due_date: string | null;
+  scheduled_start: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  /** On planned stops: its number and the drive to it. */
+  stop?: number;
+  leg_seconds?: number;
+  leg_metres?: number;
+};
+
+/** A technician's day: the suggested order of their jobs, and the drive it saves (app/services/routing.py). */
+export type RoutePlan = {
+  date: string;
+  mechanic: { id: number; name: string };
+  start: { kind: "position" | "base" | "first_stop"; latitude: number | null; longitude: number | null };
+  estimate: "straight_line" | "openrouteservice";
+  fell_back: boolean;
+  stops: RouteStop[];
+  suggested: { job_ids: number[]; seconds: number; metres: number };
+  current: { job_ids: number[]; seconds: number; metres: number };
+  applied: boolean;
+  booked: RouteStop[];
+  unplaced: RouteStop[];
 };

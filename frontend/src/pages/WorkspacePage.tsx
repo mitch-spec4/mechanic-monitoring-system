@@ -14,6 +14,7 @@ import {
   Map as MapIcon,
   MessageSquare,
   Plus,
+  Route as RouteIcon,
   Search,
   Star,
   UserRound,
@@ -35,6 +36,7 @@ import {
   resetTwoFactor,
   reviewsPage,
   servicesPage,
+  setPayRate,
   updateCustomer,
   type User,
 } from "../services/api";
@@ -59,6 +61,7 @@ import "./CustomerPage.css";
 import { AddMachine, EditForm, EditMachine } from "../components/MachineForms";
 import ShiftsView from "../components/ShiftsView";
 import TeamMap from "../components/TeamMap";
+import RoutePlanner from "../components/RoutePlanner";
 import Insights from "../components/Insights";
 import Pager from "../components/Pager";
 import InviteForm from "../components/InviteForm";
@@ -68,7 +71,7 @@ import SettingsPanel from "../components/SettingsPanel";
 import { ActivityLog } from "../components/CompanyData";
 import { confirmAction, toast } from "../components/Feedback";
 import { ROLE_NAMES } from "../components/Sidebar";
-import { errorMessage, formatBytes, formatDate } from "../lib/format";
+import { currencyName, errorMessage, formatBytes, formatDate, formatMoney } from "../lib/format";
 import { mark, t } from "../i18n";
 import { EmptyState, Loading } from "../components/States";
 import Field from "../components/Field";
@@ -192,6 +195,7 @@ const resources: Record<string, Resource> = {
   "Help & Support": { label: mark("Help & support"), description: mark("Support resources for your service workspace."), icon: HelpCircle },
   Checklists: { label: mark("Checklists"), description: mark("Checklists your technicians complete for each type of job."), icon: ListChecks },
   "Team Map": { label: mark("Clocked-in technicians"), description: mark("Where your clocked-in technicians were last seen."), icon: MapIcon },
+  Routes: { label: mark("Route planner"), description: mark("The shortest order to visit a technician's jobs on a day."), icon: RouteIcon },
   Shifts: { label: mark("Shifts"), description: mark("Clock-in and clock-out times and hours for your team."), icon: Clock },
   "My Shifts": { label: mark("My shifts"), description: mark("Your clock-in and clock-out times and hours."), icon: Clock },
   Activity: {
@@ -212,6 +216,7 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<ListItem | null>(null);
   const [resetting, setResetting] = useState<{ id: number; name: string } | null>(null);
+  const [paying, setPaying] = useState<Mechanic | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [pageNumber, setPageNumber] = useState(1);
   const [found, setFound] = useState({ total: 0, pages: 1 });
@@ -321,6 +326,11 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
             {t("Reset two-step sign-in")}
           </button>
         )}
+        {"pay_rate_cents" in item && (
+          <button className="listAction" onClick={() => setPaying(item)}>
+            {t("Pay rate")}
+          </button>
+        )}
       </>
     );
   };
@@ -342,6 +352,8 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
         return <ChecklistManager />;
       case "Team Map":
         return <TeamMap onOpenJob={onOpenJob} />;
+      case "Routes":
+        return <RoutePlanner onOpenJob={onOpenJob} />;
       case "Shifts":
       case "My Shifts":
         return <ShiftsView user={user} />;
@@ -458,7 +470,34 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
       {editing && "serial_no" in editing && <EditMachine machine={editing} onClose={() => setEditing(null)} onSaved={added} />}
       {editing && "machine_count" in editing && <EditCustomer customer={editing} onClose={() => setEditing(null)} onSaved={added} />}
       {resetting && <ResetPassword userId={resetting.id} name={resetting.name} onClose={() => setResetting(null)} />}
+      {paying && <PayRate mechanic={paying} onClose={() => setPaying(null)} onSaved={added} />}
     </main>
+  );
+}
+
+/** What an hour of a technician's time costs the company: job costing multiplies their worksheet hours by it. */
+function PayRate({ mechanic, onClose, onSaved }: { mechanic: Mechanic; onClose: () => void; onSaved: () => void }) {
+  return (
+    <EditForm
+      title={t("Pay rate: {name}", { name: mechanic.name })}
+      onClose={onClose}
+      save={async (data) => {
+        await setPayRate(mechanic.id, String(data.pay_rate ?? "").trim() || null);
+        toast(t("Pay rate saved"));
+        onClose();
+        onSaved();
+      }}
+    >
+      <Field label={t("Pay rate per hour ({currency})", { currency: currencyName() })} hint={t("What an hour of their time costs you, used to work out what each job cost. Leave empty to clear it.")} optional>
+        <input
+          id="field-pay_rate"
+          name="pay_rate"
+          inputMode="decimal"
+          defaultValue={mechanic.pay_rate_cents != null ? String(mechanic.pay_rate_cents / 100) : ""}
+          placeholder="600"
+        />
+      </Field>
+    </EditForm>
   );
 }
 
@@ -526,7 +565,10 @@ function describe(item: ListItem): Description {
     const detail = [t(item.priority || "Medium"), item.location || t("No site"), due].filter(Boolean).join(" · ");
     return { heading: item.title, detail, status: item.status, jobId: item.id };
   }
-  // Customers and technicians.
+  // Customers and technicians (with what an hour of their time costs, for job costing).
+  if ("pay_rate_cents" in item && item.pay_rate_cents != null) {
+    return { heading: item.name, detail: `${item.email} · ${t("{amount} an hour", { amount: formatMoney(item.pay_rate_cents) })}` };
+  }
   return { heading: item.name, detail: item.email };
 }
 

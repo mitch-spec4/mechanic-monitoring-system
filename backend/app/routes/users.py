@@ -19,9 +19,9 @@ from app.services.accounts import send_verification
 from app.i18n import LANGUAGES
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
-from app.utils.validation import ValidationError, choice, json_body, text
+from app.utils.validation import ValidationError, choice, json_body, money, text
 from app.utils.validation import email as read_email
-from app.i18n import _
+from app.i18n import N_, _
 
 bp = Blueprint("users", __name__)
 RESET_CODE_HOURS = 24
@@ -42,7 +42,12 @@ def list_users():
 @roles("boss")
 def mechanics():
     users = User.query.filter_by(company_id=current_user().company_id, role="mechanic").order_by(User.name).all()
-    return jsonify(mechanics=[{"id": user.id, "name": user.name, "email": user.email, "two_factor_enabled": user.totp_enabled_at is not None} for user in users])
+    return jsonify(
+        mechanics=[
+            {"id": user.id, "name": user.name, "email": user.email, "two_factor_enabled": user.totp_enabled_at is not None, "pay_rate_cents": user.pay_rate_cents}
+            for user in users
+        ]
+    )
 
 
 @bp.get("/me")
@@ -76,6 +81,11 @@ def update_user(uid):
         if email != user.email:
             # The new address isn't proven until its owner opens a link sent to it.
             user.email, user.email_verified_at, changed_email = email, None, True
+    if "pay_rate" in data:
+        # What an hour of a technician's time costs the company: for job costing.
+        if user.role != "mechanic":
+            raise ValidationError(_("Only technicians have a pay rate."))
+        user.pay_rate_cents = money(data, "pay_rate", N_("Pay rate per hour"))
     db.session.commit()
     if changed_email and user.role == "boss":
         send_verification(user)

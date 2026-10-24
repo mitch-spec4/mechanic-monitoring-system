@@ -105,6 +105,8 @@ A **repeat fault** is equipment that needed fixing twice or more in 90 days: com
 
 **Excel** downloads a workbook with a sheet each for the summary, the technicians, every completed job (customer, equipment, technician, created and completed times, hours), completed jobs over time, job types and repeat faults. **PDF** is the same page for sending on. Both are in the manager's own language with times on the company's clock, and each download is noted in **Activity**.
 
+**Margin** (on Insights, and in both downloads): what the completed jobs in the range were charged, less what they cost. Jobs with nothing charged yet don't count towards it, and the tile says how many jobs are missing a pay rate or a part cost (their cost leaves those out).
+
 **Team Map** asks for positions every 15 seconds while it's open. A position older than 15 minutes is faded: the technician's phone has stopped sending (the app is closed, or there's no signal).
 
 **Long lists.** Jobs, service requests, service records, reviews and notifications load 25 at a time, newest first, with **Previous** and **Next**. Their search runs on the server, over the whole list (a job is also found by its customer's or equipment's name). Customers, technicians and equipment load whole and show 25 (or 10 customers' equipment) a page. A technician's own jobs load whole, because their phone keeps them for working offline. For the API: `GET /api/jobs?page=2&per_page=25&q=pump` returns `jobs` with `page`, `per_page`, `total` and `pages`; without `page`, the whole list comes back as before.
@@ -144,6 +146,18 @@ To change or add wording, wrap the English in `t("...")` (or `mark("...")` for l
 **Privacy policy and terms.** `#/privacy` and `#/terms` show `backend/legal/privacy.md` and `backend/legal/terms.md`, linked from the homepage footer. **Both are placeholder text: replace them with your own before launch.** The first line of each is `Version: ...`; change it whenever the text changes. Signing up and joining a company need an **I agree** tick, and the version agreed to and when are saved on the account.
 
 **Emails while developing.** In development nothing is sent: each email is written to the backend's log (look for `Email not sent (EMAIL_BACKEND=log)`), links included. Open the link from there to confirm an email or reset a password. See [Email](#email) for sending real emails.
+
+## Routes and job costing
+
+**Pins.** Routes need to know where things are. A manager puts the company's base (yard or office) on a map under **Settings**, and each customer site on the customer's page: click or tap the map, drag the pin, use the device's location, or type the coordinates. A job is where its equipment's site is.
+
+**Planning a day (managers).** **Routes**, then a technician and a day. The plan takes that technician's unfinished jobs due on or before the day (or with no due date, or already under way) whose site has a pin. Visits with a booked time keep their times and are listed apart; jobs whose site has no pin are listed under **Not on the map**. The order: the nearest stop first, then any stretch of the route reversed while that shortens it (2-opt), which for a day's handful of stops is at or near the best. The day starts where the technician was last seen (clocked in, with a position from the last 2 hours), else at the base, else at the first stop, and ends at the last stop. The page shows the stops numbered on a map, each leg's distance and time, and what the order saves against the order the jobs are in now. **Use this order** saves it: the technician gets a notification, their Today's jobs follow it with **Stop 1**, **Stop 2**…, and **Today's route in Maps** opens the stops in order in Google Maps (the first 10: map apps take no more in one link). Every job's page has **Directions** to its site.
+
+**Drive times.** With `ROUTING_API_KEY` set (a free key from [openrouteservice.org](https://openrouteservice.org/dev/#/signup): 500 route matrices a day), distances and times are real driving ones. Without a key, distances are straight lines × 1.3 driven at `ROUTE_AVERAGE_KMH` (25 km/h, city traffic): good enough to order the stops, but the times are rough and the page says so. If the service fails or is slow (8 seconds), the plan falls back to straight lines and says that too.
+
+**Job costing (managers).** On the **Technicians** page, **Pay rate** sets what an hour of each technician's time costs the company. On a job's page, **Costs and margin** lists each technician's time on the job (from the worksheet) × their pay rate, each part × its unit cost (typed there), the total, what the customer was charged, and the margin. Anything without a rate or a cost is left out of the total and listed, so a gap never looks free. Amounts are in the company's currency (KSh), typed like `1500` or `1500.50`. Technicians and customers never see costs, rates or margins. The Excel download of **Insights** has each completed job's labour, parts, charged and margin columns.
+
+In the demo data, routes start from DK Engineering's workshop in Industrial Area, every site has a pin, Mitch has the generator job under way and the compressor job due today, and the technicians' pay rates are KSh 600, 650 and 550 an hour. The conveyor inspection was charged KSh 12,000 and the mixer inspection KSh 6,500; the generator's thermostat has no cost yet.
 
 ## Checks
 
@@ -223,6 +237,9 @@ All backend settings live in `backend/.env` (see `backend/.env.example`).
 | `CRON_SECRET` | | A long random value that turns on `/api/cron/daily` for a scheduler. See [Daily clean-up](#daily-clean-up) |
 | `TWO_FACTOR_REQUIRED` | on | `0` turns two-step sign-in off outside production. Always on in production |
 | `EXPORT_RATE_LIMIT` | `3 per hour` | "Export your data" downloads per company |
+| `ROUTING_API_KEY` | | Optional. An OpenRouteService key for real drive times in route plans; without it, straight-line estimates. See [Routes and job costing](#routes-and-job-costing) |
+| `ROUTING_PROVIDER` | `openrouteservice` | The routing service (the only one for now) |
+| `ROUTE_AVERAGE_KMH` | `25` | The speed straight-line estimates assume |
 
 Live positions taken during jobs are deleted after 30 days. The app removes old ones whenever new positions arrive; in production, also run the [daily clean-up](#daily-clean-up).
 

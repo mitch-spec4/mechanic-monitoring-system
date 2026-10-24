@@ -41,6 +41,7 @@ from app.models import (
     WorkEntry,
 )
 from app.services.company_data import delete_company, delete_files
+from app.services.equipment import site_label
 from app.services.plans import CURRENCY, add_period, price_cents
 from app.services.storage import storage
 from app.services.worksheet import copy_checklist, fill_service_record
@@ -87,8 +88,8 @@ def populate(company, tag=None, password=None):
         person(name, customer.email, "customer", customer)
         return customer
 
-    def site(owner, name, address):
-        record = Site(company_id=company.id, customer_id=owner.id, name=name, address=address)
+    def site(owner, name, address, position):
+        record = Site(company_id=company.id, customer_id=owner.id, name=name, address=address, latitude=position[0], longitude=position[1])
         db.session.add(record)
         db.session.flush()
         return record
@@ -107,14 +108,18 @@ def populate(company, tag=None, password=None):
     mitch = person("Mitch Kamau", email("mitch", "mechanicpro.test"), "mechanic")
     amina = person("Amina Otieno", email("amina", "mechanicpro.test"), "mechanic")
     brian = person("Brian Kariuki", email("brian", "mechanicpro.test"), "mechanic")
+    # What an hour of each technician's time costs, for job costing (KSh, in cents).
+    mitch.pay_rate_cents, amina.pay_rate_cents, brian.pay_rate_cents = 60000, 65000, 55000
+    # The workshop in Industrial Area: routes start here when a technician hasn't shared where they are.
+    company.base_latitude, company.base_longitude = -1.3080, 36.8510
     abc = customer_with_login("ABC Engineering", "abc", "+254 712 345 678")
     kenya = customer_with_login("Kenya Motors", "kenya", "+254 723 456 789")
     xyz = customer_with_login("XYZ Factory", "xyz", "+254 734 567 890")
 
-    abc_plant = site(abc, "Industrial Area plant", "Enterprise Road, Industrial Area")
-    abc_yard = site(abc, "Athi River yard", "Namanga Road, Athi River")
-    kenya_workshop = site(kenya, "Thika Road workshop", "Thika Road, Kasarani")
-    xyz_factory = site(xyz, "Nairobi South factory", "Likoni Road, Nairobi South")
+    abc_plant = site(abc, "Industrial Area plant", "Enterprise Road, Industrial Area", (-1.3105, 36.8470))
+    abc_yard = site(abc, "Athi River yard", "Namanga Road, Athi River", (-1.4560, 36.9780))
+    kenya_workshop = site(kenya, "Thika Road workshop", "Thika Road, Kasarani", (-1.2190, 36.8880))
+    xyz_factory = site(xyz, "Nairobi South factory", "Likoni Road, Nairobi South", (-1.3120, 36.8300))
 
     generator = machine("Generator G-102", "CAT XQ200", "G102-88421", abc, abc_plant, "Generator", "Caterpillar", 4)
     excavator = machine("Excavator EX-01", "Komatsu PC210", "EX01-55218", abc, abc_yard, "Excavator", "Komatsu", 6, "Under Maintenance")
@@ -145,7 +150,9 @@ def populate(company, tag=None, password=None):
         for position, (label, required) in enumerate(items):
             db.session.add(ChecklistTemplateItem(template_id=template.id, label=label, required=required, position=position))
 
-    def job(title, description, priority, status, location, due_in_days, customer, record, mechanic, job_type):
+    def job(title, description, priority, status, due_in_days, customer, record, mechanic, job_type):
+        # At its equipment's site, as a new job is unless another place is typed.
+        location = site_label(db.session.get(Site, record.site_id))
         created = Job(
             title=title, description=description, priority=priority, job_type=job_type, status=status, location=location,
             due_date=today + timedelta(days=due_in_days), company_id=company.id, customer_id=customer.id,
@@ -155,12 +162,12 @@ def populate(company, tag=None, password=None):
         db.session.flush()
         return created
 
-    generator_job = job("Service Generator G-102", "Generator overheating after two hours of operation.", "High", "In Progress", "Nairobi Industrial Area", 1, abc, generator, mitch, "Preventive maintenance")
-    excavator_job = job("Inspect Excavator EX-01", "Hydraulic pressure drops during heavy lifting.", "Urgent", "Assigned", "Mombasa Road", 2, abc, excavator, amina, "Inspection")
-    compressor_job = job("Compressor C-55 maintenance", "Complete the scheduled oil change and inspection.", "Medium", "Accepted", "Westlands, Nairobi", 4, kenya, compressor, mitch, "Preventive maintenance")
-    pump_job = job("Repair Hydraulic Pump H-21", "Investigate oil leak near the main seal.", "High", "Pending", "Thika Road", 7, kenya, pump, None, "Repair")
-    conveyor_job = job("Conveyor Line CL-4 inspection", "Routine belt alignment and safety inspection.", "Low", "Completed", "Athi River", -3, xyz, conveyor, brian, "Inspection")
-    mixer_job = job("Industrial Mixer MX-08 repair", "Mixer produces abnormal vibration under load.", "High", "Paused", "Nairobi South", 5, xyz, mixer, brian, "Repair")
+    generator_job = job("Service Generator G-102", "Generator overheating after two hours of operation.", "High", "In Progress", 1, abc, generator, mitch, "Preventive maintenance")
+    excavator_job = job("Inspect Excavator EX-01", "Hydraulic pressure drops during heavy lifting.", "Urgent", "Assigned", 2, abc, excavator, amina, "Inspection")
+    compressor_job = job("Compressor C-55 maintenance", "Complete the scheduled oil change and inspection.", "Medium", "Accepted", 0, kenya, compressor, mitch, "Preventive maintenance")
+    pump_job = job("Repair Hydraulic Pump H-21", "Investigate oil leak near the main seal.", "High", "Pending", 7, kenya, pump, None, "Repair")
+    conveyor_job = job("Conveyor Line CL-4 inspection", "Routine belt alignment and safety inspection.", "Low", "Completed", -3, xyz, conveyor, brian, "Inspection")
+    mixer_job = job("Industrial Mixer MX-08 repair", "Mixer produces abnormal vibration under load.", "High", "Paused", 5, xyz, mixer, brian, "Repair")
 
     def worksheet(record, entries=(), parts=(), ticked=0, statuses=()):
         """A job's history, time entries, parts and checklist."""
@@ -179,8 +186,8 @@ def populate(company, tag=None, password=None):
             started = now - timedelta(hours=start_hours_ago)
             ended = None if length_hours is None else started + timedelta(hours=length_hours)
             db.session.add(WorkEntry(job_id=record.id, mechanic_id=record.mechanic_id, started_at=started, ended_at=ended, site=record.location, work_done=work_done))
-        for name, quantity in parts:
-            db.session.add(JobPart(job_id=record.id, name=name, quantity=quantity, added_by=record.mechanic_id, created_at=now - timedelta(hours=2)))
+        for name, quantity, unit_cost in parts:
+            db.session.add(JobPart(job_id=record.id, name=name, quantity=quantity, unit_cost_cents=unit_cost, added_by=record.mechanic_id, created_at=now - timedelta(hours=2)))
         db.session.flush()
         # A job's checklist arrives with its technician (their phone has it before work starts).
         if record.mechanic_id:
@@ -202,7 +209,8 @@ def populate(company, tag=None, password=None):
         generator_job,
         statuses=[(26, "In Progress"), (23, "Paused"), (1, "In Progress")],
         entries=[(26, 3, "Drained the coolant and flushed the radiator."), (1, None, "Replacing the thermostat.")],
-        parts=[("Coolant (L)", 8), ("Thermostat", 1)],
+        # The thermostat's invoice isn't in yet: its cost shows as missing on the job's costing.
+        parts=[("Coolant (L)", 8, 45000), ("Thermostat", 1, None)],
         ticked=1,
     )
     # Written with no signal in the plant room, and sent once Mitch's phone was back online.
@@ -220,14 +228,15 @@ def populate(company, tag=None, password=None):
         mixer_job,
         statuses=[(30, "In Progress"), (27, "Paused")],
         entries=[(30, 2.5, "Measured vibration at 3 load levels; worn bearing on the drive side.")],
-        parts=[("Bearing kit", 1)],
+        parts=[("Bearing kit", 1, 520000)],
         ticked=2,
     )
+    conveyor_job.charged_cents = 1200000
     worksheet(
         conveyor_job,
         statuses=[(72, "In Progress"), (70, "Completed")],
         entries=[(72, 2, "Realigned the belt and checked all guards; safety stops tested.")],
-        parts=[("Belt fastener", 4)],
+        parts=[("Belt fastener", 4, 35000)],
         ticked=3,
     )
 
@@ -324,15 +333,16 @@ def populate(company, tag=None, password=None):
     # Visits customers booked: Kenya Motors' pump inspection in three days (10:00 in Nairobi), and
     # XYZ Factory's mixer inspection two days ago, whose findings are in (it books the repair next).
     leak = requests["Hydraulic leak inspection"]
-    leak_visit = job(leak.subject, leak.description, leak.priority, "Assigned", "Thika Road", 3, kenya, pump, amina, "Inspection")
+    leak_visit = job(leak.subject, leak.description, leak.priority, "Assigned", 3, kenya, pump, amina, "Inspection")
     leak_visit.request_id, leak_visit.visit = leak.id, "inspection"
     leak_visit.scheduled_start = datetime.combine(today + timedelta(days=3), time(7, 0))
     leak_visit.scheduled_end = leak_visit.scheduled_start + timedelta(hours=2)
     worksheet(leak_visit)
 
     check = requests["Mixer vibration check"]
-    check_visit = job(check.subject, check.description, check.priority, "Completed", "Nairobi South", -2, xyz, mixer, brian, "Inspection")
+    check_visit = job(check.subject, check.description, check.priority, "Completed", -2, xyz, mixer, brian, "Inspection")
     check_visit.request_id, check_visit.visit = check.id, "inspection"
+    check_visit.charged_cents = 650000
     check_visit.scheduled_start = (now - timedelta(hours=50)).replace(minute=0, second=0, microsecond=0)
     check_visit.scheduled_end = check_visit.scheduled_start + timedelta(hours=2)
     worksheet(

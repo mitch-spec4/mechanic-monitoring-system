@@ -5,6 +5,9 @@ class Company(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(150), nullable=False)
     location = db.Column(db.String(200))
+    # Where technicians start the day (the yard or office): the first point of a planned route.
+    base_latitude = db.Column(db.Float)
+    base_longitude = db.Column(db.Float)
     # Set on a visitor's private copy of the demo company: when it is deleted.
     demo_expires_at = db.Column(db.DateTime, index=True)
     # When a manager closed the "Get set up" guide on the dashboard.

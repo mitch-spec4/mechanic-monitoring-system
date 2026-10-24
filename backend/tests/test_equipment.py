@@ -72,7 +72,7 @@ def test_equipment_details_and_sites(client, data, auth):
     # Sites list their equipment; customers see their own.
     sites = client.get("/api/sites", headers=customer(auth)).get_json()["sites"]
     assert [(row["name"], row["machine_count"]) for row in sites] == [("Main plant", 1)]
-    assert client.get("/api/sites", headers=auth("boss@other.test")).get_json()["sites"] == [{"id": other.id, "customer_id": data["other_customer"], "name": "Elsewhere", "address": None, "notes": None, "machine_count": 0}]
+    assert client.get("/api/sites", headers=auth("boss@other.test")).get_json()["sites"] == [{"id": other.id, "customer_id": data["other_customer"], "name": "Elsewhere", "address": None, "notes": None, "position": None, "machine_count": 0}]
     assert client.get("/api/sites", headers=mech(auth)).status_code == 403
     page = client.get(f"/api/customers/{data['acme_customer']}", headers=boss(auth)).get_json()["customer"]
     assert page["sites"][0]["name"] == "Main plant" and page["sites"][0]["machine_count"] == 1

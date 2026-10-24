@@ -18,12 +18,13 @@ class WorkEntry(db.Model):
 
 
 class JobPart(db.Model):
-    """A part used on a job: name and quantity only (no prices or stock)."""
+    """A part used on a job: name and quantity, and what one cost (set by a manager; no stock)."""
 
     id = db.Column(db.Integer, primary_key=True)
     job_id = db.Column(db.Integer, db.ForeignKey("job.id"), nullable=False, index=True)
     name = db.Column(db.String(160), nullable=False)
     quantity = db.Column(db.Numeric(10, 2), nullable=False)
+    unit_cost_cents = db.Column(db.Integer)
     added_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
 

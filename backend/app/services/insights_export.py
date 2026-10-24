@@ -37,8 +37,17 @@ def blank(value):
     return "" if value is None else value
 
 
+def amount(cents_value, currency):
+    """Money as written in the files: "KSh 18,000" (no cents when there are none)."""
+    if cents_value is None:
+        return ""
+    whole = cents_value / 100
+    text = f"{whole:,.0f}" if cents_value % 100 == 0 else f"{whole:,.2f}"
+    return f"KSh {text}" if currency == "KES" else f"{currency} {text}"
+
+
 def summary_rows(data):
-    jobs, hours = data["jobs"], data["hours"]
+    jobs, hours, money = data["jobs"], data["hours"], data["money"]
     return [
         (_("Jobs created"), jobs["created"]),
         (_("Jobs completed"), jobs["completed"]),
@@ -49,6 +58,9 @@ def summary_rows(data):
         (_("Hours clocked in"), hours["clocked"]),
         (_("Hours on jobs"), hours["on_jobs"]),
         (_("Equipment with a repeat fault"), len(data["repeat_faults"])),
+        (_("Cost of completed jobs"), amount(money["cost_cents"], money["currency"])),
+        (_("Charged for {count} of them", count=money["charged_jobs"]), amount(money["charged_cents"], money["currency"])),
+        (_("Margin on the jobs charged"), amount(money["margin_cents"], money["currency"])),
     ]
 
 
@@ -104,7 +116,10 @@ def to_xlsx(data, company):
 
     completed = sheet(
         _("Completed jobs"),
-        [_("Job"), _("Title"), _("Customer"), _("Equipment"), _("Technician"), _("Job type"), _("Created"), _("Completed"), _("Hours to complete"), _("Hours worked")],
+        [
+            _("Job"), _("Title"), _("Customer"), _("Equipment"), _("Technician"), _("Job type"), _("Created"), _("Completed"),
+            _("Hours to complete"), _("Hours worked"), _("Labour cost"), _("Parts cost"), _("Charged"), _("Margin"),
+        ],
         [
             [
                 item["job"].id,
@@ -117,6 +132,10 @@ def to_xlsx(data, company):
                 local(item["completed_at"]),
                 round(item["hours_to_complete"] or 0, 1),
                 round(item["hours_worked"], 1),
+                *[
+                    item["costing"][key] / 100 if item["costing"][key] is not None else None
+                    for key in ("labour_cents", "parts_cents", "charged_cents", "margin_cents")
+                ],
             ]
             for item in data["_completed_jobs"]
         ],
@@ -125,6 +144,10 @@ def to_xlsx(data, company):
         completed.column_dimensions[column].width = 18
         for cell in completed[column][1:]:
             cell.number_format = "yyyy-mm-dd hh:mm"
+    # Money in the company's currency, as numbers Excel can add up.
+    for column in ("K", "L", "M", "N"):
+        for cell in completed[column][1:]:
+            cell.number_format = "#,##0.00"
 
     sheet(
         _("Completed over time"),

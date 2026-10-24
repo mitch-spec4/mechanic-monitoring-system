@@ -1170,6 +1170,28 @@
 .todayJob em.overdue {
   color: #b42318;
 }
+/* Its place on the route the manager planned for today. */
+.todayJob b.todayStop {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #0969d7;
+  color: #fff;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.todayPanel .dashPanelTitle {
+  gap: 8px;
+}
+.appShell a.todayRoute {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: auto;
+  padding: 3px 10px;
+  font-size: 11px;
+  text-decoration: none;
+}
 .appMain button.todayAction {
   flex: none;
   /* Beside the job on wider screens (buttons are full width by default), under it on phones. */

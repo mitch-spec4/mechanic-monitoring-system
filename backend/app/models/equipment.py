@@ -13,6 +13,9 @@ class Site(db.Model):
     customer_id = db.Column(db.Integer, db.ForeignKey("customer.id"), nullable=False, index=True)
     name = db.Column(db.String(150), nullable=False)
     address = db.Column(db.String(255))
+    # Its pin on the map: jobs on its equipment take it, for planning routes.
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
 

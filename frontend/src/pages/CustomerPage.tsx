@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from "react";
 import { AlertTriangle, ArrowLeft, CalendarClock, CheckCircle2, ClipboardList, FileText, Mail, MapPin, Pencil, Phone, Plus, Repeat, Trash2, Wrench } from "lucide-react";
 import { createSite, customerDetail, deleteSite, updateSite } from "../services/api";
-import type { CustomerDetail, EquipmentSummary, Machine, Site } from "../services/types";
+import type { CustomerDetail, EquipmentSummary, Machine, Position, Site } from "../services/types";
 import { CreateJobModal } from "../components/JobForms";
 import { AddMachine, EditMachine } from "../components/MachineForms";
 import Modal from "../components/Modal";
 import Field from "../components/Field";
+import MapPicker from "../components/MapPicker";
 import { confirmAction, toast } from "../components/Feedback";
 import { errorMessage, formatDate } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
@@ -128,7 +129,10 @@ export default function CustomerPage({ customerId, onBack, onOpenJob, onOpenMach
               {customer.sites.map((row) => (
                 <li key={row.id}>
                   <div>
-                    <strong>{row.name}</strong>
+                    <strong>
+                      {row.name}
+                      {!row.position && <small className="noPin"> · {t("No pin on the map")}</small>}
+                    </strong>
                     {row.address && <span className="siteAddress">{row.address}</span>}
                     {row.notes && <small className="muted">{row.notes}</small>}
                   </div>
@@ -229,9 +233,10 @@ export default function CustomerPage({ customerId, onBack, onOpenJob, onOpenMach
 function SiteForm({ customerId, site, onClose, onSaved }: { customerId: number; site: Site | null; onClose: () => void; onSaved: () => void }) {
   const [formError, setFormError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [position, setPosition] = useState<Position | null>(site?.position ?? null);
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const data = Object.fromEntries(new FormData(event.currentTarget));
+    const data = { ...Object.fromEntries(new FormData(event.currentTarget)), position };
     setBusy(true);
     setFormError("");
     try {
@@ -273,6 +278,11 @@ function SiteForm({ customerId, site, onClose, onSaved }: { customerId: number; 
         <Field label={t("Address")} optional>
           <input id="field-site-address" name="address" defaultValue={site?.address ?? ""} placeholder={t("e.g. {example}", { example: "Enterprise Road, Industrial Area, Nairobi" })} maxLength={255} />
         </Field>
+        <div className="formGroup">
+          <span className="fieldTitle">{t("Pin on the map")}</span>
+          <small className="muted fieldHint">{t("Where technicians go. Routes are planned from these pins.")}</small>
+          <MapPicker value={position} onChange={setPosition} label={t("Map: pin for {name}", { name: site?.name ?? t("the new site") })} />
+        </div>
         <Field label={t("Notes")} optional>
           <textarea id="field-site-notes" name="notes" defaultValue={site?.notes ?? ""} placeholder={t("e.g. {example}", { example: t("Gate B, ask for the site manager") })} maxLength={2000} />
         </Field>
