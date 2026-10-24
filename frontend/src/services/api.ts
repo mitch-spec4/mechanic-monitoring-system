@@ -32,10 +32,11 @@ import type {
   Usage,
 } from "./types";
 import type { PositionResult } from "../lib/location";
+import { noteServerClock } from "../offline/clock";
 
 // Same-origin "/api" by default: Vite proxies it to the backend in development, and in production
 // the API should be served from the same site so the session cookies are sent.
-const BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
+export const BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 
 export const SESSION_EXPIRED_EVENT = "mechanicpro:session-expired";
 // The server says this person must set up two-step sign-in before doing anything else.
@@ -74,6 +75,9 @@ export function clearSession() {
   localStorage.removeItem("refreshToken");
 }
 
+/** The CSRF token the server expects with every change (its cookie is readable on purpose). */
+export const csrfToken = () => readCookie("csrf_access_token");
+
 function readCookie(name: string) {
   const match = document.cookie.split("; ").find((part) => part.startsWith(`${name}=`));
   return match ? decodeURIComponent(match.slice(name.length + 1)) : "";
@@ -93,7 +97,7 @@ export class ApiError extends Error {
 let refreshing: Promise<boolean> | null = null;
 
 // One refresh at a time: parallel requests that all hit 401 share the same attempt.
-function refreshSession() {
+export function refreshSession() {
   refreshing ??= fetch(`${BASE}/auth/refresh`, {
     method: "POST",
     credentials: "include",
@@ -116,12 +120,30 @@ function send(path: string, options: RequestInit) {
   // its own Accept-Language, so the app's choice also goes in X-Language, which the server reads first.
   headers.set("Accept-Language", language());
   headers.set("X-Language", language());
-  return fetch(`${BASE}${path.startsWith("/") ? path : `/${path}`}`, { ...options, headers, credentials: "include" });
+  const sentAt = Date.now();
+  // Never an old answer from the browser's cache (an offline Firefox serves it): a technician's
+  // offline copy is the app's own, and says how old it is.
+  return fetch(`${BASE}${path.startsWith("/") ? path : `/${path}`}`, { cache: "no-store", ...options, headers, credentials: "include" }).then((response) => {
+    noteServerClock(response.headers.get("Date"), sentAt, Date.now());
+    return response;
+  });
+}
+
+/** Reads can come from the phone's offline copy (technicians, see offline/index.ts). */
+type Reader = <T>(path: string, load: () => Promise<T>) => Promise<T>;
+let reader: Reader | null = null;
+export function setReader(next: Reader | null) {
+  reader = next;
 }
 
 /** `announce: false` skips the data-changed event, for a request that swaps the whole session
  * (switching people in the demo): the outgoing screen must not refetch with the new session. */
 export async function api<T>(path: string, options: RequestInit = {}, announce = true): Promise<T> {
+  if ((options.method || "GET").toUpperCase() === "GET" && reader) return reader(path, () => request<T>(path, options, announce));
+  return request<T>(path, options, announce);
+}
+
+async function request<T>(path: string, options: RequestInit, announce: boolean): Promise<T> {
   let response = await send(path, options);
   if (response.status === 401 && !path.startsWith("/auth/") && localStorage.getItem("user")) {
     if (await refreshSession()) {

@@ -19,6 +19,7 @@ from app.services.location import (
     record_point,
 )
 from app.services.notifications import notify
+from app.services.sync import happened_at, queued
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
 from app.utils.validation import ValidationError, integer, json_body
@@ -95,7 +96,7 @@ def consent():
     if not agreed and open_shift(user):
         raise ValidationError(_("Clock out first. Location sharing is part of being clocked in."), 409)
     if agreed and not user.location_consent_at:
-        user.location_consent_at = utcnow()
+        user.location_consent_at = happened_at()
     if not agreed:
         user.location_consent_at = None
     db.session.commit()
@@ -107,13 +108,23 @@ def consent():
 def clock_in():
     user = current_user()
     if open_shift(user):
+        if queued():
+            # Clocked in on another phone too: already done.
+            return jsonify(status_payload(user))
         raise ValidationError(_("You are already clocked in"), 409)
     if not user.location_consent_at:
         raise ValidationError(_("Agree to location sharing before clocking in"), 409)
     fix, _reason = parse_fix(json_body())
     if not fix:
         raise ValidationError(_(NEEDS_LOCATION), 422)
-    shift = Shift(company_id=user.company_id, user_id=user.id, clocked_in_at=utcnow())
+    at = happened_at()
+    last = Shift.query.filter(Shift.user_id == user.id, Shift.clocked_out_at.isnot(None)).order_by(Shift.clocked_out_at.desc()).first()
+    if last and at < last.clocked_out_at:
+        raise ValidationError(
+            _("This clock-in was made at {time}, before your last clock-out at {last}, so it wasn't applied.", time=local_time(at), last=local_time(last.clocked_out_at)),
+            409,
+        )
+    shift = Shift(company_id=user.company_id, user_id=user.id, clocked_in_at=at)
     db.session.add(shift)
     db.session.flush()
     record_point(user, shift, "clock_in", fix)
@@ -129,12 +140,21 @@ def clock_out():
     user = current_user()
     shift = open_shift(user)
     if not shift:
+        if queued():
+            # Clocked out on another phone too: already done.
+            return jsonify(status_payload(user) | {"paused_jobs": []})
         raise ValidationError(_("You are not clocked in"), 409)
+    at = happened_at()
+    if at < shift.clocked_in_at:
+        raise ValidationError(
+            _("This clock-out was made at {time}, before you clocked in at {start}, so it wasn't applied.", time=local_time(at), start=local_time(shift.clocked_in_at)),
+            409,
+        )
     paused = pause_running_jobs(user, user)
     fix, reason = parse_fix(json_body())
     if user.location_consent_at:
         record_point(user, shift, "clock_out", fix, reason)
-    shift.clocked_out_at = utcnow()
+    shift.clocked_out_at = at
     db.session.commit()
     payload = status_payload(user)
     payload["paused_jobs"] = [job.title for job in paused]

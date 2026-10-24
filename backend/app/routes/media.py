@@ -5,11 +5,12 @@ from flask import Blueprint, Response, current_app, jsonify, redirect, request, 
 
 from app import db
 from app.models.media import JobFile
-from app.routes.worksheet import job_detail, load_job
+from app.routes.worksheet import job_detail, load_job, worksheet_job
 from app.services.billing import check_storage
 from app.services.data_export import file_for_link
 from app.services.report_pdf import build_report
 from app.services.storage import StorageError, read_upload_token, storage
+from app.services.sync import happened_at, request_key
 from app.services.worksheet import record_event
 from app.utils.auth import current_user, roles
 from app.utils.validation import ValidationError, choice, integer, json_body, text
@@ -21,7 +22,6 @@ PHOTO_KINDS = ("before", "after", "other")
 UPLOAD_KINDS = PHOTO_KINDS + ("video",)
 PHOTO_TYPES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 VIDEO_TYPES = {"video/mp4": ".mp4", "video/quicktime": ".mov", "video/webm": ".webm", "video/3gpp": ".3gp"}
-UPLOAD_STATUSES = ("In Progress", "Paused")
 KIND_LABEL = {"before": N_("before photo"), "after": N_("after photo"), "other": N_("photo"), "video": N_("video")}
 
 
@@ -39,20 +39,24 @@ def new_key(job, extension):
     return f"{job.company_id}/jobs/{job.id}/{uuid.uuid4().hex}{extension}"
 
 
-def uploadable_job(jid):
-    """Only the assigned mechanic adds media, and only while work is under way."""
-    job = load_job(jid)
-    if job.status not in UPLOAD_STATUSES:
-        raise ValidationError(_("Add photos and videos while the job is in progress or paused."), 409)
-    return job
-
-
 @bp.post("/jobs/<int:jid>/files")
 @roles("mechanic")
 def request_upload(jid):
     """Step 1: reserve a file and get where to upload it (the bucket, or this app)."""
     user = current_user()
-    job = uploadable_job(jid)
+    job = worksheet_job(jid, uploads=True)
+    key = request_key()
+    if key:
+        # The phone asks again for a photo it reserved before (the answer was lost, or the upload
+        # failed): the same file, with a fresh upload link, never a second copy.
+        earlier = JobFile.query.filter_by(uploaded_by=user.id, client_key=key).first()
+        if earlier and earlier.job_id != job.id:
+            raise ValidationError(_("This change's ID was already used for a different change."), 422)
+        if earlier and earlier.status == "ready":
+            return jsonify(file_id=earlier.id, ready=True)
+        if earlier:
+            target = storage().upload_target(earlier.storage_key, earlier.content_type, earlier.size_bytes, max_bytes(earlier.kind), earlier.id)
+            return jsonify(file_id=earlier.id, upload=target)
     data = json_body()
     kind = choice(data, "kind", UPLOAD_KINDS, "Kind")
     if not kind:
@@ -75,6 +79,8 @@ def request_upload(jid):
         size_bytes=size,
         storage_key=new_key(job, allowed[content_type]),
         original_name=text(data, "name", "Name", max_length=200),
+        created_at=happened_at(),
+        client_key=key,
     )
     db.session.add(record)
     db.session.flush()
@@ -108,7 +114,7 @@ def confirm_upload(fid):
     """Step 3: check the upload arrived and is within limits, then show it on the job."""
     user = current_user()
     record = JobFile.query.filter_by(id=fid, uploaded_by=user.id, company_id=user.company_id).first_or_404()
-    job = uploadable_job(record.job_id)
+    job = worksheet_job(record.job_id, uploads=True)
     if record.status == "ready":
         return jsonify(job=job_detail(job, user))
     size = storage().size(record.storage_key)
@@ -141,7 +147,7 @@ def delete_file(fid):
     record = JobFile.query.filter_by(id=fid, uploaded_by=user.id, company_id=user.company_id).first_or_404()
     if record.kind == "signature":
         raise ValidationError(_("Signatures can't be deleted"), 409)
-    job = uploadable_job(record.job_id)
+    job = worksheet_job(record.job_id, uploads=True)
     if record.status == "ready":
         record_event(job, user, "file_removed", note=f"Removed a {KIND_LABEL[record.kind]}")
     storage().delete(record.storage_key)

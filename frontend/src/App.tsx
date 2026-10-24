@@ -19,7 +19,9 @@ import DemoBar from "./components/DemoBar";
 import LanguageMenu from "./components/LanguageMenu";
 import BottomNav from "./components/BottomNav";
 import { LocationIndicator, ShiftProvider } from "./components/Shift";
-import { FeedbackHost } from "./components/Feedback";
+import { confirmAction, FeedbackHost } from "./components/Feedback";
+import { OfflineNotice, SyncPill, UpdateBanner } from "./components/Offline";
+import { startOffline, stopOffline, unsynced } from "./offline";
 import { LegalPage } from "./components/Legal";
 import TwoFactorSetupPage from "./components/TwoFactor";
 import { DeletionBanner } from "./components/CompanyData";
@@ -66,6 +68,11 @@ function Screens() {
     setUnits(user.units);
     if (user.language) setLanguage(user.language);
   }, [user?.language, user?.timezone, user?.units]);
+  // Technicians work offline too: their changes wait on the phone (see src/offline/).
+  useEffect(() => {
+    if (user?.role === "mechanic") void startOffline(user);
+    else void stopOffline({ wipe: false });
+  }, [user?.id, user?.role]);
   const [active, setActive] = useState("Dashboard");
   const [openJobId, setOpenJobId] = useState<number | null>(null);
   const [openCustomerId, setOpenCustomerId] = useState<number | null>(null);
@@ -93,8 +100,25 @@ function Screens() {
     setOpenCustomerId(null);
     setActive("Dashboard");
   };
-  const logout = () => {
+  const logout = async () => {
+    // Changes that haven't reached the server live only on this phone: signing out deletes them.
+    const waiting = user?.role === "mechanic" ? unsynced() : 0;
+    if (
+      waiting &&
+      !(await confirmAction({
+        title: waiting === 1 ? t("1 change hasn't synced") : t("{count} changes haven't synced", { count: waiting }),
+        message:
+          waiting === 1
+            ? t("It's saved only on this phone, and signing out deletes it. Connect to the internet and wait until it says All synced.")
+            : t("They're saved only on this phone, and signing out deletes them. Connect to the internet and wait until it says All synced."),
+        confirmLabel: t("Sign out anyway"),
+        cancelLabel: t("Stay signed in"),
+        danger: true,
+      }))
+    )
+      return;
     endSession();
+    await stopOffline({ wipe: true });
     signedOut();
     go("/signin");
   };
@@ -240,6 +264,9 @@ function Screens() {
         </div>
         <DeletionBanner user={user} onUserChanged={updateUser} />
         {user.role === "mechanic" && <LocationIndicator />}
+        {user.role === "mechanic" && <SyncPill />}
+        <UpdateBanner />
+        <OfflineNotice />
         <div id="content" tabIndex={-1}>
           {dashboard}
         </div>
@@ -252,6 +279,7 @@ function Screens() {
             }}
             onLeave={() => {
               endSession();
+              void stopOffline({ wipe: true });
               signedOut();
               go("/signup");
             }}

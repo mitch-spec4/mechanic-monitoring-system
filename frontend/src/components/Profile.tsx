@@ -9,14 +9,21 @@ type ProfileProps = { user: User; onLogout: () => void };
 
 export default function Profile({ user, onLogout }: ProfileProps) {
   const [open, setOpen] = useState(false);
+  // Opened by a click or tap: it stays open until a click outside or Escape, not just until the
+  // pointer moves away (which browsers can also report when the page changes under it).
+  const pinned = useRef(false);
   const profileRef = useRef<HTMLDivElement>(null);
+  const shut = () => {
+    pinned.current = false;
+    setOpen(false);
+  };
 
   useEffect(() => {
     const close = (event: MouseEvent) => {
-      if (profileRef.current && !profileRef.current.contains(event.target as Node)) setOpen(false);
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) shut();
     };
     const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") shut();
     };
     document.addEventListener("mousedown", close);
     document.addEventListener("keydown", escape);
@@ -27,8 +34,16 @@ export default function Profile({ user, onLogout }: ProfileProps) {
   }, []);
 
   return (
-    <div className="profile" id="profile-menu" ref={profileRef} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-      <button className="profileTrigger" onClick={() => setOpen(true)} aria-expanded={open} aria-label={t("Open profile menu")}>
+    <div className="profile" id="profile-menu" ref={profileRef} onMouseEnter={() => setOpen(true)} onMouseLeave={() => pinned.current || setOpen(false)}>
+      <button
+        className="profileTrigger"
+        onClick={() => {
+          pinned.current = true;
+          setOpen(true);
+        }}
+        aria-expanded={open}
+        aria-label={t("Open profile menu")}
+      >
         <span className="profileAvatar">{user.name[0].toUpperCase()}</span>
         <span className="profileIdentity">
           <strong>{user.name}</strong>

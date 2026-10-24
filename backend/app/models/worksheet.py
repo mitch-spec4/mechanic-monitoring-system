@@ -13,6 +13,8 @@ class WorkEntry(db.Model):
     site = db.Column(db.String(200))
     work_done = db.Column(db.Text)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+    # When the notes or times were last changed, so a change made offline earlier doesn't win.
+    updated_at = db.Column(db.DateTime)
 
 
 class JobPart(db.Model):
@@ -37,6 +39,11 @@ class JobEvent(db.Model):
     to_status = db.Column(db.String(40))
     note = db.Column(db.Text)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow, index=True)
+    # A change made offline: created_at is when it was made, synced_at when it reached the server.
+    synced_at = db.Column(db.DateTime)
+    # On an assignment change: who had the job before, so their offline work from before the
+    # change is still accepted.
+    previous_mechanic_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
 
 
 class ChecklistTemplate(db.Model):
@@ -68,3 +75,5 @@ class JobChecklistItem(db.Model):
     note = db.Column(db.Text)
     done_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     done_at = db.Column(db.DateTime)
+    # When it was last ticked, unticked or noted, so a change made offline earlier doesn't win.
+    changed_at = db.Column(db.DateTime)

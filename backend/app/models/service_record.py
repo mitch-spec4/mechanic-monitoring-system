@@ -18,3 +18,5 @@ class ServiceRecord(db.Model):
     solution = db.Column(db.Text)
     advice = db.Column(db.Text)
     service_date = db.Column(db.DateTime, nullable=False, default=utcnow)
+    # When the technician last saved the summary, so a change made offline earlier doesn't win.
+    updated_at = db.Column(db.DateTime)

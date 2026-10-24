@@ -175,7 +175,14 @@ def test_the_daily_url_needs_the_cron_secret(app, client, data):
     db.session.commit()
     response = client.get("/api/cron/daily", headers={"Authorization": "Bearer s3cret-value"})
     assert response.status_code == 200
-    assert response.get_json()["removed"] == {"demo_companies": 1, "abandoned_uploads": 0, "old_live_locations": 0, "old_activity": 0, "deleted_companies": 0}
+    assert response.get_json()["removed"] == {
+        "demo_companies": 1,
+        "abandoned_uploads": 0,
+        "old_live_locations": 0,
+        "old_activity": 0,
+        "old_offline_changes": 0,
+        "deleted_companies": 0,
+    }
 
 
 def test_the_setup_guide_follows_real_data(client, outbox):

@@ -12,7 +12,7 @@ import "./Feedback.css";
  */
 type Tone = "success" | "error" | "info";
 type Toast = { id: number; message: string; tone: Tone };
-type Confirm = { message: string; title?: string; confirmLabel?: string; danger?: boolean; resolve: (ok: boolean) => void };
+type Confirm = { message: string; title?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean; resolve: (ok: boolean) => void };
 
 let showToast: (toast: Omit<Toast, "id">) => void = () => {};
 let askConfirm: (request: Confirm) => void = (request) => request.resolve(window.confirm(request.message));
@@ -89,7 +89,7 @@ function ConfirmDialog({ request, answer }: { request: Confirm; answer: (ok: boo
         <p>{request.message}</p>
         <div className="confirmActions">
           <button ref={keep} className="secondary" onClick={() => answer(false)}>
-            {t("Keep it")}
+            {request.cancelLabel ?? t("Keep it")}
           </button>
           <button ref={confirm} className={request.danger ? "dangerButton" : "primary"} onClick={() => answer(true)}>
             {request.confirmLabel ?? t("Yes")}

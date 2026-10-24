@@ -177,6 +177,9 @@ def create_app(overrides=None):
     db.init_app(app)
     jwt.init_app(app)
     migrate.init_app(app, db, render_as_batch=True)
+    from app.services.sync import init_sync
+
+    init_sync(app)
 
     from app import models  # noqa: F401  (register models for migrations)
     from app.routes.auth import bp as auth
@@ -268,6 +271,15 @@ def create_app(overrides=None):
 
         print(f"Deleted {run()} company(ies).")
 
+    @app.cli.command("purge-sync-requests")
+    def purge_sync_requests():
+        """Forget queued changes answered more than 30 days ago (run daily)."""
+        from app.services.sync import purge_old_requests
+
+        removed = purge_old_requests()
+        db.session.commit()
+        print(f"Removed {removed} remembered change(s) older than 30 days.")
+
     @app.cli.command("purge-activity")
     def purge_activity():
         """Delete activity log entries older than 12 months (run daily)."""
@@ -294,6 +306,15 @@ def create_app(overrides=None):
     @app.get("/api/health")
     def health():
         return {"status": "ok"}
+
+    @app.after_request
+    def never_cache_api_data(response):
+        # Personal data stays out of the browser's cache. That also keeps a browser that is offline
+        # (Firefox serves its cache then) from passing an old answer off as the server's: the
+        # technician's app keeps its own copy (frontend/src/offline).
+        if response.mimetype == "application/json" and "Cache-Control" not in response.headers:
+            response.headers["Cache-Control"] = "no-store"
+        return response
 
     return app
 

@@ -10,21 +10,26 @@ from app.models.media import JobFile
 from app.models.user import User
 from app.models.worksheet import WorkEntry
 from app.services.billing import require_active
-from app.services.location import open_shift, stamp_job
+from app.services.location import shift_at, stamp_job
 from app.services.notifications import notify, notify_bosses
 from app.services.signature import SIGNATURE_FIELDS, SIGNATURE_PROBLEM, apply_signature, read_signature
+from app.services.sync import happened_at
 from app.services.worksheet import (
     completion_problems,
     copy_checklist,
     delete_job_children,
     fill_service_record,
+    handed_over,
+    last_status_event,
+    reassigned_problem,
     record_event,
+    refresh_checklist,
     start_timer,
     stop_timer,
 )
 from app.utils.auth import current_user, roles
 from app.utils.validation import ValidationError, choice, integer, iso_date, json_body, text
-from app.i18n import N_, _
+from app.i18n import N_, _, local_time
 from app.services import audit
 
 bp = Blueprint("jobs", __name__)
@@ -139,6 +144,7 @@ def create_job():
     if job.mechanic_id:
         mechanic = db.session.get(User, job.mechanic_id)
         record_event(job, user, "assigned", note=f"Assigned to {mechanic.name}")
+        copy_checklist(job)
         notify(job.mechanic_id, N_("New job assigned"), N_("{title} was assigned to you."), "job", title=job.title)
     db.session.commit()
     return jsonify(job=out(job)), 201
@@ -154,14 +160,22 @@ def update_job(jid):
 
     if user.role == "mechanic":
         if job.mechanic_id != user.id:
+            # A start, pause or complete sent from the phone's queue after the job moved on.
+            left = handed_over(job, user)
+            if left:
+                raise reassigned_problem(job, left)
             return jsonify(error=_("Forbidden")), 403
         if set(data) - ({"status"} | LOCATION_FIELDS | SIGNATURE_FIELDS) or "status" not in data:
             return jsonify(error=_("Technicians can only update job status")), 403
+        if data["status"] != job.status:
+            check_mechanic_order(job)
 
     if user.role == "boss":
         edited = edit_details(job, data)
         if edited:
             record_event(job, user, "updated", note="Changed " + ", ".join(edited))
+        if "job type" in edited:
+            refresh_checklist(job)
         if "mechanic_id" in data:
             assign_mechanic(job, integer(data, "mechanic_id", "Technician"), user)
 
@@ -252,10 +266,25 @@ def change_status(job, user, new_status):
         fill_service_record(job)
 
 
+def check_mechanic_order(job):
+    """A status change made offline is refused when the job has moved on since: cancelled, or
+    changed after it was made (its time would put it out of order in the history)."""
+    at = happened_at()
+    if job.status == "Cancelled":
+        cancelled = last_status_event(job, "Cancelled")
+        raise ValidationError(_("This job was cancelled at {time}.", time=local_time(cancelled.created_at if cancelled else None)), 409)
+    last = last_status_event(job)
+    if last and at < last.created_at:
+        raise ValidationError(
+            _("This change was made at {time}, before the job's last update at {last}, so it wasn't applied.", time=local_time(at), last=local_time(last.created_at)),
+            409,
+        )
+
+
 def require_clocked_in(job, user):
     """Job time only runs while the assigned mechanic is on the clock."""
     mechanic = db.session.get(User, job.mechanic_id) if job.mechanic_id else None
-    if mechanic and not open_shift(mechanic):
+    if mechanic and not shift_at(mechanic, happened_at()):
         if user.id == mechanic.id:
             raise ValidationError(_("Clock in before starting work"), 409)
         raise ValidationError(_("{name} isn't clocked in, so this job can't be started", name=mechanic.name), 409)
@@ -266,17 +295,18 @@ def assign_mechanic(job, mechanic_id, user):
         return
     if job.status not in REASSIGNABLE:
         raise ValidationError(_("A job that is {status} cannot be reassigned", status=_(job.status)), 409)
-    old_status = job.status
+    old_status, previous = job.status, job.mechanic_id
     if mechanic_id:
         mechanic = find_mechanic(job.company_id, mechanic_id)
         job.mechanic_id = mechanic_id
         job.status = "Assigned"
-        record_event(job, user, "assigned", from_status=old_status, to_status=job.status, note=f"Assigned to {mechanic.name}")
+        record_event(job, user, "assigned", from_status=old_status, to_status=job.status, note=f"Assigned to {mechanic.name}", previous_mechanic_id=previous)
+        copy_checklist(job)
         notify(mechanic_id, N_("New job assigned"), N_("{title} was assigned to you."), "job", title=job.title)
     else:
         job.mechanic_id = None
         job.status = "Pending"
-        record_event(job, user, "unassigned", from_status=old_status, to_status=job.status)
+        record_event(job, user, "unassigned", from_status=old_status, to_status=job.status, previous_mechanic_id=previous)
 
 
 def has_recorded_work(job):

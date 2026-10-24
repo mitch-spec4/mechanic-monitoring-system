@@ -9,13 +9,16 @@ from app.models.worksheet import (
     JobPart,
     WorkEntry,
 )
-from app.utils.time import utcnow
-from app.i18n import _
+from app.models.user import User
+from app.services.sync import happened_at, synced_late
+from app.utils.validation import ValidationError
+from app.i18n import _, local_time
 
 FINISHED = ("Completed", "Cancelled")
 
 
-def record_event(job, user, action, from_status=None, to_status=None, note=None):
+def record_event(job, user, action, from_status=None, to_status=None, note=None, previous_mechanic_id=None):
+    """Add a line to the job's history, dated when the change was made (offline changes too)."""
     db.session.add(
         JobEvent(
             job_id=job.id,
@@ -24,8 +27,34 @@ def record_event(job, user, action, from_status=None, to_status=None, note=None)
             from_status=from_status,
             to_status=to_status,
             note=note,
+            created_at=happened_at(),
+            synced_at=synced_late(),
+            previous_mechanic_id=previous_mechanic_id,
         )
     )
+
+
+def last_status_event(job, status=None):
+    query = JobEvent.query.filter(JobEvent.job_id == job.id, JobEvent.to_status.isnot(None))
+    if status:
+        query = query.filter(JobEvent.to_status == status)
+    return query.order_by(JobEvent.created_at.desc(), JobEvent.id.desc()).first()
+
+
+def handed_over(job, user):
+    """When the job last left this mechanic (reassigned or unassigned), or None if it never did."""
+    return (
+        JobEvent.query.filter_by(job_id=job.id, previous_mechanic_id=user.id)
+        .order_by(JobEvent.created_at.desc(), JobEvent.id.desc())
+        .first()
+    )
+
+
+def reassigned_problem(job, event):
+    if job.mechanic_id:
+        name = db.session.get(User, job.mechanic_id).name
+        return ValidationError(_("Reassigned to {name} at {time}", name=name, time=local_time(event.created_at)), 409)
+    return ValidationError(_("Unassigned by your manager at {time}", time=local_time(event.created_at)), 409)
 
 
 def open_entry(job):
@@ -33,19 +62,20 @@ def open_entry(job):
 
 
 def start_timer(job, mechanic_id):
-    """Open a time entry unless one is already running."""
+    """Open a time entry unless one is already running, from when work started."""
     if not open_entry(job):
-        db.session.add(WorkEntry(job_id=job.id, mechanic_id=mechanic_id, started_at=utcnow(), site=job.location))
+        db.session.add(WorkEntry(job_id=job.id, mechanic_id=mechanic_id, started_at=happened_at(), site=job.location))
 
 
 def stop_timer(job):
-    now = utcnow()
+    now = happened_at()
     for entry in WorkEntry.query.filter_by(job_id=job.id, ended_at=None).all():
         entry.ended_at = max(now, entry.started_at)
 
 
 def copy_checklist(job):
-    """Copy the job type's checklist onto the job the first time work starts."""
+    """Copy the job type's checklist onto the job once it has a technician, so their phone has it
+    before work starts (it can be ticked offline), or else when work starts."""
     if not job.job_type or JobChecklistItem.query.filter_by(job_id=job.id).first():
         return
     template = ChecklistTemplate.query.filter_by(company_id=job.company_id, job_type=job.job_type).first()
@@ -54,6 +84,16 @@ def copy_checklist(job):
     items = ChecklistTemplateItem.query.filter_by(template_id=template.id).order_by(ChecklistTemplateItem.position)
     for item in items:
         db.session.add(JobChecklistItem(job_id=job.id, label=item.label, required=item.required, position=item.position))
+
+
+def refresh_checklist(job):
+    """The job type changed before work started: the checklist follows it, unless something is ticked."""
+    items = JobChecklistItem.query.filter_by(job_id=job.id)
+    if WorkEntry.query.filter_by(job_id=job.id).first() or items.filter_by(done=True).first():
+        return
+    items.delete(synchronize_session=False)
+    if job.mechanic_id:
+        copy_checklist(job)
 
 
 def completion_problems(job):
@@ -95,7 +135,7 @@ def fill_service_record(job):
     parts = JobPart.query.filter_by(job_id=job.id).order_by(JobPart.id).all()
     if parts:
         record.parts_replaced = ", ".join(f"{part.name} ×{format_quantity(part.quantity)}" for part in parts)
-    record.service_date = utcnow()
+    record.service_date = happened_at()
     return record
 
 

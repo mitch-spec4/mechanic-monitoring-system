@@ -16,6 +16,8 @@ export type Job = {
   customer_id: number | null;
   machine_id: number | null;
   mechanic_id: number | null;
+  /** Changed on this phone, not yet on the server. */
+  pending_status?: boolean;
 };
 
 /** Why a piece of equipment needs work: an open job or request, or its status. */
@@ -135,6 +137,7 @@ export type Shift = {
   original_clocked_out_at: string | null;
   clock_in_location: LocationPoint | null;
   clock_out_location: LocationPoint | null;
+  pending?: boolean;
 };
 
 export type ShiftStatus = { consent: boolean; consent_at: string | null; shift: Shift | null; paused_jobs?: string[] };
@@ -150,8 +153,18 @@ export type TeamMember = {
 
 // ---------- A job's page ----------
 
-export type Part = { id: number; name: string; quantity: number; label: string; added_by?: string | null };
-export type ChecklistItem = { id: number; label: string; required: boolean; done: boolean; note?: string | null; done_by?: string | null; done_at?: string | null };
+// `pending`: made on this phone, not yet on the server.
+export type Part = { id: number; name: string; quantity: number; label: string; added_by?: string | null; pending?: boolean };
+export type ChecklistItem = {
+  id: number;
+  label: string;
+  required: boolean;
+  done: boolean;
+  note?: string | null;
+  done_by?: string | null;
+  done_at?: string | null;
+  pending?: boolean;
+};
 export type WorkEntry = {
   id: number;
   mechanic: string | null;
@@ -161,9 +174,21 @@ export type WorkEntry = {
   hours: number;
   site: string | null;
   work_done: string | null;
+  pending?: boolean;
 };
-export type JobEvent = { id: number; action: string; from_status: string | null; to_status: string | null; note: string | null; user: string | null; created_at: string };
-export type JobFile = { id: number; kind: string; content_type: string; size_bytes: number; url: string; created_at: string; uploaded_by?: string | null };
+export type JobEvent = {
+  id: number;
+  action: string;
+  from_status: string | null;
+  to_status: string | null;
+  note: string | null;
+  user: string | null;
+  created_at: string;
+  /** Done offline: when it reached the server. */
+  synced_at?: string | null;
+  pending?: boolean;
+};
+export type JobFile = { id: number; kind: string; content_type: string; size_bytes: number; url: string; created_at: string; uploaded_by?: string | null; pending?: boolean };
 export type Signature = { name: string; signed_at: string; url: string | null } | { not_signed_reason: string };
 export type MediaLimits = { photo_mb: number; video_mb: number; video_seconds: number };
 
@@ -196,6 +221,9 @@ export type JobDetail = {
   can_upload?: boolean;
   media_limits?: MediaLimits;
   completion_blockers?: string[];
+  // Changed on this phone, not yet on the server:
+  pending_status?: boolean;
+  record_pending?: boolean;
 };
 
 // ---------- Billing ----------

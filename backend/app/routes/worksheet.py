@@ -1,7 +1,8 @@
+import json
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, abort, jsonify
 
 from app import db
 from app.models.customer import Customer
@@ -13,7 +14,16 @@ from app.models.service_record import ServiceRecord
 from app.models.user import User
 from app.models.worksheet import JobChecklistItem, JobEvent, JobPart, WorkEntry
 from app.services.location import point_out
-from app.services.worksheet import FINISHED, completion_problems, format_quantity, record_event
+from app.services.sync import happened_at, synced_late
+from app.services.worksheet import (
+    FINISHED,
+    completion_problems,
+    format_quantity,
+    handed_over,
+    last_status_event,
+    reassigned_problem,
+    record_event,
+)
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
 from app.utils.validation import ValidationError, json_body, text
@@ -44,12 +54,66 @@ def load_job(jid):
     return query.first_or_404()
 
 
-def editable_job(jid):
-    """A job whose worksheet the current mechanic may change."""
-    job = load_job(jid)
+UPLOAD_STATUSES = ("In Progress", "Paused")
+
+
+def worksheet_job(jid, uploads=False, notes=False):
+    """The job whose worksheet the current mechanic changes, as it was when they made the change.
+
+    While the job is theirs and unfinished, anything goes. Work done offline before the job was
+    reassigned or cancelled is still kept (time, photos, notes, parts, ticks); anything made after
+    that is refused, saying what happened. A completed job's worksheet stays locked, except for
+    photos and videos taken before it was completed: they upload when the phone has a good signal.
+    """
+    user = current_user()
+    job = Job.query.filter_by(id=jid, company_id=user.company_id).first_or_404()
+    at = happened_at()
+    mine = job.mechanic_id == user.id
+    if not mine:
+        left = handed_over(job, user)
+        if not left:
+            abort(404)
+        if at >= left.created_at:
+            raise reassigned_problem(job, left)
+    if notes:
+        return job
+    if job.status == "Cancelled":
+        cancelled = last_status_event(job, "Cancelled")
+        if cancelled and at < cancelled.created_at:
+            return job
+        raise ValidationError(_("This job was cancelled at {time}, so its worksheet can no longer be changed.", time=local_time(cancelled.created_at if cancelled else None)), 409)
     if job.status in FINISHED:
+        completed = last_status_event(job, "Completed")
+        if uploads and completed and at < completed.created_at:
+            return job
         raise ValidationError(_("This job is finished ({status}), so its worksheet can no longer be changed.", status=_(job.status)), 409)
+    # Media is about the work itself (work made before a reassignment counts, whatever the job's status now).
+    if uploads and mine and job.status not in UPLOAD_STATUSES:
+        raise ValidationError(_("Add photos and videos while the job is in progress or paused."), 409)
     return job
+
+
+def version(item, values, label=None):
+    """A worksheet item's content for the history, as JSON: the app shows it in the reader's language."""
+    values = {field: iso(value) if isinstance(value, datetime) else value for field, value in values.items()}
+    return json.dumps({"item": item, "label": label, "values": values}, ensure_ascii=False)
+
+
+def newer_change_kept(job, user, changed_at, item, values, label=None):
+    """Last change wins, by when it was made. A change made offline before a newer one isn't
+    applied, but it goes into the job's history so nothing is lost silently."""
+    if changed_at is None or happened_at() >= changed_at:
+        return False
+    record_event(job, user, "change_not_applied", note=version(item, values, label))
+    db.session.commit()
+    return True
+
+
+def keep_replaced(job, user, item, before, after, label=None):
+    """A change made offline replaced what was saved before it reached the server: the earlier
+    version goes into the history."""
+    if synced_late() and before != after and any(value not in (None, "") for value in before.values()):
+        record_event(job, user, "replaced", note=version(item, before, label))
 
 
 def names_for(ids):
@@ -173,6 +237,8 @@ def job_detail(job, user):
                 "note": e.note,
                 "user": names.get(e.user_id),
                 "created_at": iso(e.created_at),
+                # Made offline: when it reached the server.
+                "synced_at": iso(e.synced_at),
             }
             for e in events
         ],
@@ -252,7 +318,7 @@ def check_span(started_at, ended_at):
 def add_entry(jid):
     """Add a finished stretch of work by hand (the running timer is managed by Start/Pause)."""
     user = current_user()
-    job = editable_job(jid)
+    job = worksheet_job(jid)
     data = json_body()
     started_at = parse_time(data, "started_at", "Start time", required=True)
     ended_at = parse_time(data, "ended_at", "End time", required=True)
@@ -265,6 +331,7 @@ def add_entry(jid):
         ended_at=ended_at,
         site=text(data, "site", "Site", max_length=200) or job.location,
         work_done=text(data, "work_done", "Work done"),
+        updated_at=happened_at(),
     )
     db.session.add(entry)
     record_event(job, user, "time_added", note=f"Added {hours_between(started_at, ended_at)} h")
@@ -272,13 +339,20 @@ def add_entry(jid):
     return jsonify(job=job_detail(job, user)), 201
 
 
+ENTRY_FIELDS = ("started_at", "ended_at", "site", "work_done")
+
+
 @bp.patch("/<int:jid>/entries/<int:eid>")
 @roles("mechanic")
 def update_entry(jid, eid):
     user = current_user()
-    job = editable_job(jid)
+    job = worksheet_job(jid)
     entry = WorkEntry.query.filter_by(id=eid, job_id=job.id, mechanic_id=user.id).first_or_404()
     data = json_body()
+    sent = {field: data[field] for field in ENTRY_FIELDS if field in data}
+    if newer_change_kept(job, user, entry.updated_at, "entry", sent, iso(entry.started_at)):
+        return jsonify(job=job_detail(job, user))
+    before = {field: getattr(entry, field) for field in ENTRY_FIELDS}
     if "work_done" in data:
         entry.work_done = text(data, "work_done", "Work done")
     if "site" in data:
@@ -295,6 +369,10 @@ def update_entry(jid, eid):
         if (started_at, ended_at) != (entry.started_at, entry.ended_at):
             record_event(job, user, "time_corrected")
         entry.started_at, entry.ended_at = started_at, ended_at
+    after = {field: getattr(entry, field) for field in ENTRY_FIELDS}
+    changed = [field for field in ENTRY_FIELDS if before[field] != after[field]]
+    keep_replaced(job, user, "entry", {field: before[field] for field in changed}, {field: after[field] for field in changed}, iso(before["started_at"]))
+    entry.updated_at = happened_at()
     db.session.commit()
     return jsonify(job=job_detail(job, user))
 
@@ -314,13 +392,14 @@ def parse_quantity(data):
 @roles("mechanic")
 def add_part(jid):
     user = current_user()
-    job = editable_job(jid)
+    job = worksheet_job(jid)
     data = json_body()
     part = JobPart(
         job_id=job.id,
         name=text(data, "name", "Part name", required=True, max_length=160),
         quantity=parse_quantity(data),
         added_by=user.id,
+        created_at=happened_at(),
     )
     db.session.add(part)
     record_event(job, user, "part_added", note=f"{part.name} ×{format_quantity(part.quantity)}")
@@ -332,8 +411,11 @@ def add_part(jid):
 @roles("mechanic")
 def remove_part(jid, pid):
     user = current_user()
-    job = editable_job(jid)
-    part = JobPart.query.filter_by(id=pid, job_id=job.id).first_or_404()
+    job = worksheet_job(jid)
+    part = JobPart.query.filter_by(id=pid, job_id=job.id).first()
+    if not part:
+        # Already gone (removed on another phone, or this removal was sent twice): nothing to do.
+        return jsonify(job=job_detail(job, user))
     record_event(job, user, "part_removed", note=f"{part.name} ×{format_quantity(part.quantity)}")
     db.session.delete(part)
     db.session.commit()
@@ -344,21 +426,31 @@ def remove_part(jid, pid):
 @roles("mechanic")
 def update_checklist_item(jid, item_id):
     user = current_user()
-    job = editable_job(jid)
+    job = worksheet_job(jid)
     item = JobChecklistItem.query.filter_by(id=item_id, job_id=job.id).first_or_404()
     data = json_body()
+    if "done" in data and not isinstance(data["done"], bool):
+        raise ValidationError(_("Done must be true or false"))
+    sent = {field: data[field] for field in ("done", "note") if field in data}
+    if newer_change_kept(job, user, item.changed_at, "checklist", sent, item.label):
+        return jsonify(job=job_detail(job, user))
     if "note" in data:
-        item.note = text(data, "note", "Note")
-    if "done" in data:
-        if not isinstance(data["done"], bool):
-            raise ValidationError(_("Done must be true or false"))
-        if data["done"] != item.done:
-            item.done = data["done"]
-            item.done_by = user.id if item.done else None
-            item.done_at = utcnow() if item.done else None
-            record_event(job, user, "checked" if item.done else "unchecked", note=item.label)
+        note = text(data, "note", "Note")
+        # Ticks have their own history lines; a note written over keeps the earlier one there.
+        keep_replaced(job, user, "checklist", {"note": item.note}, {"note": note}, item.label)
+        item.note = note
+        item.changed_at = happened_at()
+    if "done" in data and data["done"] != item.done:
+        item.done = data["done"]
+        item.done_by = user.id if item.done else None
+        item.done_at = happened_at() if item.done else None
+        item.changed_at = happened_at()
+        record_event(job, user, "checked" if item.done else "unchecked", note=item.label)
     db.session.commit()
     return jsonify(job=job_detail(job, user))
+
+
+SUMMARY_FIELDS = ("service_type", "problem", "solution", "advice")
 
 
 @bp.put("/<int:jid>/record")
@@ -366,7 +458,7 @@ def update_checklist_item(jid, item_id):
 def save_record(jid):
     """The customer-facing service summary for this job."""
     user = current_user()
-    job = editable_job(jid)
+    job = worksheet_job(jid)
     if not job.machine_id:
         raise ValidationError(_("This job has no equipment, so it has no service record. Ask your manager to link one."))
     data = json_body()
@@ -381,11 +473,17 @@ def save_record(jid):
             service_type=job.job_type or "Service",
         )
         db.session.add(record)
+    elif newer_change_kept(job, user, record.updated_at, "summary", {field: data[field] for field in SUMMARY_FIELDS if field in data}):
+        return jsonify(job=job_detail(job, user))
+    before = {field: getattr(record, field) for field in SUMMARY_FIELDS}
     if "service_type" in data:
         record.service_type = text(data, "service_type", "Service type", required=True, max_length=80)
     for field in ("problem", "solution", "advice"):
         if field in data:
             setattr(record, field, text(data, field))
+    if record.updated_at:
+        keep_replaced(job, user, "summary", before, {field: getattr(record, field) for field in SUMMARY_FIELDS})
+    record.updated_at = happened_at()
     db.session.commit()
     return jsonify(job=job_detail(job, user))
 
@@ -395,7 +493,7 @@ def save_record(jid):
 def add_note(jid):
     """A note on the job's history (managers and the assigned mechanic; never deleted)."""
     user = current_user()
-    job = load_job(jid)
+    job = worksheet_job(jid, notes=True) if user.role == "mechanic" else load_job(jid)
     note = text(json_body(), "note", "Note", required=True, max_length=2000)
     record_event(job, user, "note", note=note)
     db.session.commit()

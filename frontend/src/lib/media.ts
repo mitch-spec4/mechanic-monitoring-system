@@ -1,4 +1,7 @@
 import { confirmUpload, requestUpload, sendUpload } from "../services/api";
+import type { Job } from "../services/types";
+import { offlineState } from "../offline";
+import { queueMedia } from "../offline/changes";
 import { t } from "../i18n";
 
 export type Limits = { photo_mb: number; video_mb: number; video_seconds: number };
@@ -36,8 +39,24 @@ export function videoSeconds(file: File): Promise<number> {
   });
 }
 
-/** Check limits, compress photos, then reserve → upload → confirm. Returns the updated job. */
-export async function uploadMedia(jobId: number, kind: string, file: File, limits: Limits) {
+// Room kept free on the phone besides a photo or video waiting to upload.
+const SPARE_BYTES = 20 * 1024 * 1024;
+
+/** Before keeping a file on the phone to upload later: is there room for it? */
+async function checkSpace(size: number) {
+  if (!offlineState().active) return;
+  const estimate = await navigator.storage?.estimate?.().catch(() => undefined);
+  if (estimate?.quota && estimate.quota - (estimate.usage ?? 0) < size + SPARE_BYTES) {
+    throw new Error(t("This phone is out of space for photos and videos waiting to upload. Connect to the internet so the waiting ones can upload, or free up space."));
+  }
+}
+
+/**
+ * Check limits and compress photos on the phone, then reserve → upload → confirm. For a technician
+ * it's kept on the phone first and uploads on a good connection: returns the updated job once it's
+ * on the server, or nothing while it waits.
+ */
+export async function uploadMedia(job: Pick<Job, "id" | "title" | "status">, kind: string, file: File, limits: Limits) {
   let body: Blob = file;
   let contentType = file.type || "application/octet-stream";
   let name = file.name || "upload";
@@ -50,7 +69,10 @@ export async function uploadMedia(jobId: number, kind: string, file: File, limit
     contentType = "image/jpeg";
     name = name.replace(/\.[^.]+$/, "") + ".jpg";
   }
-  const reserved = await requestUpload(jobId, { kind, content_type: contentType, size: body.size, name });
-  await sendUpload(reserved.upload, body);
-  return (await confirmUpload(reserved.file_id)).job;
+  await checkSpace(body.size);
+  return queueMedia(job, { kind, contentType, size: body.size, name }, body, async () => {
+    const reserved = await requestUpload(job.id, { kind, content_type: contentType, size: body.size, name });
+    await sendUpload(reserved.upload, body);
+    return confirmUpload(reserved.file_id);
+  });
 }

@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, Clock, LogIn, LogOut, MapPin, ShieldCheck } from "lucide-react";
 import Modal from "./Modal";
-import { clockIn, clockOut, jobs, sendLiveLocation, setLocationConsent, shiftStatus, updateJob } from "../services/api";
+import { jobs, sendLiveLocation, shiftStatus } from "../services/api";
+import { queueClockIn, queueClockOut, queueConsent, queueStatus } from "../offline/changes";
 import { distanceMetres, errorCode, Fix, getPosition, hasFix, locationHelp, toFix } from "../lib/location";
 import { errorMessage, formatTime } from "../lib/format";
 import { confirmAction } from "./Feedback";
@@ -98,7 +99,10 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         setProblem(`${t("You can't clock in without sharing your location.")} ${locationHelp(position.location_error)}`);
         return;
       }
-      setStatus(await clockIn(position));
+      // With no signal it waits on the phone (with the time it happened) and shows as clocked in.
+      const result = await queueClockIn(position);
+      if (result) setStatus(result);
+      else await load();
       setPermission((state) => (state === "denied" ? "granted" : state));
     } catch (error) {
       setProblem(errorMessage(error));
@@ -115,7 +119,8 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
   const agree = async () => {
     setAsking(false);
     try {
-      setStatus(await setLocationConsent(true));
+      const result = await queueConsent(true);
+      if (result) setStatus(result);
       await finishClockIn();
     } catch (error) {
       setProblem(errorMessage(error));
@@ -136,10 +141,10 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
     setBusy(t("Clocking out…"));
     try {
       // Clocking out never waits long on GPS or fails without it.
-      const result = await clockOut(await getPosition(8000));
-      setStatus(result);
+      const result = await queueClockOut(await getPosition(8000));
+      if (result) setStatus(result);
       lastSent.current = null;
-      load();
+      await load();
     } catch (error) {
       setProblem(errorMessage(error));
     } finally {
@@ -148,7 +153,9 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
   };
 
   const withdrawConsent = async () => {
-    setStatus(await setLocationConsent(false));
+    const result = await queueConsent(false);
+    if (result) setStatus(result);
+    else await load();
   };
 
   const value: ShiftState = {
@@ -170,12 +177,12 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** Change a job's status; a mechanic's Start, Resume and Complete carry their position. */
-export async function changeJobStatus(jobId: number, status: string, role: string, extra: Record<string, unknown> = {}) {
+/** Change a job's status; a mechanic's Start, Resume and Complete carry their position (GPS works offline). */
+export async function changeJobStatus(job: Pick<Job, "id" | "title" | "status">, status: string, role: string, extra: Record<string, unknown> = {}) {
   if (role === "mechanic" && (status === "In Progress" || status === "Completed")) {
-    return updateJob(jobId, { status, ...extra, ...(await getPosition(10000)) });
+    return queueStatus(job, status, { ...extra, ...(await getPosition(10000)) });
   }
-  return updateJob(jobId, { status, ...extra });
+  return queueStatus(job, status, extra);
 }
 
 function ConsentModal({ onAgree, onClose }: { onAgree: () => void; onClose: () => void }) {
