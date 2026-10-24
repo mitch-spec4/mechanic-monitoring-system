@@ -8,6 +8,7 @@ import WorkspacePage from "./pages/WorkspacePage";
 import JobPage from "./pages/JobPage";
 import CustomerPage from "./pages/CustomerPage";
 import RequestPage from "./pages/RequestPage";
+import EquipmentPage from "./pages/EquipmentPage";
 import Home from "./pages/Home";
 import Signup from "./pages/Signup";
 import Checkout from "./pages/Checkout";
@@ -45,7 +46,7 @@ export default function App() {
 }
 
 // Links into the signed-in app, sent in emails.
-const APP_LINK = /^\/(requests\/\d+|messages)$/;
+const APP_LINK = /^\/(requests\/\d+|equipment\/\d+|messages)$/;
 
 function storedUser(): User | null {
   try {
@@ -81,6 +82,9 @@ function Screens() {
   const [openJobId, setOpenJobId] = useState<number | null>(null);
   const [openCustomerId, setOpenCustomerId] = useState<number | null>(null);
   const [openRequestId, setOpenRequestId] = useState<number | null>(null);
+  const [openMachineId, setOpenMachineId] = useState<number | null>(null);
+  // The job the equipment was opened from, which Back returns to.
+  const [machineFromJob, setMachineFromJob] = useState<number | null>(null);
   // The customer whose chat Messages opens on (managers).
   const [chatCustomerId, setChatCustomerId] = useState<number | null>(null);
   const [billingFocus, setBillingFocus] = useState<{ plan: string; interval: Interval }>();
@@ -89,6 +93,7 @@ function Screens() {
     setOpenJobId(null);
     setOpenCustomerId(null);
     setOpenRequestId(null);
+    setOpenMachineId(null);
     setChatCustomerId(null);
     setBillingFocus(undefined);
     setActive(label);
@@ -96,6 +101,7 @@ function Screens() {
   const openRequest = (id: number) => {
     setOpenJobId(null);
     setOpenCustomerId(null);
+    setOpenMachineId(null);
     setOpenRequestId(id);
     window.scrollTo({ top: 0 });
   };
@@ -104,8 +110,21 @@ function Screens() {
     setChatCustomerId(customerId ?? null);
   };
   const openCustomer = (id: number) => {
+    setOpenMachineId(null);
     setOpenCustomerId(id);
     window.scrollTo({ top: 0 });
+  };
+  // Over the customer or request it was opened from, so Back returns there (or to the job).
+  const openMachine = (id: number) => {
+    setMachineFromJob(openJobId);
+    setOpenJobId(null);
+    setOpenMachineId(id);
+    window.scrollTo({ top: 0 });
+  };
+  const closeMachine = () => {
+    setOpenMachineId(null);
+    setOpenJobId(machineFromJob);
+    setMachineFromJob(null);
   };
   const openJob = (id: number) => {
     setOpenJobId(id);
@@ -118,6 +137,7 @@ function Screens() {
     setOpenJobId(null);
     setOpenCustomerId(null);
     setOpenRequestId(null);
+    setOpenMachineId(null);
     setActive("Dashboard");
   };
   const logout = async () => {
@@ -147,6 +167,7 @@ function Screens() {
     setOpenJobId(null);
     setOpenCustomerId(null);
     setOpenRequestId(null);
+    setOpenMachineId(null);
     setActive("Dashboard");
   };
   // The profile kept for reloads changes too, e.g. once the email address is confirmed.
@@ -166,12 +187,16 @@ function Screens() {
     go(next.startsWith("/checkout/") ? next : APP_LINK.test(route.path) ? route.path : "/");
   };
 
-  // Links from emails: "/requests/12" opens that request, "/messages" the chat.
+  // Links from emails: "/requests/12" opens that request, "/equipment/4" that equipment, "/messages" the chat.
   useEffect(() => {
     if (!user || !APP_LINK.test(route.path)) return;
     const request = /^\/requests\/(\d+)$/.exec(route.path);
+    const machine = /^\/equipment\/(\d+)$/.exec(route.path);
     if (request) openRequest(Number(request[1]));
-    else openMessages();
+    else if (machine) {
+      navigate("Dashboard");
+      openMachine(Number(machine[1]));
+    } else openMessages();
     go("/");
   }, [user?.id, route.path]);
 
@@ -266,9 +291,18 @@ function Screens() {
   }
 
   const dashboard = openJobId ? (
-    <JobPage key={openJobId} jobId={openJobId} user={user} onBack={() => setOpenJobId(null)} />
+    <JobPage key={openJobId} jobId={openJobId} user={user} onBack={() => setOpenJobId(null)} onOpenMachine={openMachine} />
+  ) : openMachineId ? (
+    <EquipmentPage
+      key={openMachineId}
+      machineId={openMachineId}
+      user={user}
+      onBack={closeMachine}
+      onOpenJob={openJob}
+      onOpenCustomer={user.role === "boss" ? openCustomer : undefined}
+    />
   ) : openCustomerId ? (
-    <CustomerPage key={openCustomerId} customerId={openCustomerId} onBack={() => setOpenCustomerId(null)} onOpenJob={openJob} />
+    <CustomerPage key={openCustomerId} customerId={openCustomerId} onBack={() => setOpenCustomerId(null)} onOpenJob={openJob} onOpenMachine={openMachine} />
   ) : openRequestId ? (
     <RequestPage
       key={openRequestId}
@@ -276,6 +310,7 @@ function Screens() {
       user={user}
       onBack={() => setOpenRequestId(null)}
       onOpenJob={openJob}
+      onOpenMachine={openMachine}
       onOpenMessages={openMessages}
     />
   ) : active === "Billing" && user.role === "boss" ? (
@@ -287,6 +322,7 @@ function Screens() {
       onOpenJob={openJob}
       onOpenCustomer={openCustomer}
       onOpenRequest={openRequest}
+      onOpenMachine={openMachine}
       chatCustomerId={chatCustomerId}
       onUserChanged={updateUser}
     />
@@ -302,7 +338,7 @@ function Screens() {
   ) : user.role === "mechanic" ? (
     <MechanicDashboard u={user} onOpenJob={openJob} />
   ) : (
-    <CustomerDashboard u={user} onOpenJob={openJob} onOpenRequest={openRequest} onOpenMessages={() => openMessages()} />
+    <CustomerDashboard u={user} onOpenJob={openJob} onOpenRequest={openRequest} onOpenMachine={openMachine} onOpenMessages={() => openMessages()} />
   );
 
   const shell = (
@@ -310,8 +346,8 @@ function Screens() {
       <button className="skipLink" onClick={() => document.getElementById("content")?.focus()}>
         {t("Skip to content")}
       </button>
-      <Sidebar user={user} active={openJobId || openCustomerId || openRequestId ? "" : active} onNavigate={navigate} />
-      {user.role === "mechanic" && <BottomNav active={openJobId ? "" : active} onNavigate={navigate} />}
+      <Sidebar user={user} active={openJobId || openCustomerId || openRequestId || openMachineId ? "" : active} onNavigate={navigate} />
+      {user.role === "mechanic" && <BottomNav active={openJobId || openMachineId ? "" : active} onNavigate={navigate} />}
       <div className="appMain">
         <div className="topBar">
           <LanguageMenu user={user} onUserChanged={updateUser} />

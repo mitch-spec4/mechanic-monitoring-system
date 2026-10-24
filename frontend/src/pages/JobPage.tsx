@@ -49,7 +49,7 @@ import "./JobPage.css";
 import { Loading } from "../components/States";
 import Field from "../components/Field";
 
-type Props = { jobId: number; user: User; onBack: () => void };
+type Props = { jobId: number; user: User; onBack: () => void; onOpenMachine?: (id: number) => void };
 
 // Times are shown on the company's clock.
 const stamp = (value: string | null | undefined) => (value ? `${dayOf(value)}, ${timeOf(value)}` : "");
@@ -191,7 +191,7 @@ function VersionNote({ note }: { note: string | null }) {
   );
 }
 
-export default function JobPage({ jobId, user, onBack }: Props) {
+export default function JobPage({ jobId, user, onBack, onOpenMachine }: Props) {
   const [job, setJob] = useState<JobDetail | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -276,7 +276,21 @@ export default function JobPage({ jobId, user, onBack }: Props) {
         <p className="jobDescription">{job.description}</p>
         <dl className="jobMeta">
           {job.customer && <Meta label={t("Customer")} value={job.customer.name} />}
-          {job.machine && <Meta label={t("Equipment")} value={`${job.machine.name} · ${job.machine.serial_no}`} />}
+          {job.machine && (
+            <div>
+              <dt>{t("Equipment")}</dt>
+              <dd>
+                {onOpenMachine ? (
+                  <button className="titleLink" onClick={() => onOpenMachine(job.machine!.id)}>
+                    {job.machine.name}
+                  </button>
+                ) : (
+                  job.machine.name
+                )}{" "}
+                · {job.machine.serial_no}
+              </dd>
+            </div>
+          )}
           <Meta label={t("Site")} value={job.location || t("Not set")} icon={<MapPin size={13} />} />
           {job.scheduled_start ? (
             <Meta label={t("Booked visit")} value={formatVisit(job.scheduled_start, job.scheduled_end)} icon={<CalendarClock size={13} />} />

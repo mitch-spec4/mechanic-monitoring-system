@@ -2,6 +2,7 @@ from app.models.user import User
 from app.models.company import Company
 from app.models.customer import Customer
 from app.models.machine import Machine
+from app.models.equipment import MaintenancePlan, Site
 from app.models.job import Job
 from app.models.service_record import ServiceRecord
 from app.models.review import Review

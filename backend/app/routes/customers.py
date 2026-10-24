@@ -5,6 +5,7 @@ from flask import Blueprint, jsonify
 
 from app import db
 from app.models.customer import Customer
+from app.models.equipment import Site
 from app.models.invitation import Invitation
 from app.models.job import Job
 from app.models.machine import Machine
@@ -83,8 +84,13 @@ def customer_detail(cid):
         .limit(10)
         .all()
     )
+    sites = Site.query.filter_by(customer_id=customer.id).order_by(Site.name).all()
     data = customer_out(customer)
     data.update(
+        sites=[
+            {"id": site.id, "name": site.name, "address": site.address, "notes": site.notes, "machine_count": sum(1 for m in machines if m["site_id"] == site.id)}
+            for site in sites
+        ],
         machines=machines,
         needs_work_count=sum(1 for machine in machines if machine["needs_work"]),
         job_count=jobs.count(),
@@ -168,8 +174,9 @@ def delete_customer(cid):
     if has_history:
         return jsonify(error=_("This customer has equipment or service history and cannot be deleted.")), 409
 
-    # Their chat with the company goes with them.
+    # Their chat with the company and their sites go with them.
     CustomerMessage.query.filter_by(customer_id=customer.id).delete()
+    Site.query.filter_by(customer_id=customer.id).delete()
     for customer_user in User.query.filter_by(customer_id=customer.id).all():
         Notification.query.filter_by(user_id=customer_user.id).delete()
         PasswordReset.query.filter_by(user_id=customer_user.id).delete()

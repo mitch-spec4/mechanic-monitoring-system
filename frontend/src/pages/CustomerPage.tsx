@@ -1,25 +1,29 @@
-import { useState } from "react";
-import { AlertTriangle, ArrowLeft, CheckCircle2, ClipboardList, FileText, Mail, Pencil, Phone, Plus, Wrench } from "lucide-react";
-import { customerDetail } from "../services/api";
-import type { CustomerDetail, EquipmentSummary, Machine } from "../services/types";
+import { useState, type FormEvent } from "react";
+import { AlertTriangle, ArrowLeft, CalendarClock, CheckCircle2, ClipboardList, FileText, Mail, MapPin, Pencil, Phone, Plus, Repeat, Trash2, Wrench } from "lucide-react";
+import { createSite, customerDetail, deleteSite, updateSite } from "../services/api";
+import type { CustomerDetail, EquipmentSummary, Machine, Site } from "../services/types";
 import { CreateJobModal } from "../components/JobForms";
 import { AddMachine, EditMachine } from "../components/MachineForms";
+import Modal from "../components/Modal";
+import Field from "../components/Field";
+import { confirmAction, toast } from "../components/Feedback";
 import { errorMessage, formatDate } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
-import { t } from "../i18n";
+import { mark, t } from "../i18n";
 import "./JobPage.css";
 import "./CustomerPage.css";
 import { Loading } from "../components/States";
 
-type Props = { customerId: number; onBack: () => void; onOpenJob: (id: number) => void };
+type Props = { customerId: number; onBack: () => void; onOpenJob: (id: number) => void; onOpenMachine: (id: number) => void };
 
-/** A customer with all their equipment, the pieces needing work first, and their service history. */
-export default function CustomerPage({ customerId, onBack, onOpenJob }: Props) {
+/** A customer with their sites, all their equipment (the pieces needing work first), and their service history. */
+export default function CustomerPage({ customerId, onBack, onOpenJob, onOpenMachine }: Props) {
   const [customer, setCustomer] = useState<CustomerDetail | null>(null);
   const [error, setError] = useState("");
   const [creatingFor, setCreatingFor] = useState<Machine | null>(null);
   const [addingMachine, setAddingMachine] = useState(false);
   const [editing, setEditing] = useState<Machine | null>(null);
+  const [site, setSite] = useState<Site | "new" | null>(null);
   const load = () =>
     customerDetail(customerId)
       .then((data) => {
@@ -97,10 +101,42 @@ export default function CustomerPage({ customerId, onBack, onOpenJob }: Props) {
                 <MachineCard
                   key={machine.id}
                   machine={machine}
+                  siteName={customer.sites.find((s) => s.id === machine.site_id)?.name}
                   onOpenJob={onOpenJob}
+                  onOpenMachine={onOpenMachine}
                   onCreateJob={() => setCreatingFor(machine)}
                   onEdit={() => setEditing(machine)}
                 />
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="jobCard wide">
+          <div className="jobCardHead">
+            <h2>
+              <MapPin size={16} /> {t("Sites")}
+            </h2>
+            <button className="primary-sm" onClick={() => setSite("new")}>
+              <Plus size={14} /> {t("Add site")}
+            </button>
+          </div>
+          {customer.sites.length === 0 ? (
+            <p className="muted jobEmpty">{t("No sites yet. Add the places this customer has equipment, so technicians know where to go.")}</p>
+          ) : (
+            <ul className="siteList">
+              {customer.sites.map((row) => (
+                <li key={row.id}>
+                  <div>
+                    <strong>{row.name}</strong>
+                    {row.address && <span className="siteAddress">{row.address}</span>}
+                    {row.notes && <small className="muted">{row.notes}</small>}
+                  </div>
+                  <span className="jobBadge">{row.machine_count === 1 ? t("1 piece of equipment") : t("{count} pieces of equipment", { count: row.machine_count ?? 0 })}</span>
+                  <button className="listAction" onClick={() => setSite(row)} aria-label={t("Edit {name}", { name: row.name })}>
+                    <Pencil size={12} /> {t("Edit")}
+                  </button>
+                </li>
               ))}
             </ul>
           )}
@@ -174,25 +210,125 @@ export default function CustomerPage({ customerId, onBack, onOpenJob }: Props) {
           }}
         />
       )}
+      {site && (
+        <SiteForm
+          customerId={customer.id}
+          site={site === "new" ? null : site}
+          onClose={() => setSite(null)}
+          onSaved={() => {
+            setSite(null);
+            load();
+          }}
+        />
+      )}
     </main>
   );
 }
 
-type CardProps = { machine: EquipmentSummary; onOpenJob: (id: number) => void; onCreateJob?: () => void; onEdit?: () => void };
+/** Add or change one of the customer's sites; a site in use can still be removed (its equipment keeps no site). */
+function SiteForm({ customerId, site, onClose, onSaved }: { customerId: number; site: Site | null; onClose: () => void; onSaved: () => void }) {
+  const [formError, setFormError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    setBusy(true);
+    setFormError("");
+    try {
+      if (site) await updateSite(site.id, data);
+      else await createSite({ ...data, customer_id: customerId });
+      toast(site ? t("Site saved") : t("Site added"));
+      onSaved();
+    } catch (problem) {
+      setFormError(errorMessage(problem));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const remove = async () => {
+    if (!site) return;
+    const ok = await confirmAction({
+      title: t("Remove {name}?", { name: site.name }),
+      message: site.machine_count ? t("Its equipment stays with the customer, without a site.") : t("Nothing else changes."),
+      confirmLabel: t("Remove site"),
+      cancelLabel: t("Keep it"),
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await deleteSite(site.id);
+      toast(t("Site removed"));
+      onSaved();
+    } catch (problem) {
+      setFormError(errorMessage(problem));
+    }
+  };
+  return (
+    <Modal title={site ? t("Edit site") : t("Add site")} icon={<MapPin size={20} />} onClose={onClose}>
+      <form className="form form-upgraded" onSubmit={submit}>
+        {formError && <div className="error">{formError}</div>}
+        <Field label={t("Site name")}>
+          <input id="field-site-name" name="name" defaultValue={site?.name ?? ""} placeholder={t("e.g. {example}", { example: t("Head office") })} maxLength={150} required />
+        </Field>
+        <Field label={t("Address")} optional>
+          <input id="field-site-address" name="address" defaultValue={site?.address ?? ""} placeholder={t("e.g. {example}", { example: "Enterprise Road, Industrial Area, Nairobi" })} maxLength={255} />
+        </Field>
+        <Field label={t("Notes")} optional>
+          <textarea id="field-site-notes" name="notes" defaultValue={site?.notes ?? ""} placeholder={t("e.g. {example}", { example: t("Gate B, ask for the site manager") })} maxLength={2000} />
+        </Field>
+        <button className="primary" disabled={busy}>
+          {site ? t("Save changes") : t("Add site")}
+        </button>
+        {site && (
+          <button type="button" className="link dangerText" onClick={remove}>
+            <Trash2 size={14} /> {t("Remove site")}
+          </button>
+        )}
+      </form>
+    </Modal>
+  );
+}
 
-export function MachineCard({ machine, onOpenJob, onCreateJob, onEdit }: CardProps) {
+// The server's words for planned maintenance that's due (see backend/app/services/machine_work.py).
+const MAINTENANCE_STATUSES = [mark("Service due"), mark("Overdue")];
+
+type CardProps = {
+  machine: EquipmentSummary;
+  siteName?: string;
+  onOpenJob: (id: number) => void;
+  onOpenMachine?: (id: number) => void;
+  onCreateJob?: () => void;
+  onEdit?: () => void;
+};
+
+export function MachineCard({ machine, siteName, onOpenJob, onOpenMachine, onCreateJob, onEdit }: CardProps) {
   const statusClass = String(machine.status).replace(/ /g, "").toLowerCase();
+  const faults = machine.repeat_faults ?? 0;
   return (
     <li className={`machineCard ${machine.needs_work ? "needsWork" : ""}`}>
       <div className="machineCardHead">
         <div>
-          <strong>{machine.name}</strong>
-          <small>
-            {machine.model || t("Model not recorded")} · {machine.serial_no}
-          </small>
+          {onOpenMachine ? (
+            <button className="titleLink" onClick={() => onOpenMachine(machine.id)}>
+              <strong>{machine.name}</strong>
+            </button>
+          ) : (
+            <strong>{machine.name}</strong>
+          )}
+          <small>{[machine.equipment_type, machine.model || t("Model not recorded"), machine.serial_no].filter(Boolean).join(" · ")}</small>
+          {siteName && (
+            <small className="machineSite">
+              <MapPin size={11} /> {siteName}
+            </small>
+          )}
         </div>
         <span className={`machineStatus ${statusClass}`}>{t(machine.status)}</span>
       </div>
+      {faults >= 2 && (
+        <p className="repeatFault">
+          <Repeat size={13} /> {t("Repeat fault: {count} in 90 days", { count: faults })}
+        </p>
+      )}
       {machine.needs_work ? (
         <ul className="workReasons" aria-label={t("Why {name} needs work", { name: machine.name })}>
           {machine.work.map((reason, index) => (
@@ -213,6 +349,13 @@ export function MachineCard({ machine, onOpenJob, onCreateJob, onEdit }: CardPro
                   <AlertTriangle size={13} />
                   <span>
                     {t("Customer requested service:")} {reason.title} <em>{t(reason.status)}</em>
+                  </span>
+                </>
+              ) : reason.type === "maintenance" ? (
+                <>
+                  <CalendarClock size={13} />
+                  <span>
+                    {t("Planned maintenance:")} {reason.title} <em>{t(MAINTENANCE_STATUSES.find((status) => status === reason.status) ?? reason.status)}</em> {formatDate(reason.due)}
                   </span>
                 </>
               ) : (

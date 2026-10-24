@@ -8,6 +8,7 @@ import type {
   Customer,
   CustomerDetail,
   CustomerSummary,
+  EquipmentDetail,
   ErrorBody,
   IssuedCode,
   Job,
@@ -26,6 +27,7 @@ import type {
   ServiceRecord,
   ServiceRequest,
   SetupStepState,
+  Site,
   Slot,
   Shift,
   ShiftStatus,
@@ -323,6 +325,28 @@ export const correctShift = (id: number, clockedOutAt: string) => patch<{ shift:
 export const sendLiveLocation = (jobId: number, position: PositionResult) => post<{ saved: boolean }>("/location/live", { job_id: jobId, ...position });
 export const teamLocations = () => api<{ team: TeamMember[] }>("/location/team");
 export const customerDetail = (id: number) => api<{ customer: CustomerDetail }>(`/customers/${id}`);
+
+// Equipment: its page, documents, maintenance plans, and customers' sites
+export const machineDetail = (id: number) => api<{ machine: EquipmentDetail }>(`/machines/${id}`);
+export const requestDocumentUpload = (machineId: number, data: { content_type: string; size: number; name: string }) =>
+  post<{ file_id: number; upload: UploadTarget }>(`/machines/${machineId}/documents`, data);
+export const confirmDocument = (machineId: number, fileId: number) => post<{ machine: EquipmentDetail }>(`/machines/${machineId}/documents/${fileId}/confirm`, {});
+export const deleteDocument = (machineId: number, fileId: number) => remove<{ machine: EquipmentDetail }>(`/machines/${machineId}/documents/${fileId}`);
+export const createPlan = (machineId: number, data: Payload) => post<{ machine: EquipmentDetail }>(`/machines/${machineId}/plans`, data);
+export const updatePlan = (planId: number, data: Payload) => patch<{ machine: EquipmentDetail }>(`/plans/${planId}`, data);
+export const deletePlan = (planId: number) => remove<{ machine: EquipmentDetail }>(`/plans/${planId}`);
+export const createPlanJob = (planId: number) => post<{ job_id: number; machine: EquipmentDetail }>(`/plans/${planId}/job`, {});
+export const sites = (customerId?: number) => api<{ sites: Site[] }>(customerId ? `/sites?customer_id=${customerId}` : "/sites");
+export const createSite = (data: Payload) => post<{ site: Site }>("/sites", data);
+export const updateSite = (id: number, data: Payload) => patch<{ site: Site }>(`/sites/${id}`, data);
+export const deleteSite = (id: number) => remove(`/sites/${id}`);
+
+/** Add a document to a piece of equipment: reserve, upload to the signed link, confirm. */
+export async function uploadDocument(machineId: number, file: File) {
+  const reserved = await requestDocumentUpload(machineId, { content_type: file.type || "application/octet-stream", size: file.size, name: file.name });
+  await sendUpload(reserved.upload, file);
+  return confirmDocument(machineId, reserved.file_id);
+}
 
 // Job photos, videos and reports
 export const requestUpload = (jobId: number, data: { kind: string; content_type: string; size: number; name: string }) =>

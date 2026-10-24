@@ -75,6 +75,7 @@ type Props = {
   onOpenJob?: (id: number) => void;
   onOpenCustomer?: (id: number) => void;
   onOpenRequest?: (id: number) => void;
+  onOpenMachine?: (id: number) => void;
   /** Messages: the customer whose chat to open (managers). */
   chatCustomerId?: number | null;
   onUserChanged?: (user: User) => void;
@@ -191,7 +192,7 @@ const resources: Record<string, Resource> = {
   },
 };
 
-export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, onOpenRequest, chatCustomerId, onUserChanged = () => {} }: Props) {
+export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, onOpenRequest, onOpenMachine, chatCustomerId, onUserChanged = () => {} }: Props) {
   const resource = resources[title] || resources.Profile;
   const Icon = resource.icon;
   const [items, setItems] = useState<ListItem[]>([]);
@@ -316,6 +317,7 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
           query={query}
           onOpenJob={onOpenJob}
           onOpenCustomer={onOpenCustomer}
+          onOpenMachine={onOpenMachine}
           onChanged={added}
         />
       );
@@ -334,6 +336,7 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
             onOpenJob={onOpenJob}
             onOpenCustomer={onOpenCustomer}
             onOpenRequest={onOpenRequest}
+            onOpenMachine={onOpenMachine}
           />
         ))}
       </div>
@@ -463,7 +466,7 @@ function describe(item: ListItem): Description {
   if ("rating" in item) return { heading: item.comment || t("No written comment was provided."), detail: formatDate(item.created_at), badge: `${item.rating}/5` };
   if ("service_type" in item) return { heading: item.service_type, detail: item.work_done || t("No additional details"), jobId: item.job_id };
   if ("subject" in item) return { heading: item.subject, detail: item.description, status: item.status };
-  if ("serial_no" in item) return { heading: item.name, detail: item.model || t("No additional details"), status: item.status };
+  if ("serial_no" in item) return { heading: item.name, detail: [item.equipment_type, item.model].filter(Boolean).join(" · ") || t("No additional details"), status: item.status };
   if ("priority" in item) {
     const due = item.due_date ? t("Due {date}", { date: formatDate(item.due_date) }) : "";
     const detail = [t(item.priority || "Medium"), item.location || t("No site"), due].filter(Boolean).join(" · ");
@@ -480,12 +483,14 @@ type RowProps = {
   onOpenJob?: (id: number) => void;
   onOpenCustomer?: (id: number) => void;
   onOpenRequest?: (id: number) => void;
+  onOpenMachine?: (id: number) => void;
 };
 
-function ResourceRow({ item, Icon, actions, onOpenJob, onOpenCustomer, onOpenRequest }: RowProps) {
+function ResourceRow({ item, Icon, actions, onOpenJob, onOpenCustomer, onOpenRequest, onOpenMachine }: RowProps) {
   const { heading, detail, status, badge, jobId } = describe(item);
   const customer = onOpenCustomer && "machine_count" in item ? item : null;
   const request = onOpenRequest && "subject" in item ? item : null;
+  const machine = onOpenMachine && "serial_no" in item ? item : null;
   return (
     <article>
       <span className="listIcon">
@@ -502,6 +507,10 @@ function ResourceRow({ item, Icon, actions, onOpenJob, onOpenCustomer, onOpenReq
           </button>
         ) : request && onOpenRequest ? (
           <button className="titleLink" onClick={() => onOpenRequest(request.id)}>
+            <strong>{heading}</strong>
+          </button>
+        ) : machine && onOpenMachine ? (
+          <button className="titleLink" onClick={() => onOpenMachine(machine.id)}>
             <strong>{heading}</strong>
           </button>
         ) : (

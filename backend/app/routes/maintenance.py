@@ -10,6 +10,7 @@ from flask import Blueprint, abort, current_app, jsonify, request
 from app import db
 from app.services.audit import purge_old_events
 from app.services.booking import send_reminders
+from app.services.equipment import send_due_reminders
 from app.services.company_data import delete_due_companies
 from app.services.demo import purge_expired
 from app.services.location import purge_old_live_points
@@ -28,6 +29,9 @@ def run_daily():
     db.session.commit()
     # Not a clean-up: visit reminders, "book the repair" reminders and follow-ups (sent once each).
     removed["reminders"] = send_reminders()
+    db.session.commit()
+    # Planned maintenance coming due: its job and the reminders (app/services/equipment.py).
+    removed["maintenance"] = send_due_reminders()
     db.session.commit()
     # Companies whose 30 days after "Delete my company" are up (commits each one).
     removed["deleted_companies"] = delete_due_companies()

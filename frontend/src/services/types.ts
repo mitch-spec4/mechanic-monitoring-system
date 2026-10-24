@@ -30,7 +30,10 @@ export type Job = {
 export type Visit = "inspection" | "repair";
 
 /** Why a piece of equipment needs work: an open job or request, or its status. */
-export type WorkReason = { type: "job" | "request"; id: number; title: string; status: string } | { type: "status"; status: string };
+export type WorkReason =
+  | { type: "job" | "request"; id: number; title: string; status: string }
+  | { type: "maintenance"; id: number; title: string; status: string; due: string }
+  | { type: "status"; status: string };
 
 export type Machine = {
   id: number;
@@ -39,9 +42,61 @@ export type Machine = {
   serial_no: string;
   customer_id: number;
   status: string;
-  /** In the manager's list: what makes it need work. */
+  equipment_type?: string | null;
+  manufacturer?: string | null;
+  site_id?: number | null;
+  installed_on?: string | null;
+  notes?: string | null;
+  /** In the manager's list: what makes it need work, and faults in the last 90 days (2+ is a repeat fault). */
   work?: WorkReason[];
   needs_work?: boolean;
+  repeat_faults?: number;
+};
+
+/** A place a customer has equipment. */
+export type Site = { id: number; customer_id?: number; name: string; address: string | null; notes: string | null; machine_count?: number };
+
+/** Service a piece of equipment needs every N days, weeks or months. */
+export type MaintenancePlan = {
+  id: number;
+  machine_id: number;
+  title: string;
+  job_type: string | null;
+  every: number;
+  unit: "days" | "weeks" | "months";
+  next_due: string;
+  lead_days: number;
+  active: boolean;
+  last_done: string | null;
+  state: "scheduled" | "due" | "overdue" | "paused";
+  open_job_id: number | null;
+};
+
+export type EquipmentDocument = {
+  id: number;
+  name: string;
+  content_type: string;
+  size_bytes: number;
+  url: string;
+  created_at: string;
+  uploaded_by: string | null;
+  uploaded_by_id: number;
+};
+
+/** A piece of equipment's page: its details, plans, documents and everything done on it. */
+export type EquipmentDetail = Machine & {
+  customer: { id: number; name: string } | null;
+  site: Site | null;
+  repeat_fault: { count: number; days: number } | null;
+  plans: MaintenancePlan[];
+  documents: EquipmentDocument[];
+  photos: { id: number; kind: string; content_type: string; url: string; job_id: number; created_at: string }[];
+  jobs: { id: number; title: string; status: string; job_type: string | null; due_date: string | null; scheduled_start: string | null; created_at: string; mechanic: string | null; plan_id: number | null; can_open: boolean }[];
+  faults: { record_id: number; job_id: number | null; date: string; problem: string; solution: string | null }[];
+  records: ServiceRecord[];
+  can_edit: boolean;
+  can_add_documents: boolean;
+  document_mb: number;
 };
 
 /** Equipment on a customer's page, with what makes it need work. */
@@ -75,6 +130,7 @@ export type ServiceRecord = {
 };
 
 export type CustomerDetail = Customer & {
+  sites: Site[];
   machines: EquipmentSummary[];
   needs_work_count: number;
   job_count: number;
