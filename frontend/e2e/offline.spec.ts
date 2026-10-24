@@ -40,8 +40,13 @@ async function call(page: Page, method: "get" | "post" | "patch", path: string, 
 
 const seconds = (value: string) => Date.parse(/Z$/.test(value) ? value : `${value}Z`);
 
-test("the whole job with no signal, sent once when it's back", async ({ page, context }) => {
+test("the whole job with no signal, sent once when it's back", async ({ page, context, browserName }) => {
   test.setTimeout(120_000);
+  // Playwright's offline mode in WebKit fails every load, a photo file on the phone included
+  // ("WebKit encountered an internal error"), which a phone with no signal doesn't do. WebKit
+  // checks the rest of the day offline; its photos are tested online (media.spec.ts).
+  const photoOffline = browserName !== "webkit";
+  const waiting = photoOffline ? 10 : 9;
   const noErrors = failOnPageErrors(page);
   // The manager gives Brian an inspection; its checklist comes with it.
   await signIn(page, "james@mechanicpro.test");
@@ -107,24 +112,26 @@ test("the whole job with no signal, sent once when it's back", async ({ page, co
   await expect(sheet.locator(".timeline")).toContainText("No phone signal at the quarry.");
 
   const media = sheet.locator(".jobCard", { hasText: "Photos & videos" });
-  await media.locator(".mediaPick", { hasText: "Before photo" }).locator("input").setInputFiles({ name: "pump.png", mimeType: "image/png", buffer: PNG });
-  await expect(media.locator(".mediaGrid li, .error").first()).toBeVisible();
-  expect(await media.locator(".error").allTextContents()).toEqual([]);
-  await expect(media.locator(".mediaGrid li")).toHaveCount(1);
-  await expect(media.locator(".mediaGrid li")).toContainText("Waiting to sync");
+  if (photoOffline) {
+    await media.locator(".mediaPick", { hasText: "Before photo" }).locator("input").setInputFiles({ name: "pump.png", mimeType: "image/png", buffer: PNG });
+    await expect(media.locator(".mediaGrid li, .error").first()).toBeVisible();
+    expect(await media.locator(".error").allTextContents()).toEqual([]);
+    await expect(media.locator(".mediaGrid li")).toHaveCount(1);
+    await expect(media.locator(".mediaGrid li")).toContainText("Waiting to sync");
+  }
 
   // Complete with the customer's signature.
   await sheet.locator(".jobActions").getByRole("button", { name: "Complete job" }).click();
   await signAndComplete(page, "Grace Wanjiru");
   await expect(sheet.locator(".jobStatusPill")).toHaveText("Completed");
-  await expect(pill).toHaveText("Offline · 10 waiting");
+  await expect(pill).toHaveText(`Offline · ${waiting} waiting`);
 
   // Signing out now would lose it all: the app says so.
   await page.locator(".profileTrigger").click();
   await expect(page.locator(".profileTrigger")).toHaveAttribute("aria-expanded", "true");
   await page.locator(".profileLogout").click();
   const warning = page.getByRole("alertdialog");
-  await expect(warning).toContainText("10 changes haven't synced");
+  await expect(warning).toContainText(`${waiting} changes haven't synced`);
   await warning.getByRole("button", { name: "Stay signed in" }).click();
   await expect(sheet).toBeVisible();
 
@@ -150,7 +157,7 @@ test("the whole job with no signal, sent once when it's back", async ({ page, co
   const { job: saved } = await call(page, "get", `jobs/${jobId}`);
   expect(saved.status).toBe("Completed");
   expect(saved.parts.map((part: { name: string }) => part.name)).toEqual(["Pump seal"]);
-  expect(saved.files).toHaveLength(1);
+  expect(saved.files).toHaveLength(photoOffline ? 1 : 0);
   expect(saved.signature.name).toBe("Grace Wanjiru");
   expect(saved.entries).toHaveLength(1);
   expect(seconds(saved.entries[0].started_at)).toBeGreaterThan(offlineAt - 5000);
