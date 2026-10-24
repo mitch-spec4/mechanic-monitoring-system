@@ -97,6 +97,9 @@ async function setCompanyLanguage(page: Page, code: string) {
   await company.getByLabel("Company language").selectOption(code);
   await company.getByRole("button", { name: "Save company settings" }).click();
   await expect(page.locator(".toast").last()).toContainText("Company settings saved");
+  // Saved on the server, not just shown: invitations are written in it from now on.
+  const saved = await (await page.request.get("/api/company/settings")).json();
+  expect(saved.settings.language).toBe(code);
 }
 
 async function inviteCustomer(page: Page, name: string, email: string) {
