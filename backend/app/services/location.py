@@ -5,6 +5,7 @@ from datetime import timedelta
 
 from app import db
 from app.models.location import LocationPoint, Shift
+from app.services.sync import happened_at
 from app.utils.time import utcnow
 from app.utils.validation import ValidationError
 from app.i18n import _
@@ -17,6 +18,16 @@ MISSING_REASONS = {"denied", "unavailable", "timeout", "unsupported"}
 
 def open_shift(user):
     return Shift.query.filter_by(user_id=user.id, clocked_out_at=None).first()
+
+
+def shift_at(user, at):
+    """The shift the user was on at `at`: a change made offline is checked against then, not now."""
+    return (
+        Shift.query.filter(Shift.user_id == user.id, Shift.clocked_in_at <= at)
+        .filter(Shift.clocked_out_at.is_(None) | (Shift.clocked_out_at >= at))
+        .order_by(Shift.clocked_in_at.desc())
+        .first()
+    )
 
 
 def _coordinate(data, field, label, limit):
@@ -60,6 +71,7 @@ def record_point(user, shift, kind, fix, missing_reason=None, job=None):
         longitude=longitude,
         accuracy_m=accuracy,
         missing_reason=None if fix else (missing_reason or "not_sent"),
+        recorded_at=happened_at(),
     )
     db.session.add(point)
     return point

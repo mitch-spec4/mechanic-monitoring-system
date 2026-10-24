@@ -11,6 +11,7 @@ from app.models.security import AuditEvent, PasswordReset
 from app.models.service_record import ServiceRecord
 from app.models.user import User
 from app.models.location import Shift
+from app.models.sync import ClientRequest
 from app.models.worksheet import JobEvent
 from app.routes.auth import hash_code, user_payload
 from app.services import audit, two_factor
@@ -137,6 +138,7 @@ def delete_user(uid):
     if Shift.query.filter_by(user_id=user.id).first():
         return jsonify(error=_("This technician has shift records and cannot be deleted.")), 409
     Notification.query.filter_by(user_id=user.id).delete()
+    ClientRequest.query.filter_by(user_id=user.id).delete()
     PasswordReset.query.filter((PasswordReset.user_id == user.id) | (PasswordReset.created_by == user.id)).delete()
     two_factor.disable(user)
     # The activity log keeps their name, not a link to an account that no longer exists.

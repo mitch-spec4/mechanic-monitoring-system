@@ -13,6 +13,7 @@ from app.services.company_data import delete_due_companies
 from app.services.demo import purge_expired
 from app.services.location import purge_old_live_points
 from app.services.media import purge_abandoned_uploads
+from app.services.sync import purge_old_requests
 
 bp = Blueprint("maintenance", __name__)
 
@@ -22,6 +23,7 @@ def run_daily():
     removed["abandoned_uploads"] = purge_abandoned_uploads()
     removed["old_live_locations"] = purge_old_live_points()
     removed["old_activity"] = purge_old_events()
+    removed["old_offline_changes"] = purge_old_requests()
     db.session.commit()
     # Companies whose 30 days after "Delete my company" are up (commits each one).
     removed["deleted_companies"] = delete_due_companies()

@@ -9,7 +9,7 @@ from app import db
 from app.models.media import JobFile
 from app.services.storage import storage
 from app.services.worksheet import record_event
-from app.utils.time import utcnow
+from app.services.sync import happened_at
 from app.utils.validation import ValidationError, text
 from app.i18n import N_, _
 
@@ -55,10 +55,11 @@ def apply_signature(job, user, sign_off):
                 storage_key=key,
                 original_name="signature.png",
                 status="ready",
+                created_at=happened_at(),
             )
         )
         job.signed_by_name = sign_off["name"]
-        job.signed_at = utcnow()
+        job.signed_at = happened_at()
         job.no_signature_reason = None
         record_event(job, user, "signed", note=f"Signed by {sign_off['name']}")
     else:

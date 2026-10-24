@@ -13,3 +13,4 @@ from app.models.worksheet import ChecklistTemplate, ChecklistTemplateItem, JobCh
 from app.models.location import LocationPoint, Shift
 from app.models.media import JobFile
 from app.models.billing import Payment, Subscription
+from app.models.sync import ClientRequest
