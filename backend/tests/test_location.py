@@ -231,8 +231,9 @@ def test_old_live_points_are_purged_but_stamps_stay(client, data, auth):
     assert LocationPoint.query.filter_by(kind="live").count() == 1
 
 
-def test_mechanic_with_shifts_cannot_be_deleted(client, data, auth):
+def test_a_mechanic_with_shifts_is_removed_and_their_shifts_kept(client, data, auth):
     clock_in_mech2(client, auth)
     client.post("/api/shifts/clock-out", headers=mech2(auth), json=HERE)
     response = client.delete(f"/api/users/{data['mechanic2']}", headers=boss(auth))
-    assert response.status_code == 409 and "shift records" in response.get_json()["error"]
+    assert response.status_code == 200 and response.get_json()["kept"] is True
+    assert Shift.query.filter_by(user_id=data["mechanic2"]).count() == 1

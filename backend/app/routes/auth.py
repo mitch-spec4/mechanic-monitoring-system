@@ -126,7 +126,7 @@ def login():
     password = data.get("password")
     keys = (f"login-ip:{rate_limit.client_ip()}", f"login-email:{email}")
     rate_limit.check(*keys)
-    user = User.query.filter_by(email=email).first() if email else None
+    user = User.query.filter_by(email=email, removed_at=None).first() if email else None
     if user and two_factor.minutes_locked(user):
         rate_limit.record(*keys)
         return locked_response(user)
@@ -175,11 +175,17 @@ def start_two_factor_setup():
 @roles("boss", "mechanic", "customer", before_two_factor=True)
 def enable_two_factor():
     """Confirm the app is set up with one of its codes. Returns the backup codes, shown once.
-    Turning it on again (a new phone) replaces the old secret and backup codes."""
+    Turning it on again (a new phone) replaces the old secret and backup codes, so it asks for the
+    password too: a session alone (a browser left open) can't move someone's sign-in to another phone."""
     user = current_user()
     key = f"2fa-setup:{user.id}"
     rate_limit.check(key)
     data = json_body()
+    if user.totp_enabled_at:
+        password = data.get("password")
+        if not isinstance(password, str) or not user.check_password(password):
+            rate_limit.record(key)
+            raise ValidationError(_("Your current password is incorrect"))
     secret = two_factor.secret_from_setup_token(user, data.get("setup_token"))
     if not secret:
         raise ValidationError(_("The setup expired. Start again to get a new code to scan."))
@@ -318,7 +324,7 @@ def forgot_password():
     rate_limit.check(ip_key)
     rate_limit.check(email_key, setting="EMAIL_RATE_LIMIT")
     rate_limit.record(ip_key, email_key)
-    user = User.query.filter_by(email=email).first()
+    user = User.query.filter_by(email=email, removed_at=None).first()
     if user:
         send_password_reset(user)
     return jsonify(message=_("If an account uses that email, we've sent it a link to choose a new password. The link works for 1 hour."))
@@ -345,7 +351,7 @@ def reset_password():
     code = text(data, "code", "Reset code", required=True, max_length=40)
     password = new_password(data)
 
-    user = User.query.filter_by(email=email).first()
+    user = User.query.filter_by(email=email, removed_at=None).first()
     reset = (
         PasswordReset.query.filter_by(code_hash=hash_code(code), used=False).first()
         if user

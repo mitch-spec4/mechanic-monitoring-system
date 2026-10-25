@@ -146,7 +146,7 @@ def test_scoped_lists(client, data, auth):
 
 def test_reports_and_sidebar_totals(client, data, auth):
     boss_report = client.get("/api/reports", headers=boss(auth)).get_json()
-    assert boss_report["totals"] == {"customers": 1, "machines": 1, "storage_bytes": 0}
+    assert boss_report["totals"] == {"customers": 1, "machines": 1, "storage_bytes": 0, "open_requests": 0}
     mech_report = client.get("/api/reports", headers=auth("mech@acme.test")).get_json()
     assert mech_report["totals"] == {"customers": 1, "machines": 1}
     customer_report = client.get("/api/reports", headers=auth("cust@acme.test")).get_json()

@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify
 
 from app import db
-from app.models.constants import DEFAULT_PRIORITY, PRIORITIES
+from app.models.constants import ACTIVE_JOB_STATUSES, DEFAULT_PRIORITY, PRIORITIES
 from app.models.customer import Customer
 from app.models.equipment import Site
 from app.models.job import Job
@@ -33,7 +33,7 @@ from app.services.worksheet import (
     stop_timer,
 )
 from app.utils.auth import current_user, roles
-from app.utils.pages import listing, matches
+from app.utils.pages import listing, matches, only, wanted
 from app.utils.validation import ValidationError, choice, integer, iso_date, json_body, text
 from app.i18n import N_, _, local_time
 from app.services import audit
@@ -104,7 +104,7 @@ def find_machine(company_id, machine_id, customer_id=None):
 
 
 def find_mechanic(company_id, mechanic_id):
-    mechanic = User.query.filter_by(id=mechanic_id, company_id=company_id, role="mechanic").first()
+    mechanic = User.query.filter_by(id=mechanic_id, company_id=company_id, role="mechanic", removed_at=None).first()
     if not mechanic:
         raise ValidationError(_("Technician not found"), 404)
     return mechanic
@@ -119,6 +119,10 @@ def list_jobs():
         query = query.filter_by(mechanic_id=user.id)
     if user.role == "customer":
         query = query.filter_by(customer_id=user.customer_id)
+    if user.role == "boss":
+        query = only(query, Job.mechanic_id, "mechanic_id", "Technician")
+    if wanted("open"):
+        query = query.filter(Job.status.in_(ACTIVE_JOB_STATUSES))
     match = matches([Job.title, Job.description, Job.location, Job.job_type, Job.status])
     if match is not None:
         # A search also finds jobs by their customer's or equipment's name.

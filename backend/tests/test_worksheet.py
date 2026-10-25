@@ -267,9 +267,13 @@ def test_cancelling_stops_the_timer_and_deleting_cleans_up(client, data, auth):
     assert client.delete(f"/api/jobs/{fresh['id']}", headers=boss(auth)).status_code == 200
 
 
-def test_people_in_history_cannot_be_deleted(client, data, auth):
+def test_people_in_history_are_removed_not_deleted(client, data, auth):
     client.post(f"/api/jobs/{data['job']}/notes", headers=auth("boss2@acme.test"), json={"note": "Checked in"})
-    assert client.delete(f"/api/users/{data['boss2']}", headers=boss(auth)).status_code == 409
+    removed = client.delete(f"/api/users/{data['boss2']}", headers=boss(auth))
+    assert removed.status_code == 200 and removed.get_json()["kept"] is True
+    # The note still shows who wrote it.
+    history = detail(client, boss(auth), data["job"])["history"]
+    assert any(event["note"] == "Checked in" and event["user"] == "Boss Two" for event in history)
 
 
 def test_time_entries_cannot_overlap(client, data, auth):

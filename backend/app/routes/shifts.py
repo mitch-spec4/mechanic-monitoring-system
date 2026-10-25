@@ -218,11 +218,14 @@ def live():
     """Positions sent while a job is in progress and the app is open. At most one a minute is kept."""
     user = current_user()
     data = json_body()
-    shift = open_shift(user)
     job_id = integer(data, "job_id", "Job", required=True)
     job = Job.query.filter_by(id=job_id, company_id=user.company_id, mechanic_id=user.id).first_or_404()
     if job.status != "In Progress":
         raise ValidationError(_("Live location is only shared while a job is in progress"), 409)
+    shift = open_shift(user)
+    if not shift:
+        # Location is only ever recorded while clocked in (a shift closed by a manager, say).
+        raise ValidationError(_("Clock in to share your location"), 409)
     fix, _reason = parse_fix(data)
     if not fix:
         raise ValidationError(_("A position is required"))

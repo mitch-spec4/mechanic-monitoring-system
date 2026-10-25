@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify
 
 from app import db
+from app.models.constants import CLOSED_REQUEST_STATUSES
 from app.models.customer import Customer
 from app.models.job import Job
 from app.models.machine import Machine
@@ -13,13 +14,20 @@ from app.utils.auth import current_user, roles
 bp = Blueprint("reports", __name__)
 
 
+def open_requests(query):
+    return query.filter(ServiceRequest.status.notin_(CLOSED_REQUEST_STATUSES)).count()
+
+
 @bp.get("")
 @roles("boss", "mechanic", "customer")
 def report():
+    """The numbers on the dashboards and the side bar, counted by the database: the side bar asks
+    every minute, and a company's jobs only grow."""
     user = current_user()
     jobs = Job.query.filter_by(company_id=user.company_id)
     reviews = Review.query.filter_by(company_id=user.company_id)
     records = ServiceRecord.query.filter_by(company_id=user.company_id)
+    requests = ServiceRequest.query.filter_by(company_id=user.company_id)
     if user.role == "mechanic":
         jobs = jobs.filter_by(mechanic_id=user.id)
         reviews = reviews.filter_by(mechanic_id=user.id)
@@ -28,10 +36,10 @@ def report():
         jobs = jobs.filter_by(customer_id=user.customer_id)
         reviews = reviews.filter_by(customer_id=user.customer_id)
         records = records.filter_by(customer_id=user.customer_id)
+        requests = requests.filter_by(customer_id=user.customer_id)
 
-    job_rows = jobs.all()
-    ratings = [review.rating for review in reviews.all()]
-    record_rows = records.all()
+    statuses = dict(jobs.with_entities(Job.status, db.func.count(Job.id)).group_by(Job.status).all())
+    average, review_count = reviews.with_entities(db.func.avg(Review.rating), db.func.count(Review.id)).one()
 
     if user.role == "boss":
         totals = {
@@ -41,31 +49,30 @@ def report():
             "storage_bytes": db.session.query(db.func.coalesce(db.func.sum(JobFile.size_bytes), 0))
             .filter(JobFile.company_id == user.company_id, JobFile.status == "ready")
             .scalar(),
+            "open_requests": open_requests(requests),
         }
     elif user.role == "mechanic":
         totals = {
-            "customers": len({record.customer_id for record in record_rows}),
-            "machines": len({record.machine_id for record in record_rows}),
+            "customers": records.with_entities(db.func.count(db.distinct(ServiceRecord.customer_id))).scalar(),
+            "machines": records.with_entities(db.func.count(db.distinct(ServiceRecord.machine_id))).scalar(),
         }
     else:
         totals = {
             "machines": Machine.query.filter_by(company_id=user.company_id, customer_id=user.customer_id).count(),
-            "open_requests": ServiceRequest.query.filter_by(company_id=user.company_id, customer_id=user.customer_id)
-            .filter(ServiceRequest.status.notin_(["Completed", "Cancelled"]))
-            .count(),
+            "open_requests": open_requests(requests),
         }
 
     return jsonify(
         jobs={
-            "total": len(job_rows),
-            "completed": sum(job.status == "Completed" for job in job_rows),
-            "pending": sum(job.status in {"Pending", "Assigned", "Accepted"} for job in job_rows),
-            "in_progress": sum(job.status in {"In Progress", "Paused"} for job in job_rows),
-            "cancelled": sum(job.status == "Cancelled" for job in job_rows),
+            "total": sum(statuses.values()),
+            "completed": statuses.get("Completed", 0),
+            "pending": sum(statuses.get(status, 0) for status in ("Pending", "Assigned", "Accepted")),
+            "in_progress": sum(statuses.get(status, 0) for status in ("In Progress", "Paused")),
+            "cancelled": statuses.get("Cancelled", 0),
         },
         # Customers see mechanic ratings elsewhere, not an average of their own reviews.
-        rating=(sum(ratings) / len(ratings)) if ratings and user.role != "customer" else None,
-        review_count=len(ratings),
-        service_records=len(record_rows),
+        rating=float(average) if review_count and user.role != "customer" else None,
+        review_count=review_count,
+        service_records=records.count(),
         totals=totals,
     )

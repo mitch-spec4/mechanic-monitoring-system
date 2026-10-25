@@ -162,6 +162,14 @@ def delete_form(fid):
     return jsonify(ok=True)
 
 
+def refused_answers(fields, sent):
+    """A change that a newer one beat, for the job's history: each answer under its question."""
+    labels = {field["id"]: field["label"] for field in fields}
+    if not isinstance(sent, dict):
+        return {}
+    return {labels[key]: value.get("name") if isinstance(value, dict) else value for key, value in sent.items() if key in labels and value not in (None, "")}
+
+
 def form_job(jid, user):
     """The job whose form is filled in: a technician's own (as the worksheet allows), or any
     unfinished job in the company for a manager."""
@@ -209,7 +217,7 @@ def save_answers(jid, fid):
     submission = FormSubmission.query.filter_by(job_id=job.id, form_id=form.id).first()
     if submission:
         version = db.session.get(FormVersion, submission.version_id)
-        if newer_change_kept(job, user, submission.updated_at, "form", {}, label=form.name):
+        if newer_change_kept(job, user, submission.updated_at, "form", refused_answers(version.fields, data.get("answers")), label=form.name):
             return jsonify(job=job_detail(job, user))
     else:
         # The version the phone showed (it may have been cached before the form changed).
@@ -223,7 +231,8 @@ def save_answers(jid, fid):
     for field_id, signature in signatures.items():
         answers[field_id] = {"name": signature["name"]}
     complete = data.get("complete") is True
-    if complete:
+    # A completed form stays complete: a change can't leave a required question unanswered.
+    if complete or submission.status == "completed":
         # Checked before anything is stored, so a refused completion leaves no files behind.
         missing = form_rules.missing_answers(version.fields, answers, form_rules.form_files(job.id, form.id))
         if missing:

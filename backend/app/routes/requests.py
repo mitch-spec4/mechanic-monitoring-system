@@ -23,7 +23,7 @@ from app.services.equipment import site_label
 from app.services.notifications import notify, notify_bosses
 from app.services.worksheet import record_event
 from app.utils.auth import current_user, roles
-from app.utils.pages import listing, searched
+from app.utils.pages import listing, searched, wanted
 from app.utils.validation import ValidationError, choice, integer, json_body, text
 from app.i18n import N_, _
 
@@ -111,6 +111,8 @@ def requests_list():
     query = ServiceRequest.query.filter_by(company_id=user.company_id)
     if user.role == "customer":
         query = query.filter_by(customer_id=user.customer_id)
+    if wanted("open"):
+        query = query.filter(ServiceRequest.status.notin_(CLOSED_REQUEST_STATUSES))
     columns = [ServiceRequest.subject, ServiceRequest.description, ServiceRequest.status]
     return listing(searched(query, columns).order_by(ServiceRequest.id.desc()), "requests", request_out)
 

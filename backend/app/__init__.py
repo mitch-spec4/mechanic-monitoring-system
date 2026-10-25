@@ -256,6 +256,16 @@ def create_app(overrides=None):
     init_billing(app)
     init_email(app)
     CORS(app, origins=app.config["CORS_ORIGINS"], supports_credentials=True)
+
+    @app.url_value_preprocessor
+    def ids_in_range(_endpoint, values):
+        """/api/jobs/<int:jid> and the like: an ID too big for the database is simply not found,
+        instead of reaching the database and failing there."""
+        from app.utils.validation import DB_INTEGER_MAX
+
+        if any(isinstance(value, int) and value > DB_INTEGER_MAX for value in (values or {}).values()):
+            abort(404)
+
     db.init_app(app)
     jwt.init_app(app)
     migrate.init_app(app, db, render_as_batch=True)
@@ -414,7 +424,10 @@ def create_app(overrides=None):
 
         from app.routes.maintenance import run_daily
 
-        print(json.dumps(run_daily(), indent=2))
+        removed = run_daily()
+        print(json.dumps(removed, indent=2))
+        if removed.get("failed"):
+            sys.exit(1)
 
     @app.cli.command("purge-activity")
     def purge_activity():

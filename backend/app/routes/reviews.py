@@ -5,7 +5,7 @@ from app.models.review import Review
 from app.models.service_record import ServiceRecord
 from app.services.notifications import notify, notify_bosses
 from app.utils.auth import current_user, roles
-from app.utils.pages import listing, searched
+from app.utils.pages import listing, only, searched
 from app.utils.validation import ValidationError, integer, json_body, text
 from app.i18n import N_, _
 
@@ -38,6 +38,8 @@ def list_reviews():
         query = query.filter_by(customer_id=user.customer_id)
     if user.role == "mechanic":
         query = query.filter_by(mechanic_id=user.id)
+    if user.role == "boss":
+        query = only(query, Review.mechanic_id, "mechanic_id", "Technician")
     return listing(searched(query, [Review.comment, Review.advice]).order_by(Review.id.desc()), "reviews", out)
 
 

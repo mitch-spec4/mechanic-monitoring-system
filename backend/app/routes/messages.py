@@ -138,7 +138,7 @@ def send_to_customer(cid):
     message = add_message(user.company_id, customer.id, user)
     company = db.session.get(Company, user.company_id)
     link = app_link("/messages")
-    for person in User.query.filter_by(company_id=user.company_id, customer_id=customer.id, role="customer").all():
+    for person in User.query.filter_by(company_id=user.company_id, customer_id=customer.id, role="customer", removed_at=None).all():
         notify(person.id, N_("New message"), N_("{sender}: {message}"), "message", (), sender=company.name, message=preview(message.body))
         if waiting:
             continue

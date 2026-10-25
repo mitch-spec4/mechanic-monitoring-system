@@ -39,7 +39,7 @@ bp = Blueprint("company", __name__)
 def company():
     user = current_user()
     record = db.get_or_404(Company, user.company_id)
-    bosses = User.query.filter_by(company_id=user.company_id, role="boss").order_by(User.name).all()
+    bosses = User.query.filter_by(company_id=user.company_id, role="boss", removed_at=None).order_by(User.name).all()
     return jsonify(
         company={
             "id": record.id,
@@ -74,7 +74,7 @@ def setup():
         {"key": "customer", "done": has_customer or invited(company.id, "customer")},
         # Machines belong to a customer, so this waits until one has joined.
         {"key": "machine", "done": Machine.query.filter_by(company_id=company.id).first() is not None, "waiting": not has_customer},
-        {"key": "mechanic", "done": User.query.filter_by(company_id=company.id, role="mechanic").first() is not None or invited(company.id, "mechanic")},
+        {"key": "mechanic", "done": User.query.filter_by(company_id=company.id, role="mechanic", removed_at=None).first() is not None or invited(company.id, "mechanic")},
         {"key": "job", "done": Job.query.filter_by(company_id=company.id).first() is not None},
     ]
     return jsonify(dismissed=company.setup_dismissed_at is not None, steps=steps)

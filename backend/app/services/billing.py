@@ -475,12 +475,37 @@ def apply_event(event, provider_name, now=None):
 # ---------- Renewals and reminders (the daily run) ----------
 
 
+def renew(subscription, company, tries, checkout, counts, now):
+    # A renewal the provider hasn't decided yet (an M-Pesa prompt, say): ask about it instead of
+    # charging again, so nobody pays twice. Undecided: wait for the provider's webhook.
+    waiting = tries.filter(Payment.status == "pending").order_by(Payment.created_at.desc()).first()
+    if waiting:
+        event = checkout.confirm(waiting) if checkout else None
+        if event:
+            apply_event(event, checkout.name, now)
+            counts["charged" if event.kind == "paid" else "failed"] += 1
+        return
+    boss = User.query.filter_by(company_id=company.id, role="boss", removed_at=None).order_by(User.id).first()
+    if checkout and subscription.payment_token and boss:
+        payment, _provider = create_payment(boss, subscription.plan, subscription.interval, subscription.extra_mechanics, kind="renewal")
+        db.session.flush()
+        event = checkout.charge_saved(payment, subscription, boss.email)
+        if event:
+            apply_event(event, checkout.name, now)
+            counts["charged" if event.kind == "paid" else "failed"] += 1
+    elif not subscription.past_due_since:
+        # Nothing to charge: the manager pays under Billing.
+        subscription.past_due_since = now
+        tell_renewal_due(subscription)
+        counts["reminded"] += 1
+
+
 def renew_due(now=None):
     """Charge saved cards for paid periods ending within a day, retry declined ones daily (up to
     RENEWAL_ATTEMPTS), and remind managers when a trial or an unrenewable plan is ending."""
     now = now or utcnow()
     checkout = provider()
-    counts = {"charged": 0, "failed": 0, "reminded": 0}
+    counts = {"charged": 0, "failed": 0, "reminded": 0, "errors": 0}
     due = Subscription.query.filter(
         Subscription.status == "active",
         Subscription.auto_renew.is_(True),
@@ -496,20 +521,13 @@ def renew_due(now=None):
         tries = Payment.query.filter(Payment.company_id == company.id, Payment.kind == "renewal", Payment.created_at >= window_start)
         if tries.filter(Payment.created_at > now - timedelta(hours=20)).first() or tries.filter(Payment.status == "failed").count() >= RENEWAL_ATTEMPTS:
             continue
-        boss = User.query.filter_by(company_id=company.id, role="boss").order_by(User.id).first()
-        if checkout and subscription.payment_token and boss:
-            payment, _provider = create_payment(boss, subscription.plan, subscription.interval, subscription.extra_mechanics, kind="renewal")
-            db.session.flush()
-            event = checkout.charge_saved(payment, subscription, boss.email)
-            if event:
-                apply_event(event, checkout.name, now)
-                counts["charged" if event.kind == "paid" else "failed"] += 1
-        elif not subscription.past_due_since:
-            # Nothing to charge: the manager pays under Billing.
-            subscription.past_due_since = now
-            tell_renewal_due(subscription)
-            counts["reminded"] += 1
-        db.session.commit()
+        try:
+            renew(subscription, company, tries, checkout, counts, now)
+            db.session.commit()
+        except Exception:  # noqa: BLE001  one company's renewal (the provider down, say) never stops the others
+            db.session.rollback()
+            current_app.logger.exception("Renewing the plan of company %s failed", company.id)
+            counts["errors"] += 1
 
     ending = Subscription.query.filter(
         Subscription.reminded_at.is_(None),
@@ -551,7 +569,7 @@ def _tell_bosses(company_id, title, message, email=None, when=None, **values):
 
     company = db.session.get(Company, company_id)
     link = app_link("/billing")
-    for boss in User.query.filter_by(company_id=company_id, role="boss").all():
+    for boss in User.query.filter_by(company_id=company_id, role="boss", removed_at=None).all():
         with speaking(boss.language):
             if when is not None:
                 values["date"] = local_time(when, company.timezone, with_time=False)
@@ -666,7 +684,7 @@ def mechanic_count(company_id):
         Invitation.used.is_(False),
         Invitation.expires_at > utcnow(),
     ).count()
-    return User.query.filter_by(company_id=company_id, role="mechanic").count() + open_invitations
+    return User.query.filter_by(company_id=company_id, role="mechanic", removed_at=None).count() + open_invitations
 
 
 def check_mechanic_limit(company_id):

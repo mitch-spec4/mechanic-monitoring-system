@@ -104,13 +104,21 @@ def _plain(value):
     return value
 
 
+# Text starting with one of these runs as a formula when the CSV is opened in Excel or Google
+# Sheets ("=HYPERLINK(...)" typed as a job title, say).
+FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
+
+
 def cell(value):
     """A value as a spreadsheet cell: a list of names (a service's skills) as "Electrical;
-    Welding", anything else structured (a form's questions or answers) as JSON."""
+    Welding", anything else structured (a form's questions or answers) as JSON. Text that would
+    start a formula gets a leading apostrophe, so it stays text."""
     if isinstance(value, list) and all(isinstance(item, (str, int, float)) for item in value):
-        return "; ".join(map(str, value))
-    if isinstance(value, (list, dict)):
-        return json.dumps(value, ensure_ascii=False)
+        value = "; ".join(map(str, value))
+    elif isinstance(value, (list, dict)):
+        value = json.dumps(value, ensure_ascii=False)
+    if isinstance(value, str) and value.startswith(FORMULA_START):
+        return "'" + value
     return value
 
 

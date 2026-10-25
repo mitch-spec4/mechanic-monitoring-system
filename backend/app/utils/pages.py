@@ -1,7 +1,8 @@
 """Long lists a page at a time: ?page=2&per_page=25, and ?q= to search them.
 
 Without ?page the whole list comes back as before, for the screens that need all of it (the
-dashboards, and the technician's phone, which keeps its jobs for when there's no signal)."""
+technician's phone, which keeps its jobs for when there's no signal). ?open=1 keeps only what
+isn't finished, so a dashboard needn't load everything the company ever had."""
 from math import ceil
 
 from flask import jsonify, request
@@ -22,6 +23,18 @@ def matches(columns):
         return None
     pattern = "%" + words.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
     return db.or_(*[column.ilike(pattern, escape="\\") for column in columns])
+
+
+def wanted(name):
+    """A yes/no filter in the address, like ?open=1."""
+    return request.args.get(name) in ("1", "true")
+
+
+def only(query, column, name, label):
+    """Narrow a list to ?<name>=<id> (a manager looking at one technician), when it's given."""
+    if name not in request.args:
+        return query
+    return query.filter(column == integer(request.args, name, label))
 
 
 def searched(query, columns):

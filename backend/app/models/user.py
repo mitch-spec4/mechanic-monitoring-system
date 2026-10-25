@@ -32,6 +32,9 @@ class User(db.Model):
     # The privacy policy and terms this person agreed to, and when.
     terms_version = db.Column(db.String(20))
     terms_accepted_at = db.Column(db.DateTime)
+    # When a manager removed this person. Someone whose work is in the history is kept (so the
+    # history still names them) but can't sign in and is left out of lists (app/routes/users.py).
+    removed_at = db.Column(db.DateTime)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)

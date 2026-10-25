@@ -250,3 +250,29 @@ def test_forms_on_a_service_follow_its_jobs(client, data, auth, business):
     made = client.post("/api/jobs", headers=boss(auth), json={"service_id": service.id, "machine_id": data["machine"]}).get_json()["job"]
     assert [f["form_id"] for f in client.get(f"/api/jobs/{made['id']}", headers=boss(auth)).get_json()["job"]["forms"]] == [form["id"]]
     assert FormTemplate.query.count() == 1
+
+
+def test_a_completed_form_keeps_its_required_answers(client, data, auth, business):
+    """Saving a completed form can't leave a required question unanswered: its certificate would
+    go out with the answer missing, and the job would no longer wait for it."""
+    form = make_form(client, auth, fields=[q for q in QUESTIONS if q["type"] not in ("photo", "signature")])
+    url = f"/api/jobs/{data['job']}/forms/{form['id']}"
+    answers = {"levels": "yes", "load_test": "yes", "load_kw": 60, "result": "Pass"}
+    assert client.put(url, headers=mech(auth), json={"answers": answers, "complete": True}).status_code == 200
+    cleared = client.put(url, headers=mech(auth), json={"answers": {"result": None}})
+    assert cleared.status_code == 409 and cleared.get_json()["missing"] == ["Result"]
+    submission = FormSubmission.query.one()
+    assert submission.status == "completed" and submission.answers["result"] == "Pass"
+    # A correction that keeps every required answer is fine.
+    assert client.put(url, headers=mech(auth), json={"answers": {"result": "Fail"}}).status_code == 200
+    assert db.session.get(FormSubmission, submission.id).answers["result"] == "Fail"
+
+
+def test_answers_beaten_by_a_newer_change_are_kept_in_the_history(client, data, auth, business):
+    form = make_form(client, auth, required=False)
+    url = f"/api/jobs/{data['job']}/forms/{form['id']}"
+    client.put(url, headers=mech(auth), json={"answers": {"result": "Fail"}})
+    earlier = (utcnow() - timedelta(minutes=30)).isoformat() + "Z"
+    client.put(url, headers={**mech(auth), "Idempotency-Key": "form-change-0002", "X-Client-Time": earlier}, json={"answers": {"result": "Pass", "levels": "no"}})
+    note = JobEvent.query.filter_by(job_id=data["job"], action="change_not_applied").one().note
+    assert '"Result": "Pass"' in note and '"Levels correct": "no"' in note

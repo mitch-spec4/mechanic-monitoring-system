@@ -125,7 +125,7 @@ def free_slots(company, minutes, ignore_job_id=None, now=None):
     opens, closes = minutes_of(company.booking_start), minutes_of(company.booking_end)
     length = timedelta(minutes=minutes)
     travel = timedelta(minutes=company.travel_minutes)
-    technicians = [user.id for user in User.query.filter_by(company_id=company.id, role="mechanic").order_by(User.id).all()]
+    technicians = [user.id for user in User.query.filter_by(company_id=company.id, role="mechanic", removed_at=None).order_by(User.id).all()]
     if not technicians:
         return []
     query = Job.query.filter(
@@ -200,7 +200,7 @@ def remind_soon(job, company, now=None):
 
 
 def customer_users(company_id, customer_id):
-    return User.query.filter_by(company_id=company_id, customer_id=customer_id, role="customer").all()
+    return User.query.filter_by(company_id=company_id, customer_id=customer_id, role="customer", removed_at=None).all()
 
 
 def tell_customer(service_request, title, message, kind="request", email=True, button=None, **values):
@@ -230,7 +230,7 @@ def tell_customer(service_request, title, message, kind="request", email=True, b
 def tell_staff(job, title, message, kind="request", **values):
     """Managers and the visit's technician, in the app."""
     company = db.session.get(Company, job.company_id)
-    people = User.query.filter_by(company_id=job.company_id, role="boss").all()
+    people = User.query.filter_by(company_id=job.company_id, role="boss", removed_at=None).all()
     if job.mechanic_id:
         people.append(db.session.get(User, job.mechanic_id))
     for user in people:
