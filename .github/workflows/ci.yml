@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   frontend-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
@@ -35,7 +35,7 @@ jobs:
         run: npm run rtl:check
 
   backend-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: backend
@@ -61,7 +61,7 @@ jobs:
           flask --app run.py db check
 
   backend-postgres:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16
@@ -101,7 +101,7 @@ jobs:
   docker:
     # The image Render (render.yaml) builds and runs: build it, start it as staging, and check
     # that the API, its database and the web app all answer from one address.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -125,7 +125,7 @@ jobs:
 
   e2e:
     name: e2e (${{ matrix.project }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # The tests take about 5–7 minutes, and installing a browser's system packages has taken up to
     # 9 on a slow day; a stuck install still shouldn't hold the checks for hours.
     timeout-minutes: 25

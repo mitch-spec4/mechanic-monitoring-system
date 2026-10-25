@@ -120,6 +120,22 @@ def test_the_daily_command_runs_everything(app, data):
 POSTGRES = os.getenv("TEST_DATABASE_URL", "").startswith(("postgres://", "postgresql")) and shutil.which("pg_dump") and shutil.which("pg_restore")
 
 
+def test_backups_use_the_servers_own_postgres_tools(tmp_path, monkeypatch):
+    """A newer pg_restore starts with settings an older server refuses (pg_restore 17 and Postgres
+    16: transaction_timeout), so the scripts take the server's own version's tools when installed."""
+    from scripts import backup
+
+    monkeypatch.setattr(backup, "PG_LIB", tmp_path)
+    monkeypatch.setattr(backup, "server_major", lambda url: 16)
+    assert backup.pg_tool("pg_restore", "postgresql://db/x") == "pg_restore"  # not installed: the PATH's
+    tool = tmp_path / "16" / "bin" / "pg_restore"
+    tool.parent.mkdir(parents=True)
+    tool.write_text("")
+    (tmp_path / "17" / "bin").mkdir(parents=True)
+    (tmp_path / "17" / "bin" / "pg_restore").write_text("")
+    assert backup.pg_tool("pg_restore", "postgresql://db/x") == str(tool)
+
+
 @pytest.mark.skipif(not POSTGRES, reason="needs TEST_DATABASE_URL on Postgres, and pg_dump and pg_restore")
 def test_a_backup_restores_into_a_scratch_database(tmp_path):
     """The written restore test (SETUP.md, Backups), run for real: migrate a database, back it up,

@@ -571,7 +571,7 @@ Then run **Actions → Backup → Run workflow**, and after it **Restore test �
 
 To restore for real: create a new database in Render, run `RESTORE_DATABASE_URL=<its URL> python scripts/restore_check.py` from `backend/` (it restores the newest copy and checks it; it refuses the live `DATABASE_URL`), then point the app's `DATABASE_URL` at it. The files on the app's disk (photos, videos, signatures) are not in these copies: Render snapshots the disk daily (**Disks** on the app, **Restore**), and a bucket keeps its own copies once uploads move to one.
 
-Locally, with Postgres: `python scripts/backup.py` writes a copy to `backend/backups/` (or `BACKUP_DIR`; git ignores both `backups/` and `*.dump` files), and `RESTORE_DATABASE_URL=... python scripts/restore_check.py` restores it. `tests/test_deploy.py` does exactly this against `TEST_DATABASE_URL`.
+Locally, with Postgres: `python scripts/backup.py` writes a copy to `backend/backups/` (or `BACKUP_DIR`; git ignores both `backups/` and `*.dump` files), and `RESTORE_DATABASE_URL=... python scripts/restore_check.py` restores it. `tests/test_deploy.py` does exactly this against `TEST_DATABASE_URL`. Both scripts use the Postgres tools of the database's own version when they're installed (`/usr/lib/postgresql/16/bin` on Debian and Ubuntu, from `postgresql-client-16`), because a newer `pg_restore` can't restore into Postgres 16.
 
 ## Errors, logs and the health check
 
