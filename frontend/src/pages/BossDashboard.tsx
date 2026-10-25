@@ -25,7 +25,6 @@ import { PRIORITIES, statusClass } from "../lib/labels";
 import type { User } from "../services/api";
 import type { CustomerSummary, Job, Machine, Mechanic, ServiceRequest } from "../services/types";
 import { t } from "../i18n";
-import { PlanBanner } from "./BillingPage";
 import Field from "../components/Field";
 
 type Props = {
@@ -33,13 +32,12 @@ type Props = {
   onOpenJob: (id: number) => void;
   onOpenCustomer: (id: number) => void;
   onOpenRequest?: (id: number) => void;
-  onOpenBilling?: () => void;
   onUserChanged?: (user: User) => void;
 };
 
 const FINISHED = ["Completed", "Cancelled", "Declined"];
 
-export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenRequest = () => {}, onOpenBilling = () => {}, onUserChanged = () => {} }: Props) {
+export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenRequest = () => {}, onUserChanged = () => {} }: Props) {
   const [data, setData] = useState<Job[]>([]);
   const [cs, setCs] = useState<CustomerSummary[]>([]);
   const [ms, setMs] = useState<Mechanic[]>([]);
@@ -85,7 +83,6 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenRequ
       <Header u={u} />
       <main className="page">
         {u.email_verified === false && <VerifyBanner user={u} onVerified={onUserChanged} />}
-        <PlanBanner onOpenBilling={onOpenBilling} />
         <SetupGuide onAction={(step: SetupStep) => setModal(SETUP_MODALS[step])} />
         <div className="welcome">
           <div>

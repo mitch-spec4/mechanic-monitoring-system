@@ -47,7 +47,8 @@ from app.utils.time import utcnow
 
 LINK_DAYS = 7
 # Never leave the server, whatever table they're in.
-SECRET_COLUMNS = {"password_hash", "totp_secret", "totp_last_step", "code", "code_hash", "token_hash"}
+# The payment token can charge the saved card (with the provider key), so it stays out too.
+SECRET_COLUMNS = {"password_hash", "totp_secret", "totp_last_step", "code", "code_hash", "token_hash", "payment_token"}
 
 
 def _rows(model, query):

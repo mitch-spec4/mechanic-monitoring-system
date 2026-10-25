@@ -10,6 +10,7 @@ import type {
   CustomerSummary,
   EquipmentDetail,
   ErrorBody,
+  Feature,
   Insights,
   IssuedCode,
   Job,
@@ -71,6 +72,10 @@ export type User = {
   timezone: string;
   units: string;
   currency?: string;
+  /** What the company's plan includes (missing on profiles saved before plans had features). */
+  features?: Feature[];
+  /** Managers: where the plan stands, for the banner across the app. */
+  subscription?: Subscription | null;
   two_factor_enabled: boolean;
   two_factor_setup_needed: boolean;
   /** Set while the company waits to be deleted: when it happens. */
@@ -255,10 +260,17 @@ export const signup = (data: Payload) => post<Signed & { checkout_url?: string }
 /** The billing page: the plans, this company's plan and usage, and its payments. */
 export type Billing = Pricing & { subscription: Subscription | null; usage: Usage; payments: Payment[] };
 export const billing = () => api<Billing>("/billing");
-export const startCheckout = (plan: string, interval: string) => post<{ checkout_url: string; payment: Payment }>("/billing/checkout", { plan, interval });
+export const startCheckout = (plan: string, interval: string, extraMechanics = 0) =>
+  post<{ checkout_url: string; payment: Payment }>("/billing/checkout", { plan, interval, extra_mechanics: extraMechanics });
+export const setRenewal = (autoRenew: boolean) => post<{ subscription: Subscription }>("/billing/renewal", { auto_renew: autoRenew });
+/** Back from the payment provider's page: how it went. */
+export const confirmPayment = (reference: string) =>
+  post<{ payment: Payment; subscription: Subscription | null }>(`/billing/payments/${encodeURIComponent(reference)}/confirm`, {});
+/** Test mode: charge the saved test card for the next period now. */
+export const testRenew = () => post<{ payment: Payment; subscription: Subscription }>("/billing/test/renew", {});
 export const checkoutDetail = (reference: string) =>
   api<{ payment: Payment; company: string; email: string }>(`/billing/payments/${encodeURIComponent(reference)}`);
-export const payTestCheckout = (reference: string, outcome: "success" | "declined") =>
+export const payTestCheckout = (reference: string, outcome: "success" | "declined" | "declines_later") =>
   post<{ payment: Payment; subscription: Subscription | null }>(`/billing/test/${encodeURIComponent(reference)}/pay`, { outcome });
 
 export const jobs = () => api<{ jobs: Job[] }>("/jobs");

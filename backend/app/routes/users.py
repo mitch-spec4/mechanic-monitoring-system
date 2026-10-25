@@ -16,6 +16,7 @@ from app.models.worksheet import JobEvent
 from app.routes.auth import hash_code, user_payload
 from app.services import audit, two_factor
 from app.services.accounts import send_verification
+from app.services.billing import require_feature
 from app.i18n import LANGUAGES
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
@@ -83,6 +84,7 @@ def update_user(uid):
             user.email, user.email_verified_at, changed_email = email, None, True
     if "pay_rate" in data:
         # What an hour of a technician's time costs the company: for job costing.
+        require_feature(user.company_id, "costing")
         if user.role != "mechanic":
             raise ValidationError(_("Only technicians have a pay rate."))
         user.pay_rate_cents = money(data, "pay_rate", N_("Pay rate per hour"))

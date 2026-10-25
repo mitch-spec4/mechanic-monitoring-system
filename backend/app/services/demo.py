@@ -302,17 +302,18 @@ def populate(company, tag=None, password=None):
 
     add_signature(conveyor_job, brian, "Grace Wanjiru", now)
 
-    # On the Professional plan, paid monthly (a test-mode payment a week ago).
+    # On the Business plan (every feature), paid monthly (a test-mode payment a week ago).
     paid = now - timedelta(days=7)
     db.session.add(
         Subscription(
-            company_id=company.id, plan="professional", interval="month", status="active",
+            company_id=company.id, plan="business", interval="month", status="active",
             trial_ends_at=paid, current_period_end=add_period(paid, "month"), created_at=paid - timedelta(days=14),
+            payment_token="test_card_4242", payment_method="Test card •••• 4242",
         )
     )
     db.session.add(
         Payment(
-            company_id=company.id, user_id=boss.id, plan="professional", interval="month", amount_cents=price_cents("professional", "month"),
+            company_id=company.id, user_id=boss.id, plan="business", interval="month", amount_cents=price_cents("business", "month"),
             currency=CURRENCY, provider="test", reference=f"pay_demo_{tag or 'first_month'}", status="paid", created_at=paid, paid_at=paid,
         )
     )

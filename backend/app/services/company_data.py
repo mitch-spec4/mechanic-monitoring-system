@@ -12,6 +12,7 @@ from app import db
 from app.models import (
     AuditEvent,
     BackupCode,
+    BillingEvent,
     ChecklistTemplate,
     ClientRequest,
     ChecklistTemplateItem,
@@ -76,6 +77,7 @@ def delete_company(company_id):
         delete(Invitation).where(Invitation.company_id == company_id),
         delete(ChecklistTemplateItem).where(ChecklistTemplateItem.template_id.in_(templates)),
         delete(ChecklistTemplate).where(ChecklistTemplate.company_id == company_id),
+        delete(BillingEvent).where(BillingEvent.company_id == company_id),
         delete(Payment).where(Payment.company_id == company_id),
         delete(Subscription).where(Subscription.company_id == company_id),
         delete(User).where(User.company_id == company_id),

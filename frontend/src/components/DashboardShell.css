@@ -792,6 +792,12 @@
 .bossOverviewGrid .dashPanel {
   grid-area: auto;
 }
+/* A page the company's plan doesn't include. */
+.sidebarLock {
+  flex: none;
+  margin-inline-start: auto;
+  opacity: 0.7;
+}
 .sidebarLink {
   font-size: 12px;
   padding-top: 10px;

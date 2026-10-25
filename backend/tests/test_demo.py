@@ -191,6 +191,7 @@ def test_the_daily_url_needs_the_cron_secret(app, client, data):
         "deleted_companies": 0,
         "reminders": {"visit_reminders": 0, "repair_reminders": 0, "follow_ups": 0},
         "maintenance": {"maintenance_jobs": 0, "service_due_reminders": 0},
+        "billing": {"charged": 0, "failed": 0, "reminded": 0},
     }
 
 

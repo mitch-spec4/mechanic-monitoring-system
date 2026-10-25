@@ -25,7 +25,7 @@ export default function Checkout({ reference, user, onDone }: Props) {
       .catch((problem) => setError(errorMessage(problem)));
   }, [reference, user?.id]);
 
-  const pay = async (outcome: "success" | "declined") => {
+  const pay = async (outcome: "success" | "declined" | "declines_later") => {
     setError("");
     setBusy(true);
     try {
@@ -87,6 +87,12 @@ export default function Checkout({ reference, user, onDone }: Props) {
                   {t(payment.plan_name)} · {payment.interval === "year" ? t("Yearly") : t("Monthly")}
                 </dd>
               </div>
+              {payment.extra_mechanics > 0 && (
+                <div>
+                  <dt>{t("Extra technicians")}</dt>
+                  <dd>{payment.extra_mechanics}</dd>
+                </div>
+              )}
               <div>
                 <dt>{t("Receipt to")}</dt>
                 <dd>{detail.email}</dd>
@@ -124,6 +130,9 @@ export default function Checkout({ reference, user, onDone }: Props) {
               </button>
               <button type="button" className="textLink declineLink" disabled={busy} onClick={() => pay("declined")}>
                 {t("Try a declined card")}
+              </button>
+              <button type="button" className="textLink declineLink" disabled={busy} onClick={() => pay("declines_later")}>
+                {t("Pay with a card that will decline at renewal")}
               </button>
             </form>
           </section>

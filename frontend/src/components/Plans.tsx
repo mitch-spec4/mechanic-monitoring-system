@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
 import { plans as fetchPlans } from "../services/api";
 import { money } from "../lib/route";
+import { FEATURES } from "../lib/plan";
 import { t } from "../i18n";
 
 import type { Interval, Plan, Pricing } from "../services/types";
@@ -68,6 +69,11 @@ export function PlanCards({
               <li>
                 <Check size={15} /> {t("Unlimited customers, equipment and jobs")}
               </li>
+              {plan.features.map((feature) => (
+                <li key={feature}>
+                  <Check size={15} /> {t(FEATURES[feature].name)}
+                </li>
+              ))}
             </ul>
             <button className={featured ? "primary" : "secondary"} onClick={() => onChoose(plan.key)}>
               {cta(plan.key)}

@@ -20,6 +20,7 @@ from app.models.security import PasswordReset
 from app.models.user import User
 from app.services import audit, rate_limit, two_factor
 from app.services.accounts import mark_verified, send_password_reset, send_verification, user_for_reset, user_for_verification
+from app.services.billing import features_for, subscription_for, subscription_out
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
 from app.services.legal import record_agreement
@@ -49,6 +50,10 @@ def user_payload(user):
         "units": company.units if company else "metric",
         # Job costs and pay rates are in the company's currency.
         "currency": company.currency if company else "KES",
+        # What the company's plan includes (see app/services/plans.py), and for managers, where the
+        # plan stands (a trial's days left, a failed payment...) for the banner across the app.
+        "features": list(features_for(user.company_id)) if company else [],
+        "subscription": subscription_out(subscription_for(user.company_id)) if company and user.role == "boss" else None,
         # Two-step sign-in: whether it's on, and whether this person must set it up before going on.
         "two_factor_enabled": user.totp_enabled_at is not None,
         "two_factor_setup_needed": two_factor.needs_setup(user),

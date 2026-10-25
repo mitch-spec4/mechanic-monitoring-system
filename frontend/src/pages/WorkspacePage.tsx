@@ -62,6 +62,8 @@ import { AddMachine, EditForm, EditMachine } from "../components/MachineForms";
 import ShiftsView from "../components/ShiftsView";
 import TeamMap from "../components/TeamMap";
 import RoutePlanner from "../components/RoutePlanner";
+import PlanLocked from "../components/PlanLocked";
+import { can } from "../lib/plan";
 import Insights from "../components/Insights";
 import Pager from "../components/Pager";
 import InviteForm from "../components/InviteForm";
@@ -326,7 +328,7 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
             {t("Reset two-step sign-in")}
           </button>
         )}
-        {"pay_rate_cents" in item && (
+        {"pay_rate_cents" in item && can(user, "costing") && (
           <button className="listAction" onClick={() => setPaying(item)}>
             {t("Pay rate")}
           </button>
@@ -353,7 +355,7 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
       case "Team Map":
         return <TeamMap onOpenJob={onOpenJob} />;
       case "Routes":
-        return <RoutePlanner onOpenJob={onOpenJob} />;
+        return can(user, "routes") ? <RoutePlanner onOpenJob={onOpenJob} /> : <PlanLocked feature="routes" user={user} />;
       case "Shifts":
       case "My Shifts":
         return <ShiftsView user={user} />;
@@ -422,7 +424,7 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
       {summary ? (
         <>
           <ReportSummary summary={summary} />
-          {isBoss && <Insights onOpenMachine={onOpenMachine} />}
+          {isBoss && (can(user, "insights") ? <Insights onOpenMachine={onOpenMachine} /> : <PlanLocked feature="insights" user={user} compact />)}
         </>
       ) : !(resource.list || resource.page) ? null : (
         <div className="subPageStats">

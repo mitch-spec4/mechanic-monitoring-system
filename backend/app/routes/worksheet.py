@@ -13,6 +13,7 @@ from app.models.machine import Machine
 from app.models.service_record import ServiceRecord
 from app.models.user import User
 from app.models.worksheet import JobChecklistItem, JobEvent, JobPart, WorkEntry
+from app.services.billing import has_feature, require_feature
 from app.services.costing import job_costing
 from app.services.location import point_out
 from app.services.routing import site_positions
@@ -263,8 +264,8 @@ def job_detail(job, user):
         # Where it is (its equipment's site), for directions.
         position=job_position(job),
     )
-    if user.role == "boss":
-        # What it cost and what it made: managers only.
+    if user.role == "boss" and has_feature(job.company_id, "costing"):
+        # What it cost and what it made: managers only, on plans with job costing.
         detail["costing"] = job_costing(job, now)
     return detail
 
@@ -445,6 +446,7 @@ def update_costing(jid):
     """What the customer is charged ({charged}), and what parts cost ({parts: [{id, unit_cost}]})."""
     user = current_user()
     job = load_job(jid)
+    require_feature(job.company_id, "costing")
     data = json_body()
     if "charged" in data:
         job.charged_cents = money(data, "charged", N_("Charged"))

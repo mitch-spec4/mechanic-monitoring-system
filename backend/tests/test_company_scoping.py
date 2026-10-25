@@ -36,6 +36,7 @@ NOT_ID_SCOPED = {
     "/api/files/upload/<token>",  # test_media: upload tokens
     "/api/insights/export.<kind>",  # test_insights: a file format, no record
     "/api/legal/<name>",  # public pages
+    "/api/billing/webhooks/<name>",  # test_billing: a provider's signed webhooks, no record
     "/static/<path:filename>",
 }
 
@@ -99,6 +100,7 @@ def attempts(ids):
     return [
         ("GET", f"/api/billing/payments/{ids['reference']}", None),
         ("POST", f"/api/billing/test/{ids['reference']}/pay", {"outcome": "success"}),
+        ("POST", f"/api/billing/payments/{ids['reference']}/confirm", None),
         ("PATCH", f"/api/checklists/{ids['tid']}", {"job_type": "Stolen"}),
         ("DELETE", f"/api/checklists/{ids['tid']}", None),
         ("GET", f"/api/customers/{ids['cid']}", None),

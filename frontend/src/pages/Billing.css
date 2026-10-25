@@ -45,6 +45,34 @@
   margin: 4px 0 0;
   color: rgba(255, 255, 255, 0.85);
 }
+.planStatus.past_due,
+.planStatus.problem {
+  background: linear-gradient(135deg, #93370d, #dc6803);
+}
+.planStatus {
+  flex-wrap: wrap;
+}
+.planStatus > div:not(.planStatusActions) {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.planStatus .planFacts {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+}
+.planStatusActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.appShell .planStatusActions .secondary {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
 .statePill {
   font-style: normal;
   font-size: 12px;
@@ -279,6 +307,69 @@
   padding-inline: 0 10px;
   border-bottom: 1px solid #eef2f6;
 }
+/* Technicians bought on top of a plan's own. */
+.extraMechanics {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #f5f8fc;
+}
+.extraMechanics > div:first-child {
+  flex: 1;
+  min-width: 200px;
+}
+.extraMechanics strong {
+  font-size: 14px;
+}
+.extraMechanics p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #5b6b80;
+}
+.extraMechanics .extraTotal {
+  flex-basis: 100%;
+  margin: 0;
+  font-weight: 700;
+  color: #0f1d33;
+}
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.stepper output {
+  min-width: 28px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.appShell .stepper .iconButton {
+  width: 34px;
+  height: 34px;
+}
+.paymentKind {
+  display: block;
+  font-size: 11px;
+  color: #5b6b80;
+}
+.failedPill {
+  display: inline-grid;
+  gap: 2px;
+  padding: 3px 9px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #b42318;
+  background: #fee4e2;
+}
+.failedPill small {
+  font-weight: 500;
+}
 .paidPill {
   padding: 3px 9px;
   border-radius: 999px;
@@ -327,6 +418,17 @@
 @media (max-width: 760px) {
   .billingPage {
     padding: 14px;
+  }
+  /* The buttons go under the plan's details, full width. */
+  .planStatusIcon {
+    display: none;
+  }
+  .planStatusActions {
+    flex-basis: 100%;
+  }
+  .appShell .planStatusActions .secondary {
+    flex: 1 1 140px;
+    justify-content: center;
   }
   .meters {
     grid-template-columns: minmax(0, 1fr);
