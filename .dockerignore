@@ -1,0 +1,18 @@
+# Kept out of the image: dependencies are installed fresh, and nothing local or secret goes in.
+.git
+.github
+**/node_modules
+**/__pycache__
+**/*.pyc
+**/.env
+**/.env.*
+!backend/.env.example
+frontend/dist
+frontend/test-results
+frontend/playwright-report
+frontend/tsconfig.tsbuildinfo
+backend/instance
+backend/*.db
+backend/backups
+**/*.dump
+docs

@@ -25,10 +25,11 @@ Built with React + TypeScript (Vite) on the frontend and Flask, SQLAlchemy, Alem
 - **Job history.** Every status change, assignment, edit, part, checklist tick and note is logged with who and when, and managers see it as a timeline.
 - **Permanent service history.** Records, reviews and customer service requests can't be deleted; finished jobs lock their worksheet.
 - **Notifications** for assignments, status changes, requests and reviews.
+- **Ready to deploy.** One Docker image serves the app and its API on the same site. `render.yaml` sets up the app, its Postgres database and the daily run on Render in one step, starting as a staging copy that needs no email or payment keys. It comes with a health check, error reports (Sentry), nightly off-site backups with a weekly restore test, and a launch checklist. See [SETUP.md](SETUP.md#deploying) and [LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md).
 
 ## Quick start
 
-See **[SETUP.md](SETUP.md)** for the full local setup on Windows, macOS and Linux, the demo accounts, the checks and every environment variable. In short:
+See **[SETUP.md](SETUP.md)** for the full local setup on Windows, macOS and Linux, the demo accounts, the checks, every environment variable and deploying. In short:
 
 ```bash
 cd backend && python -m venv .venv && source .venv/bin/activate
@@ -48,6 +49,8 @@ Then open http://localhost:5173.
 - `backend/app/utils`: role checks and input validation
 - `backend/migrations`: Alembic database migrations
 - `backend/tests`: pytest suite
+- `backend/scripts`: the container's start script, the daily-run caller, backups and the restore test
+- `Dockerfile`, `render.yaml`: the production image and the Render setup
 - `frontend/src/pages`: role dashboards and workspace pages
 - `frontend/src/components`: shared UI
 - `frontend/src/services/api.ts`: API client (token refresh, error handling)
@@ -55,4 +58,4 @@ Then open http://localhost:5173.
 
 ## Status
 
-Under active development. Production deployment configuration and a real payment provider haven't been built yet, and the privacy policy and terms are placeholders. Don't use the demo data or demo passwords outside local development.
+Under active development. It deploys (to Render by default), but live payments aren't switched on yet (test mode only), and the privacy policy and terms are placeholders: go through [LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md) before taking real customers. Don't use the demo data or demo passwords outside local development.

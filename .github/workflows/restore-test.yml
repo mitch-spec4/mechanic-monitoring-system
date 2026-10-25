@@ -1,0 +1,56 @@
+name: Restore test
+
+# Every week: the newest backup is restored into an empty Postgres here, and checked (schema at the
+# latest migration, every table there, rows counted). A failure here means backups can't be trusted:
+# fix it before anything else. Off until the backup secrets are set. SETUP.md, "Backups and the restore test".
+on:
+  schedule:
+    - cron: "0 3 * * 0" # Sundays, 06:00 in Nairobi
+  workflow_dispatch:
+
+jobs:
+  restore:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: restore_test
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      RESTORE_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/restore_test
+      BACKUP_BUCKET: ${{ secrets.BACKUP_BUCKET }}
+      BACKUP_ENDPOINT_URL: ${{ secrets.BACKUP_ENDPOINT_URL }}
+      BACKUP_REGION: ${{ secrets.BACKUP_REGION }}
+      BACKUP_ACCESS_KEY_ID: ${{ secrets.BACKUP_ACCESS_KEY_ID }}
+      BACKUP_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_SECRET_ACCESS_KEY }}
+      APP_ENV: development
+    steps:
+      - name: Check the settings
+        id: ready
+        run: |
+          if [ -z "$BACKUP_BUCKET" ]; then
+            echo "::notice::The restore test is off: set the backup secrets (SETUP.md, Backups)."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.ready.outputs.go == 'true'
+      - uses: actions/setup-python@v5
+        if: steps.ready.outputs.go == 'true'
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - name: Restore the newest backup and check it
+        if: steps.ready.outputs.go == 'true'
+        working-directory: backend
+        run: |
+          # pg_dump and pg_restore 16 or newer, for the Postgres 16 database (usually already on the runner).
+          pg_dump --version | grep -Eq " (1[6-9]|[2-9][0-9])\." || { sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends postgresql-client-16; }
+          pip install -r requirements.txt
+          python scripts/restore_check.py

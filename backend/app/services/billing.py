@@ -241,8 +241,8 @@ def init_billing(app):
     name = app.config["BILLING_PROVIDER"]
     if name not in PROVIDERS:
         raise RuntimeError("BILLING_PROVIDER must be 'test', 'paystack' or 'none'")
-    if name == "test" and app.config["IS_PRODUCTION"]:
-        raise RuntimeError("BILLING_PROVIDER=test takes no real money and is only for development")
+    if name == "test" and app.config["IS_PRODUCTION"] and not app.config.get("IS_STAGING"):
+        raise RuntimeError("BILLING_PROVIDER=test takes no real money and is only for development and staging")
     if name == "paystack":
         key = app.config["PAYSTACK_SECRET_KEY"]
         if not key.startswith("sk_test_"):

@@ -1,0 +1,83 @@
+# Render Blueprint for MechanicPro: the app (API and web app on one site, from the Dockerfile), its
+# Postgres database, and the daily run. In Render: New → Blueprint → this repository.
+# Step by step, costs, and switching from staging to production: SETUP.md, "Deploying".
+#
+# It starts as APP_ENV=staging: production's security, but emails go to the app's log and payments
+# to the test checkout, so it runs before there's a domain, an email provider or a payment account.
+
+databases:
+  - name: mechanicpro-db
+    plan: basic-256mb
+    region: frankfurt
+    databaseName: mechanicpro
+    user: mechanicpro
+    postgresMajorVersion: "16"
+
+envVarGroups:
+  - name: mechanicpro-settings
+    envVars:
+      - key: APP_ENV
+        value: staging
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      # Protects /api/cron/daily, which the daily job below calls.
+      - key: CRON_SECRET
+        generateValue: true
+      # Photos, videos and signatures on the app's disk (below). Move to a bucket (STORAGE_BACKEND=s3)
+      # before running more than one instance: SETUP.md, File storage.
+      - key: STORAGE_BACKEND
+        value: local
+      - key: STORAGE_LOCAL_DIR
+        value: /var/data/uploads
+      # Render's proxy is in front of the app: rate limits see the visitor's address through it.
+      - key: TRUSTED_PROXY_COUNT
+        value: "1"
+
+services:
+  - type: web
+    name: mechanicpro
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    # Migrations before each deploy goes live (a failed migration stops the deploy, and the old
+    # version keeps running).
+    preDeployCommand: flask --app run.py db upgrade
+    disk:
+      name: uploads
+      mountPath: /var/data
+      sizeGB: 5
+    envVars:
+      - fromGroup: mechanicpro-settings
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mechanicpro-db
+          property: connectionString
+      # preDeployCommand runs them, so the app doesn't on start.
+      - key: MIGRATE_ON_START
+        value: "0"
+      # Optional: error reports to Sentry. Without it, errors are in the service's logs.
+      - key: SENTRY_DSN
+        sync: false
+
+  # Once a day (03:30 UTC, 06:30 in Nairobi): clean-up, reminders, maintenance jobs, plan renewals,
+  # expired demo copies and deletions due. It asks the app to do it, since only the app can reach
+  # its disk.
+  - type: cron
+    name: mechanicpro-daily
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    schedule: "30 3 * * *"
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: python scripts/call_daily.py
+    envVars:
+      - fromGroup: mechanicpro-settings
+      # The app's address, e.g. https://mechanicpro.onrender.com (shown on the web service's page).
+      - key: APP_URL
+        sync: false

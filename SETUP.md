@@ -1,6 +1,6 @@
 # MechanicPro setup
 
-This guide covers running MechanicPro locally, running the checks, and the settings a production deployment needs. Deployment to a specific host will be added later.
+This guide covers running MechanicPro locally, running the checks, the settings a production deployment needs, and deploying it (to Render by default; see [Deploying](#deploying)).
 
 ## Requirements
 
@@ -38,7 +38,7 @@ python seed.py
 flask --app run.py run --debug --port 5000
 ```
 
-`seed.py` applies the database migrations and then loads demo data. It is safe to run more than once. Check the backend at http://127.0.0.1:5000/api/health, which returns `{"status":"ok"}`.
+`seed.py` applies the database migrations and then loads demo data. It is safe to run more than once. Check the backend at http://127.0.0.1:5000/api/health, which returns `{"status": "ok", "database": "ok", "version": "dev"}`.
 
 > **Upgrading from an older checkout?** Earlier versions created the database without migrations. The backend now stops with a message telling you so. Delete `backend/instance/mechanic_pro.db` and run `seed.py` again.
 
@@ -207,11 +207,11 @@ All backend settings live in `backend/.env` (see `backend/.env.example`).
 
 | Variable | Development default | Production |
 | --- | --- | --- |
-| `APP_ENV` | `development` (set in `.env.example`) | Leave unset or set `production` |
+| `APP_ENV` | `development` (set in `.env.example`) | Leave unset or set `production`. `staging`: production's security, with emails written to the log and the test checkout allowed, for trying a deployment before you have the keys. See [Deploying](#deploying) |
 | `SECRET_KEY` | built-in development value | **Required**, random, 32+ characters |
 | `JWT_SECRET_KEY` | built-in development value | **Required**, random, 32+ characters |
 | `DATABASE_URL` | `sqlite:///mechanic_pro.db` (stored in `backend/instance/`) | **Required**, e.g. `postgresql://user:pass@host:5432/db` |
-| `CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | **Required**, your frontend origin(s); `*` is rejected |
+| `CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | Your frontend origin(s); `*` is rejected. Defaults to `APP_URL`, which is right when the web app and the API are on the same site (as in the Docker image) |
 | `JWT_ACCESS_MINUTES` | `30` | Access token lifetime |
 | `JWT_REFRESH_MINUTES` | `10080` (7 days) | Refresh token lifetime |
 | `LOGIN_RATE_LIMIT` | `10 per minute;50 per hour` | Failed sign-ins per IP and per email; invitation and reset attempts per IP. Stored in the database |
@@ -227,7 +227,7 @@ All backend settings live in `backend/.env` (see `backend/.env.example`).
 | `MAX_VIDEO_SECONDS` | `60` | Longest video the phone will upload |
 | `BILLING_PROVIDER` | `test` | Leave unset: `none` (free trials only). `test` is refused in production; `paystack` takes test keys only. See [Plans and payments](#plans-and-payments) |
 | `PAYSTACK_SECRET_KEY` | | With `paystack`: the **test** secret key (`sk_test_...`) from the Paystack dashboard |
-| `APP_URL` | the first `CORS_ORIGINS` entry | **Required**: your site's `https://` address. Links in emails point here |
+| `APP_URL` | the first `CORS_ORIGINS` entry | **Required**: your site's `https://` address. Links in emails point here. On Render, defaults to the app's `onrender.com` address (`RENDER_EXTERNAL_URL`, which Render sets) |
 | `EMAIL_BACKEND` | `log` (emails are written to the log) | `smtp` (the default, and required). See [Email](#email) |
 | `EMAIL_FROM` | `MechanicPro <no-reply@mechanicpro.test>` | **Required**, e.g. `MechanicPro <no-reply@yourdomain.com>`, on a domain your provider has verified |
 | `SMTP_HOST` / `SMTP_PORT` | / `587` | **Required** host; port from your provider |
@@ -241,6 +241,15 @@ All backend settings live in `backend/.env` (see `backend/.env.example`).
 | `ROUTING_API_KEY` | | Optional. An OpenRouteService key for real drive times in route plans; without it, straight-line estimates. See [Routes and job costing](#routes-and-job-costing) |
 | `ROUTING_PROVIDER` | `openrouteservice` | The routing service (the only one for now) |
 | `ROUTE_AVERAGE_KMH` | `25` | The speed straight-line estimates assume |
+| `SENTRY_DSN` | | Optional. Sends unexpected errors to Sentry. See [Errors, logs and the health check](#errors-logs-and-the-health-check) |
+| `FRONTEND_DIST` | | Set in the Docker image (`/app/web`): the built web app, served by the backend on the same site |
+| `MIGRATE_ON_START` | `1` in the Docker image | `1` runs the migrations as the container starts; `0` when the host runs them before each deploy (Render) |
+| `WEB_CONCURRENCY` | `2` | Gunicorn worker processes in the Docker image. Raise it with a bigger server |
+| `GUNICORN_THREADS` / `GUNICORN_TIMEOUT` | `4` / `180` | Threads per worker, and the seconds a request may take before gunicorn restarts the worker |
+| `PORT` | `8000` in the Docker image | The port gunicorn listens on. Render sets it |
+| `GIT_SHA` | | The deployed commit, shown as `version` by the health check and in error reports. On Render, `RENDER_GIT_COMMIT` is used instead |
+| `BACKUP_*`, `RESTORE_DATABASE_URL` | | For the backup and restore scripts. See [Backups and the restore test](#backups-and-the-restore-test) |
+| `TEST_OUTBOX` | | Browser tests only: keeps sent emails where the tests can read them. Refused in production |
 
 Live positions taken during jobs are deleted after 30 days. The app removes old ones whenever new positions arrive; in production, also run the [daily clean-up](#daily-clean-up).
 
@@ -279,8 +288,8 @@ If sending fails, the request still succeeds and the error is logged: signup car
 
 Once a day, six things should be cleared away: demo companies whose 24 hours are up, uploads that were started but never finished, live positions older than 30 days, activity-log entries older than 12 months, the IDs of changes sent from phones' offline queues more than 30 days ago, and companies whose 30 days after a deletion request are up (with all their files). The same run sends the booking reminders: for visits today or tomorrow (in the company's time zone) not reminded yet, for repairs not booked 3 days after the inspection, and the follow-up a day after the work is done. It also creates the jobs for maintenance plans coming due, with their reminders, and renews paid plans ending within a day with the saved card (see [Plans and payments](#plans-and-payments)), with reminders of trials and cancelled plans ending soon. Each is sent once. Either:
 
-- call `GET /api/cron/daily` with the header `Authorization: Bearer <CRON_SECRET>` from your host's scheduler (Vercel Cron sends exactly this header when `CRON_SECRET` is set), or
-- run `flask --app run.py purge-demos`, `purge-uploads`, `purge-locations`, `purge-activity`, `purge-sync-requests`, `delete-due-companies`, `send-reminders`, `send-service-due` and `renew-plans` from cron.
+- call `GET` or `POST /api/cron/daily` with the header `Authorization: Bearer <CRON_SECRET>` from your host's scheduler (Vercel Cron sends exactly this header when `CRON_SECRET` is set; on Render, the `mechanicpro-daily` cron job does it with `scripts/call_daily.py`), or
+- run `flask --app run.py daily` from cron on the server itself: everything at once, the same as the URL. Each part also has its own command: `purge-demos`, `purge-uploads`, `purge-locations`, `purge-activity`, `purge-sync-requests`, `delete-due-companies`, `send-reminders`, `send-service-due` and `renew-plans`.
 
 Run it in the morning, company time, so "tomorrow's visit" reminders arrive the day before.
 
@@ -391,17 +400,113 @@ Technicians can do their whole day with no signal; managers' and customers' scre
 
 To try it on a computer: `npm run build && npm run preview` (with the backend running), open http://localhost:4173 in Chrome, sign in as a technician, then turn the network off in DevTools (Network → Offline) and keep working. The development server (`npm run dev`) has offline mode too, but no service worker, so it can't be reloaded while offline.
 
-## Production notes (until the deployment guide is written)
+## Deploying
 
-- Run `flask --app run.py db upgrade` on every deploy. Never run `seed.py`.
-- Run the [daily clean-up](#daily-clean-up): it is also what finally deletes companies whose owners asked for it.
+The app ships as one Docker image (`Dockerfile`): the web app is built into it and Flask serves it on the same site as the API, so the secure session cookies work without any extra setup. Gunicorn runs it (`backend/gunicorn.conf.py`). The image runs on any host that runs containers. The repository includes a ready setup for one of them: [Render](https://render.com).
+
+### Which host
+
+| | Render (the default here) | Railway | Fly.io |
+| --- | --- | --- | --- |
+| Setup in this repository | `render.yaml`: the app, its database and the daily run, in one step | Build from the `Dockerfile`; add Postgres and a cron job by hand | Build from the `Dockerfile`; Postgres and the scheduled run by hand |
+| Billing | A fixed price per service | By usage, per second | By usage |
+| Nearest region to Kenya | Frankfurt | Europe (Amsterdam) | Johannesburg or Frankfurt |
+
+Render is the default because one file sets up everything, the price is fixed, and it has the parts the app needs: Postgres with its own backups, a lasting disk for uploads, a step that runs migrations before a new version goes live, health checks and scheduled jobs. None of the three has a region in East Africa: from Nairobi, expect roughly 150–200 ms per request to Frankfurt. That is fine for this app. On another host, the same image needs `DATABASE_URL`, the variables in the Render settings below, `flask --app run.py db upgrade` before each version (or `MIGRATE_ON_START=1`, the default, which runs it as the app starts), and the [daily run](#daily-clean-up).
+
+### What Render costs
+
+Approximate, in US dollars a month, before tax. Prices change, so check [render.com/pricing](https://render.com/pricing) before you rely on them:
+
+| Part | Plan in `render.yaml` | About |
+| --- | --- | --- |
+| The app | Starter web service (0.5 CPU, 512 MB) | $7 |
+| Postgres | Basic-256mb, plus storage at about $0.30 a GB | $6–7 |
+| Disk for photos and videos | 5 GB at about $0.25 a GB | $1.25 |
+| Daily run | Starter cron job: a minimum of $1, plus the minute or so it runs | about $1 |
+| Workspace | Hobby | $0 |
+| **Total** | | **about $15 a month** (about KSh 2,000) |
+
+Free Render services can't be used: a free web service has no disk and no pre-deploy step and goes to sleep, and a free database is deleted after 30 days. As the business grows: Postgres Basic-1gb (about $19), the Standard web service (about $25, 2 GB), and moving uploads to a bucket (Cloudflare R2's first 10 GB are free) before running more than one copy of the app.
+
+### Deploying to Render
+
+1. Push this repository to GitHub (already done if you're reading this there).
+2. In Render: **New → Blueprint**, pick the repository, and **Apply**. It reads `render.yaml` and creates:
+   - **mechanicpro-db**: Postgres 16 in Frankfurt.
+   - **mechanicpro**: the app, from the `Dockerfile`, with a 5 GB disk at `/var/data` for uploads. Before each new version goes live, it runs the database migrations; if they fail, the old version keeps running.
+   - **mechanicpro-daily**: the daily run, at 03:30 UTC (06:30 in Nairobi).
+   - **mechanicpro-settings**: the shared settings, with `SECRET_KEY`, `JWT_SECRET_KEY` and `CRON_SECRET` generated by Render. You never type or see them.
+3. When it asks for `APP_URL` (for the daily run): the app's address, `https://mechanicpro.onrender.com`. If Render had to give the app another name, copy the address from the app's page and correct `APP_URL` on **mechanicpro-daily → Environment**. `SENTRY_DSN` can stay empty (see [Errors, logs and the health check](#errors-logs-and-the-health-check)).
+4. Wait for the first deploy (about 5–10 minutes), then open the address. `/api/health` should answer `{"status": "ok", "database": "ok", ...}`.
+5. Try it: **Try the demo**, or sign up a company. On **mechanicpro-daily**, **Trigger Run** to check the daily run; its log shows what it did.
+
+Every push to the default branch deploys again (Render's **Auto-Deploy**). If the migrations fail, the new version never goes live and the running one carries on. Because the app has a disk, Render stops the running version before starting the new one, so **each deploy has a short downtime** (usually under a minute); phones keep working offline through it. Once uploads are in a bucket (`STORAGE_BACKEND=s3`) the disk can be removed, and deploys then switch over with no downtime.
+
+### Staging first, production when you're ready
+
+The blueprint starts the app as **`APP_ENV=staging`**: production's security (real secrets, `https`, secure cookies, two-step sign-in for everyone, the security headers), but no keys needed for anything else:
+
+| | Staging | Production |
+| --- | --- | --- |
+| Email | Written to the app's log on Render, not sent | Sent through your email provider (required) |
+| Payments | The test checkout and test cards (`BILLING_PROVIDER=test`) | `none` (free trials only) until you set a provider |
+| Maps and drive times | Straight-line estimates without `ROUTING_API_KEY` | The same |
+| Address | `https://mechanicpro.onrender.com` | Your own domain |
+
+Staging is for you and people you invite to try it, **not for real customers**: anyone can "pay" with a test card there, and emails (with their sign-in, reset and invitation links) only appear in the log, so anyone who can read the log can use those links. To invite a technician in staging, copy the invitation link from the app's log (**Logs** on the service, search "Email not sent").
+
+To switch to production, on the **mechanicpro-settings** group (or the service's **Environment**), then **Save, rebuild and deploy**:
+
+1. **Your domain** (optional but recommended): on the app's **Settings → Custom Domains**, add `app.yourdomain.com`, and add the DNS record Render shows at your domain's registrar. Render issues the `https` certificate itself. Then set `APP_URL=https://app.yourdomain.com` and `CORS_ORIGINS=https://app.yourdomain.com`, and the same `APP_URL` on **mechanicpro-daily**.
+2. **Email**: `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` (see [Email](#email)). The app refuses to start in production without them.
+3. **Payments**, when they're ready: `BILLING_PROVIDER=paystack` and `PAYSTACK_SECRET_KEY` (test keys only for now; see [Plans and payments](#plans-and-payments)). Without them, production offers free trials only.
+4. **Drive times** (optional): `ROUTING_API_KEY`, a free OpenRouteService key.
+5. **Error reports** (optional): `SENTRY_DSN`.
+6. `APP_ENV=production`.
+7. Before taking real customers, go through [LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md).
+
+`SECRET_KEY` also encrypts the two-step sign-in keys: never change it once people have set up their phones (Render keeps the generated value; don't regenerate it).
+
+### Rolling back
+
+On the app's **Events**, pick an earlier deploy and **Rollback**. Migrations are not undone: they're written to work with the version before them (new columns are optional), so going back one version is safe. To undo a migration itself, run `flask --app run.py db downgrade` from the service's **Shell** first.
+
+## Backups and the restore test
+
+There are two kinds of backups:
+
+1. **Render's own.** Paid Render databases keep point-in-time recovery (the last 3 days on the Hobby workspace, 7 on Professional): **mechanicpro-db → Recovery** restores into a new database. This covers mistakes in the app.
+2. **A nightly copy outside Render**, in case the database or the Render account itself is lost: `.github/workflows/backup.yml` runs `backend/scripts/backup.py` (pg_dump) every night at 03:15 Nairobi time and keeps 30 days of copies in an S3-compatible bucket. **Every week, `.github/workflows/restore-test.yml` restores the newest copy** into an empty Postgres, checks the schema is at the latest migration and every table is there, and prints the row counts. A failed restore test means the backups can't be trusted: fix it before anything else.
+
+Both are off (they say so and stop) until these repository secrets are set, under GitHub **Settings → Secrets and variables → Actions**:
+
+| Secret | What |
+| --- | --- |
+| `BACKUP_DATABASE_URL` | The database's **External Database URL** from **mechanicpro-db → Connect**. GitHub's runners connect from changing addresses, so leave the database's **Access Control** open to all (the default; the password still protects it) |
+| `BACKUP_BUCKET` | A private bucket only for backups (not the photos' bucket), e.g. on Cloudflare R2 |
+| `BACKUP_ENDPOINT_URL` / `BACKUP_REGION` | As for [file storage](#file-storage): for R2, `https://<account-id>.r2.cloudflarestorage.com` and `auto` |
+| `BACKUP_ACCESS_KEY_ID` / `BACKUP_SECRET_ACCESS_KEY` | A key for that bucket only |
+
+Then run **Actions → Backup → Run workflow**, and after it **Restore test → Run workflow**, and check both pass. `BACKUP_KEEP_DAYS` (default 30) sets how long copies are kept.
+
+To restore for real: create a new database in Render, run `RESTORE_DATABASE_URL=<its URL> python scripts/restore_check.py` from `backend/` (it restores the newest copy and checks it; it refuses the live `DATABASE_URL`), then point the app's `DATABASE_URL` at it. The files on the app's disk (photos, videos, signatures) are not in these copies: Render snapshots the disk daily (**Disks** on the app, **Restore**), and a bucket keeps its own copies once uploads move to one.
+
+Locally, with Postgres: `python scripts/backup.py` writes a copy to `backend/backups/` (or `BACKUP_DIR`; git ignores both `backups/` and `*.dump` files), and `RESTORE_DATABASE_URL=... python scripts/restore_check.py` restores it. `tests/test_deploy.py` does exactly this against `TEST_DATABASE_URL`.
+
+## Errors, logs and the health check
+
+- **Logs.** In production the app writes to standard output, which Render shows under **Logs**: each request (gunicorn), each error with its stack trace, and each email in staging. An unexpected error answers "Something went wrong" to the user and logs the request's method and path, never its body.
+- **Error reports.** With `SENTRY_DSN` set (a free [Sentry](https://sentry.io) project: **Settings → Client Keys (DSN)**), every unexpected error is also sent to Sentry with its version, and Sentry emails you when a new one appears. A report has the stack trace and the request's method and address; not its cookies, its body, the visitor's IP address or the values the code was handling.
+- **Health check.** `GET /api/health` answers `200 {"status": "ok", "database": "ok", "version": "<commit>"}`, or `503` with `"database": "unreachable"` when the database doesn't answer. Render checks it every few seconds, stops sending visitors to an app that fails it, and restarts it if it keeps failing. For an alert when the site is down, point a free uptime monitor (UptimeRobot, Better Stack...) at it.
+- **Version.** `version` is the deployed commit (`RENDER_GIT_COMMIT`, or `GIT_SHA` elsewhere), so the health check and error reports say exactly which code is running.
+
+## Before launch
+
+[LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md) lists everything to check before taking real customers: keys, domain, email, payments, legal text, backups, monitoring and the map tiles. In short:
+
+- Never run `seed.py` in production. The demo company for **Try the demo** is created by the app itself, a fresh copy for each visitor, and the daily run deletes copies after 24 hours.
 - Replace the placeholder `backend/legal/privacy.md` and `backend/legal/terms.md` with your own, reviewed text.
-- `SECRET_KEY` also encrypts the two-step sign-in keys. Changing it makes every authenticator app's codes stop working (backup codes still do, and people can then set up their phone again under **Settings**, or be reset), so keep it stable.
-- Set up [email](#email) before launch: the app won't start in production without it.
-- Use `STORAGE_BACKEND=s3` unless the app runs on one server with a lasting disk.
 - Map tiles come from the free OpenStreetMap servers, which are not meant for heavy commercial use. Switch to a paid tile provider before launch.
-- Serve the backend with a production WSGI server (for example gunicorn), not `flask run`.
-- Build the frontend with `npm run build` and serve `frontend/dist/` as static files. Serve `sw.js` and `index.html` without long caching, so phones find new versions.
-- Serve the frontend and the API from the same site over HTTPS (for example `app.example.com` with the API at `/api`). Sessions are httpOnly, `Secure` cookies with CSRF protection, so browsers won't send them to a different site.
-- Behind a load balancer, set `TRUSTED_PROXY_COUNT` so rate limiting sees real client IPs.
+- Move uploads to a bucket (`STORAGE_BACKEND=s3`, see [File storage](#file-storage)) before running more than one copy of the app.
 - Never commit `.env` files; set the variables in your host's settings.
