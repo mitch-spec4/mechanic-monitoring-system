@@ -38,20 +38,31 @@ def fmt_date(value):
 
 
 class Report(FPDF):
-    def __init__(self, company_name, reference):
+    """A page with the company's name (and logo, top right), what the document is and its
+    reference on top, and page numbers below."""
+
+    def __init__(self, company_name, reference, title=None, logo=None):
         super().__init__(format="A4")
         self.company_name = company_name
         self.reference = reference
+        self.title_text = title or _("Service report")
+        self.logo = logo
         self.set_auto_page_break(True, margin=18)
         self.set_margins(16, 16, 16)
 
     def header(self):
+        if self.logo:
+            image, (width, height) = self.logo
+            # At most 14 mm high and 45 mm wide, in the top right corner.
+            scale = min(14 / height, 45 / width)
+            image.seek(0)
+            self.image(image, x=194 - width * scale, y=12, w=width * scale, h=height * scale)
         self.set_font("Helvetica", "B", 13)
         self.set_text_color(*INK)
         self.cell(0, 7, clean(self.company_name), new_x="LMARGIN", new_y="NEXT")
         self.set_font("Helvetica", "", 9)
         self.set_text_color(*MUTED)
-        self.cell(0, 5, clean(_("Service report") + f"  -  {self.reference}"), new_x="LMARGIN", new_y="NEXT")
+        self.cell(0, 5, clean(self.title_text + f"  -  {self.reference}"), new_x="LMARGIN", new_y="NEXT")
         self.set_draw_color(*LINE)
         self.line(16, self.get_y() + 2, 194, self.get_y() + 2)
         self.ln(6)
@@ -125,7 +136,7 @@ def build_report(job):
         JobEvent.query.filter_by(job_id=job.id, action="status", to_status="Completed").order_by(JobEvent.created_at.desc()).first()
     )
 
-    pdf = Report(company.name if company else "MechanicPro", _("Job #{number}", number=job.id))
+    pdf = Report(company.name if company else "MechanicPro", _("Job #{number}", number=job.id), logo=company_logo(company))
     pdf.alias_nb_pages()
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 17)
@@ -197,6 +208,18 @@ def build_report(job):
     return bytes(pdf.output())
 
 
+def company_logo(company):
+    """The company's logo, ready for a PDF page: (image, (width, height)), or None."""
+    if not company or not company.logo_key:
+        return None
+    try:
+        data = storage().read(company.logo_key)
+    except Exception:  # noqa: BLE001 - a missing logo shouldn't stop the document
+        return None
+    image, size = thumbnail(data, 600)
+    return (image, size) if image else None
+
+
 def stored_thumbnail(record, max_px):
     try:
         data = storage().read(record.storage_key)
@@ -205,8 +228,9 @@ def stored_thumbnail(record, max_px):
     return thumbnail(data, max_px)
 
 
-def add_photo_grid(pdf, photos):
-    """Three photos per row, each fitted inside the same box and labelled Before/After/Photo."""
+def add_photo_grid(pdf, photos, label=None):
+    """Three photos per row, each fitted inside the same box and labelled Before/After/Photo
+    (or with `label`)."""
     columns, gap = 3, 4
     width = (pdf.w - pdf.l_margin - pdf.r_margin - gap * (columns - 1)) / columns
     height = width * 0.75
@@ -214,7 +238,7 @@ def add_photo_grid(pdf, photos):
     for photo in photos:
         image, _size = stored_thumbnail(photo, 900)
         if image:
-            images.append((image, _(PHOTO_LABELS[photo.kind])))
+            images.append((image, label or _(PHOTO_LABELS[photo.kind])))
     for start in range(0, len(images), columns):
         if pdf.get_y() + height + 8 > pdf.h - pdf.b_margin:
             pdf.add_page()

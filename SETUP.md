@@ -199,6 +199,45 @@ The job for the work gets the service's checklist.
 
 Mitch's compressor job was made from the compressor service. With the generator job (2½ h), his route for today shows about 4½ h of work.
 
+## Custom forms and certificates
+
+**Building a form (managers, Professional and Business plans).** The **Forms** page lists the company's forms; **New form** opens the builder:
+
+- a name and description;
+- **Jobs that get it**: any job types (from **Checklists**) and services (from **Settings → Services you offer**). A job gets every form in use that's on its job type or its service;
+- **Required**: the job can't be completed until the form is;
+- **A certificate**: the customer can see and download it once it's completed. Otherwise it's for the team only;
+- the questions, in order. Each one is a section heading, text (short or long), a number, yes / no, a choice (one of a list), a date, photos, or a signature (drawn, with the signer's name), and can be marked required;
+- **When to ask**: a question can be asked only when an earlier yes / no or choice question has a given answer ("Why not?" only when "Load test done" is "No"). A hidden question is never required, and its answer is dropped.
+
+**Preview** shows the form as a technician sees it, with the show-and-hide rules working; nothing is saved.
+
+**Changing a form.** Its name, jobs and settings change at once. Once a form has been filled in on any job, changing its questions makes a new version: forms already filled in keep the questions they answered, and new ones get the new version. A form that has been filled in can't be deleted; turn it off (**In use**) and it stops being added to jobs, while the jobs that have it keep it.
+
+**Filling it in (technicians and managers).** The job's page has a **Forms** card listing its forms (Not started, Started, Completed by…). **Fill in** opens the form; only the questions its answers so far call for are shown. **Save** keeps a draft; **Complete the form** first checks that every required question shown is answered, and lists any that aren't. A completed form can still be corrected until the job is finished, and the job's history notes who completed it. Photos can be added once work has started (as on the worksheet). The assigned technician fills in their own jobs' forms; a manager can fill in any job's until it's finished.
+
+**With no signal.** Forms work offline like the rest of the worksheet: answers and completion are saved on the phone, shown as "waiting to sync" and sent when the signal returns; photos upload on a good connection. If a form was changed in two places, the most recent change wins and the other goes into the job's history. A form's questions are kept with the job on the phone, so a form changed meanwhile is filled in with the version the phone showed.
+
+**The PDF.** A completed form has a **PDF**: the company's logo and name, the customer, equipment, site and job, who completed it and when, each question that was asked with its answer, its photos and signatures, and the form's version. Managers and the job's technician can open any completed form's PDF; customers only certificates.
+
+**Where customers see certificates.** On the job's page (**Certificates**) and on the equipment's page, which lists every certificate completed on that equipment's jobs, newest first. There, managers see every completed form, and technicians the ones from their own jobs (**Forms and certificates**).
+
+**The logo.** Under **Settings → Logo**, a manager adds a PNG or JPEG of up to 1 MB. It's printed at the top of certificates and of the job's service report. A wide logo on a white background prints best.
+
+**Plans.** On Starter, the **Forms** page is locked and no form can be filled in or required. Forms already filled in stay on their jobs, with their PDFs.
+
+**Also:** the data export has `forms.csv`, `form_versions.csv` (each version's questions) and `form_answers.csv` (each form filled in on a job). Deleting a company deletes its forms, everything filled in and its logo.
+
+**In the demo data:**
+
+| Form | On | Required | Certificate |
+| --- | --- | --- | --- |
+| Generator load test certificate | Service: Generator 500-hour service | Yes | Yes |
+| Inspection certificate | Job type: Inspection | No | Yes |
+| Site safety check | Job type: Repair | No | No (team only) |
+
+DK Engineering has a logo. The generator certificate shows the rule: its load and voltage questions appear only when "Load test done" is "Yes", and "Why not?" only when it's "No". Brian completed the inspection certificate on the conveyor inspection, so XYZ Factory can download it from the conveyor's page. His mixer repair has the site safety check, not started yet.
+
 ## Checks
 
 ```bash
@@ -337,7 +376,7 @@ Without a `CRON_SECRET`, the URL doesn't exist.
 
 ## File storage
 
-Photos, videos and signatures are stored in one of two ways, chosen by `STORAGE_BACKEND`:
+Photos, videos, signatures, documents and the company's logo are stored in one of two ways, chosen by `STORAGE_BACKEND`:
 
 - **`local`** (the default) saves files on the server's disk, under `backend/instance/uploads` or `STORAGE_LOCAL_DIR`. Use it for development, or a single server with a lasting disk; back that folder up with the database.
 - **`s3`** uses any S3-compatible bucket: Cloudflare R2, Backblaze B2, AWS S3 or MinIO. Use it on serverless hosts (their disks don't last, and they cap request sizes) and whenever more than one server runs the app.
@@ -374,14 +413,14 @@ The homepage (`/`) shows the plans; **Get started** (or **Choose** on a plan) cr
 | Plan | Monthly | Yearly | Technicians | Storage | Also includes |
 | --- | --- | --- | --- | --- | --- |
 | Starter | KSh 1,500 | KSh 15,000 | 3 | 2 GB | Everything else in the app |
-| Professional | KSh 4,500 | KSh 45,000 | 10 | 20 GB | Insights and exports; planned maintenance and reminders |
+| Professional | KSh 4,500 | KSh 45,000 | 10 | 20 GB | Insights and exports; planned maintenance and reminders; custom forms and certificates |
 | Business | KSh 12,000 | KSh 120,000 | 30 | 100 GB | Also route planning; job costing and margins |
 
 **Extra technicians**, on any plan, are KSh 500 a month each (KSh 5,000 a year), chosen on Billing before paying. Yearly billing charges ten months (two months free).
 
 **What every plan includes**: jobs, worksheets (time, parts, checklists, notes), equipment and customers, photos, videos, the customer's sign-off and PDF reports, clock-in and the team map, customer requests with booking and chat, offline mode, two languages, and everything in Settings.
 
-**Features a plan doesn't include** are locked for that company: the API refuses them (403, saying which plan has it), the sidebar shows a lock, and the page shows what it is with a **See plans** button. Nothing already made is lost by moving to a smaller plan: existing maintenance plans stay listed but stop creating jobs; costs, pay rates and planned routes stay saved, out of view. A smaller plan must still fit the team (technicians plus open invitations) and the files, or checkout says what to change. Companies created before plans existed have no limits and every feature.
+**Features a plan doesn't include** are locked for that company: the API refuses them (403, saying which plan has it), the sidebar shows a lock, and the page shows what it is with a **See plans** button. Nothing already made is lost by moving to a smaller plan: existing maintenance plans stay listed but stop creating jobs; forms already filled in stay on their jobs with their PDFs; costs, pay rates and planned routes stay saved, out of view. A smaller plan must still fit the team (technicians plus open invitations) and the files, or checkout says what to change. Companies created before plans existed have no limits and every feature.
 
 **Trials.** Every new company starts with a 14-day free trial of the plan it chose; no card is needed. Managers see the days left in a banner on every page, and get a reminder (in the app and by email) three days before it ends.
 
@@ -412,7 +451,7 @@ To try it locally with the test provider: open http://localhost:5173, choose a p
 
 Technicians can do their whole day with no signal; managers' and customers' screens stay online only and say "You're offline" when there's no connection.
 
-**What works offline:** clocking in and out (with location sharing agreed), starting, pausing, resuming and completing jobs (with the customer's signature), time entries, parts, checklist ticks, the service summary, notes, photos and videos, and the position stamps that go with them.
+**What works offline:** clocking in and out (with location sharing agreed), starting, pausing, resuming and completing jobs (with the customer's signature), time entries, parts, checklist ticks, the service summary, notes, filling in forms, photos and videos, and the position stamps that go with them.
 
 **How it works:**
 

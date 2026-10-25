@@ -16,3 +16,4 @@ from app.models.media import JobFile
 from app.models.billing import BillingEvent, Payment, Subscription
 from app.models.sync import ClientRequest
 from app.models.service import ServiceTemplate
+from app.models.forms import FormSubmission, FormTemplate, FormVersion

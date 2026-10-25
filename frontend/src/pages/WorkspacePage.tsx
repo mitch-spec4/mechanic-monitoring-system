@@ -4,6 +4,7 @@ import {
   BarChart3,
   Bell,
   CheckCircle2,
+  ClipboardCheck,
   ClipboardList,
   Clock,
   Cog,
@@ -17,10 +18,10 @@ import {
   Route as RouteIcon,
   Search,
   Star,
+  type LucideIcon,
   UserRound,
   Users,
   Wrench,
-  type LucideIcon,
 } from "lucide-react";
 import {
   company,
@@ -54,6 +55,7 @@ import type {
   ServiceRequest,
 } from "../services/types";
 import ChecklistManager from "../components/ChecklistManager";
+import FormsManager from "../components/FormsManager";
 import Messages from "../components/Messages";
 import MachinesByCustomer from "../components/MachinesByCustomer";
 import { machineSummary } from "./BossDashboard";
@@ -196,6 +198,7 @@ const resources: Record<string, Resource> = {
   Profile: { label: mark("Profile"), description: mark("Your account details and access."), icon: UserRound },
   "Help & Support": { label: mark("Help & support"), description: mark("Support resources for your service workspace."), icon: HelpCircle },
   Checklists: { label: mark("Checklists"), description: mark("Checklists your technicians complete for each type of job."), icon: ListChecks },
+  Forms: { label: mark("Forms"), description: mark("Forms your technicians fill in on jobs, and the certificates they make."), icon: ClipboardCheck },
   "Team Map": { label: mark("Clocked-in technicians"), description: mark("Where your clocked-in technicians were last seen."), icon: MapIcon },
   Routes: { label: mark("Route planner"), description: mark("The shortest order to visit a technician's jobs on a day."), icon: RouteIcon },
   Shifts: { label: mark("Shifts"), description: mark("Clock-in and clock-out times and hours for your team."), icon: Clock },
@@ -352,6 +355,8 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
         );
       case "Checklists":
         return <ChecklistManager />;
+      case "Forms":
+        return can(user, "forms") ? <FormsManager /> : <PlanLocked feature="forms" user={user} />;
       case "Team Map":
         return <TeamMap onOpenJob={onOpenJob} />;
       case "Routes":

@@ -272,6 +272,7 @@ def create_app(overrides=None):
     from app.routes.customers import bp as customers
     from app.routes.demo import bp as demo
     from app.routes.equipment import bp as equipment
+    from app.routes.forms import bp as forms
     from app.routes.jobs import bp as jobs
     from app.routes.maintenance import bp as maintenance
     from app.routes.legal import bp as legal
@@ -309,6 +310,7 @@ def create_app(overrides=None):
     app.register_blueprint(routes, url_prefix="/api/routes")
     app.register_blueprint(media, url_prefix="/api")
     app.register_blueprint(equipment, url_prefix="/api")
+    app.register_blueprint(forms, url_prefix="/api")
     app.register_blueprint(shifts, url_prefix="/api/shifts")
     app.register_blueprint(location, url_prefix="/api/location")
     app.register_blueprint(billing, url_prefix="/api")

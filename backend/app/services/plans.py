@@ -21,6 +21,7 @@ MAX_EXTRA_MECHANICS = 100
 FEATURE_NAMES = {
     "insights": N_("Insights and exports"),
     "maintenance": N_("Planned maintenance and reminders"),
+    "forms": N_("Custom forms and certificates"),
     "routes": N_("Route planning"),
     "costing": N_("Job costing and margins"),
 }
@@ -28,13 +29,13 @@ FEATURE_NAMES = {
 # the team map, requests, booking and chat, offline mode) is in every plan.
 PLANS = {
     "starter": {"name": "Starter", "monthly_cents": 150_000, "mechanics": 3, "storage_gb": 2, "features": ()},
-    "professional": {"name": "Professional", "monthly_cents": 450_000, "mechanics": 10, "storage_gb": 20, "features": ("insights", "maintenance")},
+    "professional": {"name": "Professional", "monthly_cents": 450_000, "mechanics": 10, "storage_gb": 20, "features": ("insights", "maintenance", "forms")},
     "business": {
         "name": "Business",
         "monthly_cents": 1_200_000,
         "mechanics": 30,
         "storage_gb": 100,
-        "features": ("insights", "maintenance", "routes", "costing"),
+        "features": ("insights", "maintenance", "forms", "routes", "costing"),
     },
 }
 ALL_FEATURES = tuple(FEATURE_NAMES)

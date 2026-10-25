@@ -228,8 +228,8 @@ def test_plans_list_their_features_and_extra_technicians(client):
     data = client.get("/api/plans").get_json()
     assert {plan["key"]: plan["features"] for plan in data["plans"]} == {
         "starter": [],
-        "professional": ["insights", "maintenance"],
-        "business": ["insights", "maintenance", "routes", "costing"],
+        "professional": ["insights", "maintenance", "forms"],
+        "business": ["insights", "maintenance", "forms", "routes", "costing"],
     }
     assert data["extra_mechanic_cents"] == 50_000 and data["max_extra_mechanics"] == 100
 
@@ -237,7 +237,7 @@ def test_plans_list_their_features_and_extra_technicians(client):
 def test_features_follow_the_plan(client, auth, data):
     # Companies from before plans have everything.
     me = client.get("/api/users/me", headers=boss(auth)).get_json()["user"]
-    assert me["features"] == ["insights", "maintenance", "routes", "costing"] and me["subscription"] is None
+    assert me["features"] == ["insights", "maintenance", "forms", "routes", "costing"] and me["subscription"] is None
     subscription = give_plan(data["acme"], "starter")
     mech = client.get("/api/users/me", headers=auth("mech@acme.test")).get_json()["user"]
     assert mech["features"] == [] and mech["subscription"] is None

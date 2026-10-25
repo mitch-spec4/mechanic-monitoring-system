@@ -28,6 +28,7 @@ from app.services.worksheet import (
     record_event,
 )
 from app.services.catalog import service_summary
+from app.services.forms import job_forms
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
 from app.utils.validation import ValidationError, integer, json_body, money, text
@@ -205,9 +206,12 @@ def job_detail(job, user):
                 "uploaded_by": names.get(f.uploaded_by),
             }
             for f in files
-            if f.kind != "signature"
+            # The sign-off, and the photos and signatures answering forms, are shown with those.
+            if f.kind not in ("signature", "form_photo", "form_signature")
         ],
         "signature": signature_out(job, files),
+        # The job's forms (customers: completed certificates only).
+        "forms": job_forms(job, user, attached=has_feature(job.company_id, "forms")),
         # The PDF report exists once the job is completed.
         "report_url": f"/api/jobs/{job.id}/report.pdf" if job.status == "Completed" else None,
         "record": (

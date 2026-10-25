@@ -1,8 +1,11 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Building2, CalendarClock, Languages, Moon, UserRound } from "lucide-react";
+import { Building2, CalendarClock, ImageIcon, Languages, Moon, Trash2, Upload, UserRound } from "lucide-react";
 import {
+  apiUrl,
   changePassword,
   companySettings,
+  removeLogo,
+  uploadLogo,
   saveCompanySettings,
   saveLanguage,
   type BookingSettings,
@@ -22,6 +25,7 @@ import { TwoFactorSettings } from "./TwoFactor";
 import { CompanyDataSettings } from "./CompanyData";
 import Field from "./Field";
 import MapPicker from "./MapPicker";
+import "./Forms.css";
 import ServiceCatalog from "./ServiceCatalog";
 
 type Props = { user: User; onUserChanged: (user: User) => void };
@@ -67,6 +71,7 @@ export default function SettingsPanel({ user, onUserChanged }: Props) {
       </section>
       <AppearancePicker />
       {user.role === "boss" && <CompanySettingsForm user={user} onUserChanged={onUserChanged} />}
+      {user.role === "boss" && <LogoSettings />}
       {user.role === "boss" && <BookingSettingsForm />}
       {user.role === "boss" && <ServiceCatalog />}
       {user.role === "mechanic" && <LocationSettings />}
@@ -240,6 +245,82 @@ const BOOKING_NUMBERS: [NumberSetting, string, string, number, number, number][]
 ];
 
 /** When customers can book visits online, and how long visits take (managers). */
+const LOGO_MB = 1;
+
+/** The company's logo: on certificates and service reports (PNG or JPEG, up to 1 MB). */
+function LogoSettings() {
+  const [url, setUrl] = useState<string | null | undefined>(undefined);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let current = true;
+    companySettings()
+      .then((data) => current && setUrl(data.settings.logo_url))
+      .catch((problem) => current && setError(errorMessage(problem)));
+    return () => {
+      current = false;
+    };
+  }, []);
+  const pick = (input: HTMLInputElement) => {
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    setError("");
+    if (!["image/png", "image/jpeg"].includes(file.type)) return setError(t("The logo must be a PNG or JPEG image"));
+    if (file.size > LOGO_MB * 1024 * 1024) return setError(t("The logo is too large; the limit is {size} MB.", { size: LOGO_MB }));
+    const reader = new FileReader();
+    reader.onload = async () => {
+      setBusy(true);
+      try {
+        const data = await uploadLogo(String(reader.result));
+        setUrl(data.settings.logo_url);
+        toast(t("Logo saved"));
+      } catch (problem) {
+        setError(errorMessage(problem));
+      } finally {
+        setBusy(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+  const clear = async () => {
+    setBusy(true);
+    try {
+      setUrl((await removeLogo()).settings.logo_url);
+      toast(t("Logo removed"));
+    } catch (problem) {
+      setError(errorMessage(problem));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="settingsSection" aria-labelledby="settings-logo">
+      <h3 id="settings-logo">
+        <ImageIcon size={16} /> {t("Logo")}
+      </h3>
+      <p className="muted">{t("Shown on certificates and service reports. A PNG or JPEG of up to 1 MB; a wide logo on a white background prints best.")}</p>
+      {error && <div className="error">{error}</div>}
+      {url === undefined ? (
+        !error && <Loading />
+      ) : (
+        <div className="logoRow">
+          {url ? <img className="logoPreview" src={apiUrl(url)} alt={t("Your logo")} /> : <span className="logoEmpty">{t("No logo yet")}</span>}
+          <label className={`secondary logoPick ${busy ? "disabled" : ""}`}>
+            <Upload size={14} /> {url ? t("Change logo") : t("Add a logo")}
+            <input type="file" accept="image/png,image/jpeg" hidden disabled={busy} onChange={(event) => pick(event.currentTarget)} />
+          </label>
+          {url && (
+            <button type="button" className="iconButton delete" title={t("Remove logo")} aria-label={t("Remove logo")} disabled={busy} onClick={clear}>
+              <Trash2 size={15} />
+            </button>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function BookingSettingsForm() {
   const [booking, setBooking] = useState<BookingSettings | null>(null);
   const [error, setError] = useState("");

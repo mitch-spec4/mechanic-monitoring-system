@@ -56,7 +56,7 @@ async function checkSpace(size: number) {
  * it's kept on the phone first and uploads on a good connection: returns the updated job once it's
  * on the server, or nothing while it waits.
  */
-export async function uploadMedia(job: Pick<Job, "id" | "title" | "status">, kind: string, file: File, limits: Limits) {
+export async function uploadMedia(job: Pick<Job, "id" | "title" | "status">, kind: string, file: File, limits: Limits, formField?: string) {
   let body: Blob = file;
   let contentType = file.type || "application/octet-stream";
   let name = file.name || "upload";
@@ -70,8 +70,8 @@ export async function uploadMedia(job: Pick<Job, "id" | "title" | "status">, kin
     name = name.replace(/\.[^.]+$/, "") + ".jpg";
   }
   await checkSpace(body.size);
-  return queueMedia(job, { kind, contentType, size: body.size, name }, body, async () => {
-    const reserved = await requestUpload(job.id, { kind, content_type: contentType, size: body.size, name });
+  return queueMedia(job, { kind, contentType, size: body.size, name, formField }, body, async () => {
+    const reserved = await requestUpload(job.id, { kind, content_type: contentType, size: body.size, name, form_field: formField });
     await sendUpload(reserved.upload, body);
     return confirmUpload(reserved.file_id);
   });

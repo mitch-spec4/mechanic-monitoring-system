@@ -9,6 +9,7 @@ import {
   BarChart3,
   Bell,
   CalendarClock,
+  ClipboardCheck,
   ClipboardList,
   Clock,
   Cog,
@@ -44,6 +45,7 @@ const roleLinks = {
     [Users, mark("Customers")],
     [Wrench, mark("Equipment")],
     [ListChecks, mark("Checklists")],
+    [ClipboardCheck, mark("Forms")],
     [UserRound, mark("Technicians")],
     [MapIcon, mark("Team Map")],
     [RouteIcon, mark("Routes")],
@@ -76,7 +78,7 @@ const utilityLinks = [
   [HelpCircle, mark("Help & Support")],
 ] as const;
 // Pages that need a feature the plan may not include: they show a lock, and an upgrade card when opened.
-const PAGE_FEATURES: Record<string, Feature> = { Routes: "routes" };
+const PAGE_FEATURES: Record<string, Feature> = { Routes: "routes", Forms: "forms" };
 export const ROLE_NAMES: Record<Role, string> = { boss: mark("Boss"), mechanic: mark("Technician"), customer: mark("Customer") };
 
 function sidebarRows(role: Role, stats: Report): [string, number][] {

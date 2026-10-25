@@ -24,6 +24,9 @@ from app.models import (
     Review,
     ServiceRequest,
     ServiceTemplate,
+    FormSubmission,
+    FormTemplate,
+    FormVersion,
     Shift,
     User,
     WorkEntry,
@@ -73,7 +76,13 @@ def acme_records(data):
         company_id=acme, machine_id=data["machine"], uploaded_by=data["boss"], kind="document", content_type="application/pdf", storage_key="acme/manual.pdf", status="ready"
     )
     service = ServiceTemplate(company_id=acme, name="Annual service", checklist_id=template.id, duration_minutes=90, skills=["Electrical"], booking="direct")
-    db.session.add_all([item, entry, part, request, notification, review, file, payment, site, plan, document, service])
+    form = FormTemplate(company_id=acme, name="Safety check", job_types=["Repair"], customer_visible=True)
+    db.session.add_all([item, entry, part, request, notification, review, file, payment, site, plan, document, service, form])
+    db.session.flush()
+    version = FormVersion(form_id=form.id, number=1, fields=[{"id": "safe", "type": "yesno", "label": "Safe", "required": True}])
+    db.session.add(version)
+    db.session.flush()
+    db.session.add(FormSubmission(company_id=acme, job_id=job, form_id=form.id, version_id=version.id, answers={"safe": "yes"}, status="completed", completed_at=utcnow()))
     db.session.commit()
     return {
         "tid": template.id,
@@ -94,6 +103,7 @@ def acme_records(data):
         "plan": plan.id,
         "document": document.id,
         "service": service.id,
+        "form": form.id,
     }
 
 
@@ -107,6 +117,10 @@ def attempts(ids):
         ("PATCH", f"/api/checklists/{ids['tid']}", {"job_type": "Stolen"}),
         ("DELETE", f"/api/checklists/{ids['tid']}", None),
         ("PATCH", f"/api/catalog/{ids['service']}", {"name": "Stolen"}),
+        ("PATCH", f"/api/forms/{ids['form']}", {"name": "Stolen"}),
+        ("DELETE", f"/api/forms/{ids['form']}", None),
+        ("PUT", f"/api/jobs/{jid}/forms/{ids['form']}", {"answers": {"safe": "no"}}),
+        ("GET", f"/api/jobs/{jid}/forms/{ids['form']}/certificate.pdf", None),
         ("DELETE", f"/api/catalog/{ids['service']}", None),
         ("GET", f"/api/customers/{ids['cid']}", None),
         ("PATCH", f"/api/customers/{ids['cid']}", {"name": "Stolen"}),
@@ -192,6 +206,7 @@ def test_people_from_another_company_can_reach_none_of_its_records(client, data,
     assert db.session.get(MaintenancePlan, acme_records["plan"]).title == "Oil change"
     assert db.session.get(JobFile, acme_records["document"]) is not None
     assert db.session.get(ServiceTemplate, acme_records["service"]).name == "Annual service"
+    assert db.session.get(FormTemplate, acme_records["form"]).name == "Safety check"
 
 
 def test_every_id_route_is_covered(app, data, acme_records):

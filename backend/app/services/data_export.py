@@ -24,6 +24,9 @@ from app.models import (
     Company,
     Customer,
     CustomerMessage,
+    FormSubmission,
+    FormTemplate,
+    FormVersion,
     Invitation,
     Job,
     JobChecklistItem,
@@ -75,6 +78,9 @@ def _tables(company_id):
         "checklist_templates": (ChecklistTemplate, ChecklistTemplate.query.filter_by(company_id=company_id)),
         "checklist_template_items": (ChecklistTemplateItem, ChecklistTemplateItem.query.filter(ChecklistTemplateItem.template_id.in_(templates))),
         "services": (ServiceTemplate, ServiceTemplate.query.filter_by(company_id=company_id)),
+        "forms": (FormTemplate, FormTemplate.query.filter_by(company_id=company_id)),
+        "form_versions": (FormVersion, FormVersion.query.filter(FormVersion.form_id.in_(db.session.query(FormTemplate.id).filter(FormTemplate.company_id == company_id)))),
+        "form_answers": (FormSubmission, FormSubmission.query.filter_by(company_id=company_id)),
         "service_records": (ServiceRecord, ServiceRecord.query.filter_by(company_id=company_id)),
         "service_requests": (ServiceRequest, ServiceRequest.query.filter_by(company_id=company_id)),
         "customer_messages": (CustomerMessage, CustomerMessage.query.filter_by(company_id=company_id)),
@@ -95,6 +101,16 @@ def _plain(value):
     # Quantities like 1.50: written exactly as stored, not rounded through a float.
     if isinstance(value, Decimal):
         return str(value)
+    return value
+
+
+def cell(value):
+    """A value as a spreadsheet cell: a list of names (a service's skills) as "Electrical;
+    Welding", anything else structured (a form's questions or answers) as JSON."""
+    if isinstance(value, list) and all(isinstance(item, (str, int, float)) for item in value):
+        return "; ".join(map(str, value))
+    if isinstance(value, (list, dict)):
+        return json.dumps(value, ensure_ascii=False)
     return value
 
 
@@ -135,8 +151,7 @@ def build_export(company_id):
             writer = csv.DictWriter(text, fieldnames=columns)
             writer.writeheader()
             for row in everything[name]:
-                # Lists (a service's skills) as "Electrical; Welding" in a spreadsheet cell.
-                writer.writerow({key: "; ".join(map(str, value)) if isinstance(value, list) else value for key, value in row.items()})
+                writer.writerow({key: cell(value) for key, value in row.items()})
             # The byte order mark makes Excel read the file as UTF-8 (names like "Wanjirū").
             zipped.writestr(f"{name}.csv", "﻿" + text.getvalue())
         zipped.writestr(

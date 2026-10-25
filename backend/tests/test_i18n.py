@@ -95,6 +95,7 @@ def test_company_settings(client, data, auth):
         "units": "metric",
         "language": "en",
         "base": None,
+        "logo_url": None,
     }
     assert "Africa/Dar_es_Salaam" in settings["timezones"] and "TZS" in settings["currencies"]
     assert settings["languages"] == [{"code": "en", "name": "English"}, {"code": "sw", "name": "Kiswahili"}]
@@ -107,6 +108,7 @@ def test_company_settings(client, data, auth):
         "units": "imperial",
         "language": "sw",
         "base": None,
+        "logo_url": None,
     }
     assert db.session.get(Company, data["acme"]).timezone == "Africa/Dar_es_Salaam"
     assert client.patch("/api/company/settings", headers=boss, json={"timezone": "Mars/Olympus"}).status_code == 400

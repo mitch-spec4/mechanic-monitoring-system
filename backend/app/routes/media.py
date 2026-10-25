@@ -4,10 +4,12 @@ import uuid
 from flask import Blueprint, Response, current_app, jsonify, redirect, request, send_file
 
 from app import db
+from app.models.forms import FormSubmission, FormTemplate, FormVersion
 from app.models.media import JobFile
 from app.routes.worksheet import job_detail, load_job, worksheet_job
-from app.services.billing import check_storage
+from app.services.billing import check_storage, require_feature
 from app.services.data_export import file_for_link
+from app.services.forms import forms_for_job, latest_version
 from app.services.report_pdf import build_report
 from app.services.storage import StorageError, read_upload_token, storage
 from app.services.sync import happened_at, request_key
@@ -19,10 +21,11 @@ from app.i18n import N_, _
 bp = Blueprint("media", __name__)
 
 PHOTO_KINDS = ("before", "after", "other")
-UPLOAD_KINDS = PHOTO_KINDS + ("video",)
+# A photo answering a form's question comes with `form_field` ("<form id>:<question id>").
+UPLOAD_KINDS = PHOTO_KINDS + ("video", "form_photo")
 PHOTO_TYPES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 VIDEO_TYPES = {"video/mp4": ".mp4", "video/quicktime": ".mov", "video/webm": ".webm", "video/3gpp": ".3gp"}
-KIND_LABEL = {"before": N_("before photo"), "after": N_("after photo"), "other": N_("photo"), "video": N_("video")}
+KIND_LABEL = {"before": N_("before photo"), "after": N_("after photo"), "other": N_("photo"), "video": N_("video"), "form_photo": N_("form photo")}
 
 
 def max_bytes(kind):
@@ -33,6 +36,20 @@ def max_bytes(kind):
 def media_limits():
     config = current_app.config
     return {"photo_mb": config["MAX_PHOTO_MB"], "video_mb": config["MAX_VIDEO_MB"], "video_seconds": config["MAX_VIDEO_SECONDS"]}
+
+
+def photo_question(job, data):
+    """The form question a form photo answers: a photo question of a form on this job."""
+    raw = data.get("form_field")
+    form_id, _sep, field_id = raw.partition(":") if isinstance(raw, str) else ("", "", "")
+    form = FormTemplate.query.filter_by(id=int(form_id), company_id=job.company_id).first() if form_id.isdigit() else None
+    if not form or form not in forms_for_job(job):
+        raise ValidationError(_("This photo isn't for a form on this job"), 404)
+    submission = FormSubmission.query.filter_by(job_id=job.id, form_id=form.id).first()
+    version = db.session.get(FormVersion, submission.version_id) if submission else latest_version(form)
+    if not any(field["id"] == field_id and field["type"] == "photo" for field in version.fields):
+        raise ValidationError(_("This form has no photo question {id}", id=field_id), 404)
+    return f"{form.id}:{field_id}"
 
 
 def new_key(job, extension):
@@ -65,6 +82,9 @@ def request_upload(jid):
     allowed = VIDEO_TYPES if kind == "video" else PHOTO_TYPES
     if content_type not in allowed:
         raise ValidationError(_("This type of file can't be added as a {kind}: {content_type}", kind=_(KIND_LABEL[kind]), content_type=content_type), 415)
+    if kind == "form_photo":
+        require_feature(job.company_id, "forms")
+    form_field = photo_question(job, data) if kind == "form_photo" else None
     size = integer(data, "size", "Size", required=True, minimum=1)
     limit = max_bytes(kind)
     if size > limit:
@@ -81,6 +101,7 @@ def request_upload(jid):
         original_name=text(data, "name", "Name", max_length=200),
         created_at=happened_at(),
         client_key=key,
+        form_field=form_field,
     )
     db.session.add(record)
     db.session.flush()
@@ -145,7 +166,7 @@ def confirm_upload(fid):
 def delete_file(fid):
     user = current_user()
     record = JobFile.query.filter(JobFile.id == fid, JobFile.uploaded_by == user.id, JobFile.company_id == user.company_id, JobFile.job_id.isnot(None)).first_or_404()
-    if record.kind == "signature":
+    if record.kind in ("signature", "form_signature"):
         raise ValidationError(_("Signatures can't be deleted"), 409)
     job = worksheet_job(record.job_id, uploads=True)
     if record.status == "ready":

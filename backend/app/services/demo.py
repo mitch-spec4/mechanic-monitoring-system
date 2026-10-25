@@ -21,6 +21,9 @@ from app.models import (
     Company,
     Customer,
     CustomerMessage,
+    FormSubmission,
+    FormTemplate,
+    FormVersion,
     Job,
     JobChecklistItem,
     JobEvent,
@@ -70,6 +73,61 @@ SERVICES = (
     ("Compressor full service", "Oil, air and separator filters, belts, and a leak and pressure test.", "Compressor", "Preventive maintenance", 120, ("Compressors",), "direct"),
     ("Breakdown call-out", "Something has stopped working and you're not sure why.", None, "Repair", 120, (), "inspection"),
     ("Conveyor belt replacement", "Remove the worn belt, fit and align the new one, and test run under load.", "Conveyor", "Repair", 240, ("Conveyors", "Welding"), "none"),
+)
+
+
+FORMS = (
+    (
+        "Generator load test certificate",
+        "Issued after a generator service: levels, a load test, and the result.",
+        [
+            {"id": "before", "type": "heading", "label": "Before the test"},
+            {"id": "levels", "type": "yesno", "label": "Oil and coolant levels correct", "required": True},
+            {"id": "hours", "type": "number", "label": "Running hours", "required": True},
+            {"id": "test", "type": "heading", "label": "Load test"},
+            {"id": "load_test", "type": "yesno", "label": "Load test done", "required": True},
+            {"id": "load_kw", "type": "number", "label": "Load applied (kW)", "required": True, "show_if": {"field": "load_test", "equals": "yes"}},
+            {"id": "voltage", "type": "number", "label": "Output voltage (V)", "required": True, "show_if": {"field": "load_test", "equals": "yes"}},
+            {"id": "no_test", "type": "text", "label": "Why not?", "required": True, "show_if": {"field": "load_test", "equals": "no"}},
+            {"id": "result", "type": "choice", "label": "Result", "required": True, "options": ["Pass", "Pass with advice", "Fail"]},
+            {"id": "advice", "type": "text", "label": "Advice for the customer", "long": True},
+            {"id": "panel", "type": "photo", "label": "Control panel after the test"},
+            {"id": "next_due", "type": "date", "label": "Next service due"},
+            {"id": "signature", "type": "signature", "label": "Technician's signature", "required": True},
+        ],
+        ("Generator 500-hour service",),
+        True,
+        True,
+    ),
+    (
+        "Inspection certificate",
+        "The equipment's condition after an inspection.",
+        [
+            {"id": "condition", "type": "choice", "label": "Overall condition", "required": True, "options": ["Good", "Fair", "Poor"]},
+            {"id": "safe", "type": "yesno", "label": "Safe to operate", "required": True},
+            {"id": "faults", "type": "yesno", "label": "Faults found", "required": True},
+            {"id": "fault_notes", "type": "text", "label": "Describe the faults", "required": True, "long": True, "show_if": {"field": "faults", "equals": "yes"}},
+            {"id": "photo", "type": "photo", "label": "Photo of the equipment"},
+            {"id": "next_due", "type": "date", "label": "Next inspection due"},
+            {"id": "signature", "type": "signature", "label": "Inspector's signature", "required": True},
+        ],
+        ("Inspection",),
+        False,
+        True,
+    ),
+    (
+        "Site safety check",
+        "Before starting a repair. For the team only.",
+        [
+            {"id": "isolated", "type": "yesno", "label": "Machine isolated and locked out", "required": True},
+            {"id": "area", "type": "yesno", "label": "Work area made safe and signposted", "required": True},
+            {"id": "ppe", "type": "choice", "label": "Protective equipment worn", "options": ["Gloves and glasses", "Full PPE", "Not needed"]},
+            {"id": "hazards", "type": "text", "label": "Hazards noticed", "long": True},
+        ],
+        ("Repair",),
+        False,
+        False,
+    ),
 )
 
 
@@ -330,6 +388,37 @@ def populate(company, tag=None, password=None):
 
     add_signature(conveyor_job, brian, "Grace Wanjiru", now)
 
+    # Forms: a load test certificate the generator service needs, an inspection certificate on
+    # inspections (filled in on the conveyor's), and an internal safety check on repairs.
+    company.logo_key, company.logo_content_type = demo_logo(company), "image/png"
+    forms = {}
+    for name, description, fields, attach, required, visible in FORMS:
+        form = FormTemplate(
+            company_id=company.id, name=name, description=description, required=required, customer_visible=visible,
+            job_types=[value for value in attach if isinstance(value, str) and value in CHECKLISTS],
+            service_ids=[services[value].id for value in attach if value in services],
+        )
+        db.session.add(form)
+        db.session.flush()
+        version = FormVersion(form_id=form.id, number=1, fields=fields, created_by=boss.id)
+        db.session.add(version)
+        db.session.flush()
+        forms[name] = (form, version)
+    certificate, version = forms["Inspection certificate"]
+    done = now - timedelta(hours=70)
+    db.session.add(
+        FormSubmission(
+            company_id=company.id, job_id=conveyor_job.id, form_id=certificate.id, version_id=version.id, machine_id=conveyor.id,
+            status="completed", updated_at=done, updated_by=brian.id, completed_at=done, completed_by=brian.id,
+            answers={
+                "condition": "Good", "safe": "yes", "faults": "yes",
+                "fault_notes": "Belt slightly out of line at the tail pulley; realigned and tensioned.",
+                "next_due": (today + timedelta(days=182)).isoformat(), "signature": {"name": "Brian Kariuki"},
+            },
+        )
+    )
+    add_drawn(conveyor_job, brian, "form_signature", f"{certificate.id}:signature", done)
+
     # On the Business plan (every feature), paid monthly (a test-mode payment a week ago).
     paid = now - timedelta(days=7)
     db.session.add(
@@ -420,19 +509,50 @@ def populate(company, tag=None, password=None):
     return boss
 
 
-def add_signature(job, mechanic, name, now, hours_ago=70):
-    """The customer's sign-off on a completed job: a drawn signature stored like a real one."""
+def drawn_png():
     image = Image.new("RGBA", (480, 160), (255, 255, 255, 0))
     pen = ImageDraw.Draw(image)
     points = [(30 + x * 4, 95 - 38 * math.sin(x / 7) * math.exp(-x / 160) - (x % 23)) for x in range(105)]
     pen.line(points, fill=(23, 32, 51, 255), width=4, joint="curve")
     out = io.BytesIO()
     image.save(out, "PNG")
-    key = f"{job.company_id}/jobs/{job.id}/signature-demo.png"
+    return out.getvalue()
+
+
+def add_drawn(job, mechanic, kind, form_field, at):
+    """A drawn signature answering a form's question."""
+    png = drawn_png()
+    key = f"{job.company_id}/jobs/{job.id}/{kind}-{form_field.replace(':', '-')}-demo.png"
+    storage().put(key, png, "image/png")
+    db.session.add(
+        JobFile(company_id=job.company_id, job_id=job.id, uploaded_by=mechanic.id, kind=kind, content_type="image/png",
+                size_bytes=len(png), storage_key=key, original_name="signature.png", status="ready", created_at=at, form_field=form_field)
+    )
+
+
+def demo_logo(company):
+    """A simple logo for the demo company's certificates and reports: "DK" on a blue tile."""
+    image = Image.new("RGB", (360, 120), (255, 255, 255))
+    pen = ImageDraw.Draw(image)
+    pen.rounded_rectangle((0, 0, 120, 120), radius=24, fill=(11, 107, 220))
+    initials, rest = "DK", "Engineering"  # the company's name, not text to translate
+    pen.text((60, 60), initials, fill=(255, 255, 255), anchor="mm", font_size=56)
+    pen.text((136, 60), rest, fill=(12, 22, 38), anchor="lm", font_size=40)
+    out = io.BytesIO()
+    image.save(out, "PNG")
+    key = f"{company.id}/logo-demo.png"
     storage().put(key, out.getvalue(), "image/png")
+    return key
+
+
+def add_signature(job, mechanic, name, now, hours_ago=70):
+    """The customer's sign-off on a completed job: a drawn signature stored like a real one."""
+    png = drawn_png()
+    key = f"{job.company_id}/jobs/{job.id}/signature-demo.png"
+    storage().put(key, png, "image/png")
     db.session.add(
         JobFile(company_id=job.company_id, job_id=job.id, uploaded_by=mechanic.id, kind="signature", content_type="image/png",
-                size_bytes=len(out.getvalue()), storage_key=key, original_name="signature.png", status="ready")
+                size_bytes=len(png), storage_key=key, original_name="signature.png", status="ready")
     )
     job.signed_by_name = name
     job.signed_at = now - timedelta(hours=hours_ago)

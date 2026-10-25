@@ -8,6 +8,7 @@ export const FEATURES: Record<Feature, { name: string; plan: string }> = {
   maintenance: { name: mark("Planned maintenance and reminders"), plan: "Professional" },
   routes: { name: mark("Route planning"), plan: "Business" },
   costing: { name: mark("Job costing and margins"), plan: "Business" },
+  forms: { name: mark("Custom forms and certificates"), plan: "Professional" },
 };
 
 /** Whether the company's plan includes a feature. A profile saved before plans had features says

@@ -81,7 +81,7 @@ const PLAN_COPY: Record<string, { desc: string; team: string; features: string[]
   professional: {
     desc: mark("Organize the work across a growing team."),
     team: mark("Growing teams"),
-    features: [mark("Everything in Starter"), mark("Insights with Excel and PDF exports"), mark("Planned maintenance and reminders")],
+    features: [mark("Everything in Starter"), mark("Insights with Excel and PDF exports"), mark("Planned maintenance and reminders"), mark("Custom forms and PDF certificates")],
     planned: [mark("Custom statuses and fields"), mark("Approvals"), mark("Workload and job timelines")],
     best: mark("Teams ready for more structure and fewer manual follow-ups."),
   },
@@ -113,6 +113,7 @@ const COMPARE: [string, (plan: Plan) => string][] = [
   // What a plan includes comes from the server (backend/app/services/plans.py).
   [mark("Insights & Excel/PDF exports"), (plan) => (plan.features.includes("insights") ? "Included" : "—")],
   [mark("Planned maintenance & reminders"), (plan) => (plan.features.includes("maintenance") ? "Included" : "—")],
+  [mark("Custom forms & certificates"), (plan) => (plan.features.includes("forms") ? "Included" : "—")],
   [mark("Route planning"), (plan) => (plan.features.includes("routes") ? "Included" : "—")],
   [mark("Job costing & margins"), (plan) => (plan.features.includes("costing") ? "Included" : "—")],
   [mark("Custom statuses & fields"), (plan) => (plan.key === "starter" ? "—" : "Planned")],

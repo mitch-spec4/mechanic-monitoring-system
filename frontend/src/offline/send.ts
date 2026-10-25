@@ -190,8 +190,8 @@ const stamped = (value: string) => (/Z$|[+-]\d\d:\d\d$/.test(value) ? value : `$
 async function sendMedia(db: OfflineDB, env: SendEnv, item: QueueItem): Promise<Outcome> {
   const blob = await getBlob(db, item.id);
   if (!blob || !item.media || !item.jobId) return { type: "refused", item, status: 410, data: {}, code: "missing" };
-  const { kind, contentType, size, name } = item.media;
-  const reserve = await call(env, item, "POST", `/jobs/${item.jobId}/files`, { kind, content_type: contentType, size, name });
+  const { kind, contentType, size, name, formField } = item.media;
+  const reserve = await call(env, item, "POST", `/jobs/${item.jobId}/files`, { kind, content_type: contentType, size, name, form_field: formField });
   const refused = await verdict(item, reserve);
   if (refused) return refused;
   const reserved = (await (reserve as Response).json()) as { file_id: number; ready?: boolean; upload?: { method: string; url: string; headers: Record<string, string> } };

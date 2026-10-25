@@ -15,7 +15,7 @@ class JobFile(db.Model):
     # Set instead of job_id for an equipment document.
     machine_id = db.Column(db.Integer, db.ForeignKey("machine.id"), nullable=True, index=True)
     uploaded_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    kind = db.Column(db.String(20), nullable=False)  # before, after, other, video, signature, document
+    kind = db.Column(db.String(20), nullable=False)  # before, after, other, video, signature, document, form_photo, form_signature
     content_type = db.Column(db.String(80), nullable=False)
     size_bytes = db.Column(db.Integer, nullable=False, default=0)
     storage_key = db.Column(db.String(255), nullable=False, unique=True)
@@ -25,3 +25,5 @@ class JobFile(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
     # The phone's own ID for a queued photo or video, so sending it again never adds it twice.
     client_key = db.Column(db.String(80))
+    # A photo or signature answering a form's question: "<form id>:<question id>".
+    form_field = db.Column(db.String(80))

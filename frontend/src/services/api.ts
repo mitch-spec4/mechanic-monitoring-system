@@ -1,6 +1,8 @@
 import { language, t } from "../i18n";
 import type {
   AuditEvent,
+  CustomForm,
+  FormField,
   BookableService,
   CatalogService,
   ChatMessage,
@@ -242,11 +244,14 @@ export type BookingSettings = {
   notice_hours: number;
   window_days: number;
 };
-export type CompanySettings = { timezone: string; currency: string; units: string; language: string; booking: BookingSettings; base: Position | null };
+export type CompanySettings = { timezone: string; currency: string; units: string; language: string; booking: BookingSettings; base: Position | null; logo_url: string | null };
 export type CompanySettingsOptions = { timezones: string[]; currencies: string[]; units: string[]; languages: { code: string; name: string }[] };
 export const companySettings = () => api<{ settings: CompanySettings } & CompanySettingsOptions>("/company/settings");
-export const saveCompanySettings = (settings: Partial<Omit<CompanySettings, "booking">> & { booking?: Partial<BookingSettings> }) =>
+export const saveCompanySettings = (settings: Partial<Omit<CompanySettings, "booking" | "logo_url">> & { booking?: Partial<BookingSettings> }) =>
   patch<{ settings: CompanySettings }>("/company/settings", settings);
+/** The company's logo, as a PNG or JPEG data URL, for certificates and reports. */
+export const uploadLogo = (image: string) => put<{ settings: CompanySettings }>("/company/logo", { image });
+export const removeLogo = () => remove<{ settings: CompanySettings }>("/company/logo");
 
 // "Try the demo": a private demo company, seen as the boss, a mechanic or a customer
 export const startDemo = (role: string) => post<Signed>("/demo", { role });
@@ -371,6 +376,16 @@ export const createChecklist = (data: ChecklistDraft) => post<{ checklist: Check
 export const updateChecklist = (id: number, data: Partial<ChecklistDraft>) => patch<{ checklist: Checklist }>(`/checklists/${id}`, data);
 export const deleteChecklist = (id: number) => remove(`/checklists/${id}`);
 
+// Custom forms: managers build them; a form's answers are saved on a job (offline too: offline/changes.ts)
+export type FormDraft = Partial<Omit<CustomForm, "id" | "version" | "submissions">> & { fields?: FormField[] };
+export const listForms = () => api<{ forms: CustomForm[] }>("/forms");
+export const createForm = (data: FormDraft) => post<{ form: CustomForm }>("/forms", data);
+export const updateForm = (id: number, data: FormDraft) => patch<{ form: CustomForm }>(`/forms/${id}`, data);
+export const deleteForm = (id: number) => remove(`/forms/${id}`);
+/** A form's answers: the version shown, the answers (null clears one; a signature is {name, image}), and whether to complete it. */
+export type FormAnswers = { version_id?: number; answers: Record<string, unknown>; complete?: boolean };
+export const saveFormAnswers = (jobId: number, formId: number, data: FormAnswers) => put<WithJob>(`/jobs/${jobId}/forms/${formId}`, data);
+
 // The service catalog: managers keep it; customers see what they can book for a piece of equipment
 export type ServiceDraft = Partial<Omit<CatalogService, "id" | "checklist" | "jobs">> & { checklist_id?: number | null };
 export const catalog = () => api<{ services: CatalogService[] }>("/catalog");
@@ -418,7 +433,7 @@ export async function uploadDocument(machineId: number, file: File) {
 }
 
 // Job photos, videos and reports
-export const requestUpload = (jobId: number, data: { kind: string; content_type: string; size: number; name: string }) =>
+export const requestUpload = (jobId: number, data: { kind: string; content_type: string; size: number; name: string; form_field?: string }) =>
   post<{ file_id: number; upload: UploadTarget }>(`/jobs/${jobId}/files`, data);
 export const confirmUpload = (fileId: number) => post<WithJob>(`/files/${fileId}/confirm`, {});
 export const deleteFile = (fileId: number) => remove<WithJob>(`/files/${fileId}`);

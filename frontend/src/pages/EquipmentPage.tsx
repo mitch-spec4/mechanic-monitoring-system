@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
+  Award,
   CalendarCheck,
   CalendarClock,
   Camera,
@@ -22,6 +23,7 @@ import {
 import { apiUrl, catalog, createJob, createPlan, createPlanJob, deleteDocument, deletePlan, machineDetail, updatePlan, uploadDocument, type User } from "../services/api";
 import type { CatalogService, EquipmentDetail, MaintenancePlan } from "../services/types";
 import { servicesFor } from "../components/JobForms";
+import { CertificateList } from "../components/JobFormsCard";
 import { can } from "../lib/plan";
 import PlanLocked from "../components/PlanLocked";
 import { confirmAction, toast } from "../components/Feedback";
@@ -164,6 +166,19 @@ export default function EquipmentPage({ machineId, user, onBack, onOpenJob, onOp
         {(machine.can_edit || machine.plans.length > 0) && <PlansCard machine={machine} user={user} onChanged={setMachine} onOpenJob={onOpenJob} openable={openable} />}
         {machine.can_edit && <ServiceShortcuts machine={machine} onOpenJob={onOpenJob} />}
         <DocumentsCard machine={machine} user={user} onChanged={setMachine} />
+        {machine.certificates.length > 0 && (
+          <section className="jobCard" aria-labelledby="equipment-certificates">
+            <div className="jobCardHead">
+              <h2 id="equipment-certificates">
+                <Award size={16} /> {user.role === "customer" ? t("Certificates") : t("Forms and certificates")}
+              </h2>
+              <span className="jobBadge">{machine.certificates.length}</span>
+            </div>
+            <CertificateList
+              items={machine.certificates.map((item) => ({ key: `${item.job_id}-${item.form_id}`, name: item.name, detail: item.job_title, date: item.completed_at, url: item.pdf_url }))}
+            />
+          </section>
+        )}
         {machine.faults.length > 0 && (
           <section className="jobCard">
             <div className="jobCardHead">

@@ -15,6 +15,9 @@ from app.models import (
     BillingEvent,
     ChecklistTemplate,
     ClientRequest,
+    FormSubmission,
+    FormTemplate,
+    FormVersion,
     ChecklistTemplateItem,
     Company,
     Customer,
@@ -55,10 +58,15 @@ def delete_company(company_id):
     users = select(User.id).where(User.company_id == company_id)
     templates = select(ChecklistTemplate.id).where(ChecklistTemplate.company_id == company_id)
     keys = list(db.session.scalars(select(JobFile.storage_key).where(JobFile.company_id == company_id)))
+    keys += [key for key in db.session.scalars(select(Company.logo_key).where(Company.id == company_id)) if key]
+    forms = select(FormTemplate.id).where(FormTemplate.company_id == company_id)
     for statement in (
         delete(LocationPoint).where(LocationPoint.company_id == company_id),
         delete(Shift).where(Shift.company_id == company_id),
         delete(JobFile).where(JobFile.company_id == company_id),
+        delete(FormSubmission).where(FormSubmission.company_id == company_id),
+        delete(FormVersion).where(FormVersion.form_id.in_(forms)),
+        delete(FormTemplate).where(FormTemplate.company_id == company_id),
         delete(JobChecklistItem).where(JobChecklistItem.job_id.in_(jobs)),
         delete(JobEvent).where(JobEvent.job_id.in_(jobs)),
         delete(JobPart).where(JobPart.job_id.in_(jobs)),

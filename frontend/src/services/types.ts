@@ -129,6 +129,8 @@ export type EquipmentDetail = Machine & {
   records: ServiceRecord[];
   can_edit: boolean;
   can_add_documents: boolean;
+  /** Forms completed on its jobs (customers: the certificates). */
+  certificates: Certificate[];
   document_mb: number;
 };
 
@@ -372,6 +374,8 @@ export type JobDetail = {
   can_upload?: boolean;
   media_limits?: MediaLimits;
   completion_blockers?: string[];
+  /** The forms on the job (customers: completed certificates only). */
+  forms?: JobForm[];
   // Changed on this phone, not yet on the server:
   pending_status?: boolean;
   record_pending?: boolean;
@@ -400,7 +404,7 @@ export type Subscription = {
 };
 
 /** What a plan can include beyond the basics (see backend/app/services/plans.py). */
-export type Feature = "insights" | "maintenance" | "routes" | "costing";
+export type Feature = "insights" | "maintenance" | "routes" | "costing" | "forms";
 
 export type Payment = {
   reference: string;
@@ -519,6 +523,70 @@ export type Costing = {
   missing_rates: (string | null)[];
   missing_costs: string[];
 };
+
+/** What a question asks for (backend/app/services/forms.py). */
+export type FormFieldType = "heading" | "text" | "number" | "yesno" | "choice" | "date" | "photo" | "signature";
+
+/** One question of a form's version. */
+export type FormField = {
+  id: string;
+  type: FormFieldType;
+  label: string;
+  help?: string;
+  required?: boolean;
+  /** Text: a box for longer answers. */
+  long?: boolean;
+  /** Choice: what can be picked. */
+  options?: string[];
+  /** Only asked when an earlier yes/no or choice question has this answer. */
+  show_if?: { field: string; equals: string };
+};
+
+/** An answer as stored: text, a number, "yes"/"no", a choice, a date, or a signer's name. */
+export type FormAnswer = string | number | { name: string };
+
+/** A form built by the managers (the Forms page). */
+export type CustomForm = {
+  id: number;
+  name: string;
+  description: string | null;
+  job_types: string[];
+  service_ids: number[];
+  required: boolean;
+  customer_visible: boolean;
+  active: boolean;
+  version: { id: number; number: number; fields: FormField[] } | null;
+  /** How many jobs it was filled in on. */
+  submissions: number;
+};
+
+/** A form on a job, and what was filled in. */
+export type JobForm = {
+  form_id: number;
+  name: string;
+  description: string | null;
+  required: boolean;
+  customer_visible: boolean;
+  /** The certificate, once completed. */
+  pdf_url: string | null;
+  completed_at: string | null;
+  // Left out for customers:
+  version?: { id: number; number: number; fields: FormField[] } | null;
+  submission?: {
+    status: "draft" | "completed";
+    answers: Record<string, FormAnswer>;
+    updated_at: string | null;
+    updated_by: string | null;
+    completed_by: string | null;
+    photos: Record<string, { id: number; url: string; content_type: string; pending?: boolean }[]>;
+    signatures: Record<string, { url: string | null; name: string | null; signed_at: string | null }>;
+    /** Changed on this phone, not yet on the server. */
+    pending?: boolean;
+  } | null;
+};
+
+/** A completed form on a piece of equipment's jobs. */
+export type Certificate = { form_id: number; name: string; job_id: number; job_title: string; completed_at: string | null; customer_visible: boolean; pdf_url: string };
 
 export type RouteStop = {
   job_id: number;
