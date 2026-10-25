@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Copy, Download, KeyRound, ShieldCheck, Smartphone } from "lucide-react";
 import Modal from "./Modal";
 import { toast } from "./Feedback";
@@ -68,15 +68,24 @@ export function TwoFactorSetupSteps({ onEnabled }: { onEnabled: (user: User) => 
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<{ user: User; codes: string[] } | null>(null);
 
+  // Each request makes a new key: only the newest one's answer is shown, so the key never changes
+  // under someone scanning it (an older answer arriving last, or one after the screen closed).
+  const latest = useRef(0);
   const start = () => {
+    const request = ++latest.current;
     setError("");
     setDetails(null);
     setCode("");
     startTwoFactorSetup()
-      .then(setDetails)
-      .catch((problem) => setError(errorMessage(problem)));
+      .then((answer) => request === latest.current && setDetails(answer))
+      .catch((problem) => request === latest.current && setError(errorMessage(problem)));
   };
-  useEffect(start, []);
+  useEffect(() => {
+    start();
+    return () => {
+      latest.current += 1;
+    };
+  }, []);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
