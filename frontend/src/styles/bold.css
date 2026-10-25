@@ -835,7 +835,9 @@ body {
 
 /* ---------- Pages arrive with a short rise ---------- */
 .appShell #content > * > * {
-  animation: rise 0.42s var(--ease) both;
+  /* backwards, not both: a transform left after the rise would trap the dialogs opened inside
+     (a transformed parent is what position: fixed measures from, and it clips them). */
+  animation: rise 0.42s var(--ease) backwards;
 }
 .appShell #content > * > *:nth-child(2) {
   animation-delay: 0.04s;
