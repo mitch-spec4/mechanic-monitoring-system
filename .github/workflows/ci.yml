@@ -5,9 +5,10 @@ on:
     branches: [main]
   pull_request:
 
-# A newer push to a pull request replaces its older checks that are still running.
+# A newer push to a pull request replaces its older checks that are still running. Re-running an
+# older run gets a group of its own, so it never cancels the checks of a newer push.
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}${{ github.run_attempt != '1' && format('-rerun-{0}', github.run_id) || '' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
