@@ -115,12 +115,18 @@ function CompanySettingsForm({ user, onUserChanged }: Props) {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    // An answer that comes after the form was left (or loaded twice) must not undo a change.
+    let current = true;
     companySettings()
       .then((data) => {
+        if (!current) return;
         setSettings(data.settings);
         setOptions({ timezones: data.timezones, currencies: data.currencies, units: data.units, languages: data.languages });
       })
-      .catch((problem) => setError(errorMessage(problem)));
+      .catch((problem) => current && setError(errorMessage(problem)));
+    return () => {
+      current = false;
+    };
   }, []);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -240,9 +246,13 @@ function BookingSettingsForm() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    let current = true;
     companySettings()
-      .then((data) => setBooking(data.settings.booking))
-      .catch((problem) => setError(errorMessage(problem)));
+      .then((data) => current && setBooking(data.settings.booking))
+      .catch((problem) => current && setError(errorMessage(problem)));
+    return () => {
+      current = false;
+    };
   }, []);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
