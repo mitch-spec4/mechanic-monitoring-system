@@ -166,6 +166,22 @@ def test_demo_copies_skip_two_factor(client, app, required):
     assert client.get("/api/jobs").status_code == 200
 
 
+def test_moving_two_step_sign_in_to_a_new_phone_needs_the_password(client, data, auth, required, clock):
+    """A session alone (a browser left open, a stolen cookie) can't move someone's two-step
+    sign-in to another phone and replace their backup codes."""
+    enrol("boss@acme.test")
+    headers = auth("boss@acme.test")
+    setup = client.post("/api/auth/two-factor/setup", headers=headers).get_json()
+    body = {"setup_token": setup["setup_token"], "code": code_at(NOW, setup["secret"])}
+    assert client.post("/api/auth/two-factor/enable", headers=headers, json=body).status_code == 400
+    wrong = client.post("/api/auth/two-factor/enable", headers=headers, json={**body, "password": "wrong"})
+    assert wrong.status_code == 400 and "password" in wrong.get_json()["error"]
+    assert two_factor.decrypt_secret(User.query.filter_by(email="boss@acme.test").one().totp_secret) == "JBSWY3DPEHPK3PXP"
+    moved = client.post("/api/auth/two-factor/enable", headers=headers, json={**body, "password": PASSWORD})
+    assert moved.status_code == 200 and len(moved.get_json()["backup_codes"]) == 10
+    assert two_factor.decrypt_secret(User.query.filter_by(email="boss@acme.test").one().totp_secret) == setup["secret"]
+
+
 def test_new_backup_codes_need_the_password(client, data, auth, required, clock):
     _user, old = enrol("boss@acme.test")
     headers = auth("boss@acme.test")

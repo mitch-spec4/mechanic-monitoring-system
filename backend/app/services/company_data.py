@@ -15,6 +15,9 @@ from app.models import (
     BillingEvent,
     ChecklistTemplate,
     ClientRequest,
+    FormSubmission,
+    FormTemplate,
+    FormVersion,
     ChecklistTemplateItem,
     Company,
     Customer,
@@ -34,6 +37,7 @@ from app.models import (
     Review,
     ServiceRecord,
     ServiceRequest,
+    ServiceTemplate,
     Shift,
     Site,
     Subscription,
@@ -54,10 +58,15 @@ def delete_company(company_id):
     users = select(User.id).where(User.company_id == company_id)
     templates = select(ChecklistTemplate.id).where(ChecklistTemplate.company_id == company_id)
     keys = list(db.session.scalars(select(JobFile.storage_key).where(JobFile.company_id == company_id)))
+    keys += [key for key in db.session.scalars(select(Company.logo_key).where(Company.id == company_id)) if key]
+    forms = select(FormTemplate.id).where(FormTemplate.company_id == company_id)
     for statement in (
         delete(LocationPoint).where(LocationPoint.company_id == company_id),
         delete(Shift).where(Shift.company_id == company_id),
         delete(JobFile).where(JobFile.company_id == company_id),
+        delete(FormSubmission).where(FormSubmission.company_id == company_id),
+        delete(FormVersion).where(FormVersion.form_id.in_(forms)),
+        delete(FormTemplate).where(FormTemplate.company_id == company_id),
         delete(JobChecklistItem).where(JobChecklistItem.job_id.in_(jobs)),
         delete(JobEvent).where(JobEvent.job_id.in_(jobs)),
         delete(JobPart).where(JobPart.job_id.in_(jobs)),
@@ -75,6 +84,7 @@ def delete_company(company_id):
         delete(ClientRequest).where(ClientRequest.user_id.in_(users)),
         delete(AuditEvent).where(AuditEvent.company_id == company_id),
         delete(Invitation).where(Invitation.company_id == company_id),
+        delete(ServiceTemplate).where(ServiceTemplate.company_id == company_id),
         delete(ChecklistTemplateItem).where(ChecklistTemplateItem.template_id.in_(templates)),
         delete(ChecklistTemplate).where(ChecklistTemplate.company_id == company_id),
         delete(BillingEvent).where(BillingEvent.company_id == company_id),

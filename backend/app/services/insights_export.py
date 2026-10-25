@@ -100,6 +100,10 @@ def to_xlsx(data, company):
             cell.alignment = Alignment(vertical="top", wrap_text=True)
         for row in rows:
             page.append(row)
+            # Text people typed (a job title "=HYPERLINK(...)") stays text: Excel never runs it.
+            for cell in page[page.max_row]:
+                if cell.data_type == "f":
+                    cell.data_type = "s"
         page.freeze_panes = "A2"
         for index, heading in enumerate(headings, start=1):
             longest = max([len(str(heading))] + [len(str(row[index - 1])) for row in rows if index - 1 < len(row)])

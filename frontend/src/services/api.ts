@@ -1,6 +1,10 @@
 import { language, t } from "../i18n";
 import type {
   AuditEvent,
+  CustomForm,
+  FormField,
+  BookableService,
+  CatalogService,
   ChatMessage,
   Checklist,
   Company,
@@ -194,8 +198,8 @@ type WithJob = { job: JobDetail };
 export const login = (email: string, password: string) => post<Signed | { two_factor_required: true; ticket: string }>("/auth/login", { email, password });
 export const verifyTwoFactor = (ticket: string, code: string, remember: boolean) => post<Signed>("/auth/two-factor/verify", { ticket, code, remember });
 export const startTwoFactorSetup = () => post<TwoFactorSetup>("/auth/two-factor/setup", {});
-export const enableTwoFactor = (setupToken: string, code: string) =>
-  post<Signed & { backup_codes: string[] }>("/auth/two-factor/enable", { setup_token: setupToken, code });
+export const enableTwoFactor = (setupToken: string, code: string, password?: string) =>
+  post<Signed & { backup_codes: string[] }>("/auth/two-factor/enable", { setup_token: setupToken, code, password });
 export const twoFactorStatus = () => api<TwoFactorStatus>("/auth/two-factor");
 export const renewBackupCodes = (password: string) => post<{ backup_codes: string[] }>("/auth/two-factor/backup-codes", { password });
 export const resetTwoFactor = (userId: number) => post<Ok>(`/users/${userId}/reset-two-factor`, {});
@@ -240,11 +244,14 @@ export type BookingSettings = {
   notice_hours: number;
   window_days: number;
 };
-export type CompanySettings = { timezone: string; currency: string; units: string; language: string; booking: BookingSettings; base: Position | null };
+export type CompanySettings = { timezone: string; currency: string; units: string; language: string; booking: BookingSettings; base: Position | null; logo_url: string | null };
 export type CompanySettingsOptions = { timezones: string[]; currencies: string[]; units: string[]; languages: { code: string; name: string }[] };
 export const companySettings = () => api<{ settings: CompanySettings } & CompanySettingsOptions>("/company/settings");
-export const saveCompanySettings = (settings: Partial<Omit<CompanySettings, "booking">> & { booking?: Partial<BookingSettings> }) =>
+export const saveCompanySettings = (settings: Partial<Omit<CompanySettings, "booking" | "logo_url">> & { booking?: Partial<BookingSettings> }) =>
   patch<{ settings: CompanySettings }>("/company/settings", settings);
+/** The company's logo, as a PNG or JPEG data URL, for certificates and reports. */
+export const uploadLogo = (image: string) => put<{ settings: CompanySettings }>("/company/logo", { image });
+export const removeLogo = () => remove<{ settings: CompanySettings }>("/company/logo");
 
 // "Try the demo": a private demo company, seen as the boss, a mechanic or a customer
 export const startDemo = (role: string) => post<Signed>("/demo", { role });
@@ -274,6 +281,11 @@ export const payTestCheckout = (reference: string, outcome: "success" | "decline
   post<{ payment: Payment; subscription: Subscription | null }>(`/billing/test/${encodeURIComponent(reference)}/pay`, { outcome });
 
 export const jobs = () => api<{ jobs: Job[] }>("/jobs");
+/** Jobs not finished yet: what the manager's dashboard shows, without every job ever done. */
+export const openJobs = () => api<{ jobs: Job[] }>("/jobs?open=1");
+/** One technician's jobs and reviews, for their profile. */
+export const technicianJobs = (mechanicId: number) => api<{ jobs: Job[] }>(`/jobs?mechanic_id=${mechanicId}`);
+export const technicianReviews = (mechanicId: number) => api<{ reviews: Review[] }>(`/reviews?mechanic_id=${mechanicId}`);
 export const notifications = () => api<{ notifications: Notification[] }>("/notifications");
 export const machines = () => api<{ machines: Machine[] }>("/machines");
 export const services = () => api<{ records: ServiceRecord[] }>("/services");
@@ -329,6 +341,10 @@ export const company = () => api<{ company: Company }>("/company");
 export const createJob = (data: Payload) => post<{ job: Job }>("/jobs", data);
 export const updateJob = (id: number, data: Payload) => patch<{ job: Job }>(`/jobs/${id}`, data);
 export const deleteJob = (id: number) => remove(`/jobs/${id}`);
+// Someone with work in the history isn't deleted: their access ends and the history keeps them (kept).
+export const removePerson = (id: number) => remove<{ ok: boolean; kept: boolean }>(`/users/${id}`);
+export const deleteCustomer = (id: number) => remove(`/customers/${id}`);
+export const deleteMachine = (id: number) => remove(`/machines/${id}`);
 export const invite = (data: Payload) => post<{ code: string; expires_at: string; emailed: boolean }>("/customers/invite", data);
 export const createMachine = (data: Payload) => post<{ id: number; machine: Machine }>("/machines", data);
 export const createRequest = (data: Payload) => post<{ id: number }>("/customers/requests", data);
@@ -369,6 +385,24 @@ export const createChecklist = (data: ChecklistDraft) => post<{ checklist: Check
 export const updateChecklist = (id: number, data: Partial<ChecklistDraft>) => patch<{ checklist: Checklist }>(`/checklists/${id}`, data);
 export const deleteChecklist = (id: number) => remove(`/checklists/${id}`);
 
+// Custom forms: managers build them; a form's answers are saved on a job (offline too: offline/changes.ts)
+export type FormDraft = Partial<Omit<CustomForm, "id" | "version" | "submissions">> & { fields?: FormField[] };
+export const listForms = () => api<{ forms: CustomForm[] }>("/forms");
+export const createForm = (data: FormDraft) => post<{ form: CustomForm }>("/forms", data);
+export const updateForm = (id: number, data: FormDraft) => patch<{ form: CustomForm }>(`/forms/${id}`, data);
+export const deleteForm = (id: number) => remove(`/forms/${id}`);
+/** A form's answers: the version shown, the answers (null clears one; a signature is {name, image}), and whether to complete it. */
+export type FormAnswers = { version_id?: number; answers: Record<string, unknown>; complete?: boolean };
+export const saveFormAnswers = (jobId: number, formId: number, data: FormAnswers) => put<WithJob>(`/jobs/${jobId}/forms/${formId}`, data);
+
+// The service catalog: managers keep it; customers see what they can book for a piece of equipment
+export type ServiceDraft = Partial<Omit<CatalogService, "id" | "checklist" | "jobs">> & { checklist_id?: number | null };
+export const catalog = () => api<{ services: CatalogService[] }>("/catalog");
+export const bookableServices = (machineId: number) => api<{ services: BookableService[] }>(`/catalog?machine_id=${machineId}`);
+export const createService = (data: ServiceDraft) => post<{ service: CatalogService }>("/catalog", data);
+export const updateService = (id: number, data: ServiceDraft) => patch<{ service: CatalogService }>(`/catalog/${id}`, data);
+export const deleteService = (id: number) => remove(`/catalog/${id}`);
+
 // Clock in/out and location
 export const shiftStatus = () => api<ShiftStatus>("/shifts/current");
 export const setLocationConsent = (consent: boolean) => post<ShiftStatus>("/shifts/consent", { consent });
@@ -408,7 +442,7 @@ export async function uploadDocument(machineId: number, file: File) {
 }
 
 // Job photos, videos and reports
-export const requestUpload = (jobId: number, data: { kind: string; content_type: string; size: number; name: string }) =>
+export const requestUpload = (jobId: number, data: { kind: string; content_type: string; size: number; name: string; form_field?: string }) =>
   post<{ file_id: number; upload: UploadTarget }>(`/jobs/${jobId}/files`, data);
 export const confirmUpload = (fileId: number) => post<WithJob>(`/files/${fileId}/confirm`, {});
 export const deleteFile = (fileId: number) => remove<WithJob>(`/files/${fileId}`);

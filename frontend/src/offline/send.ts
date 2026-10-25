@@ -52,14 +52,18 @@ export async function flushOutbox(db: OfflineDB, userId: number, env: SendEnv, h
         await putItem(db, { ...item, state: "sending" });
         hooks.changed?.();
         const outcome = await sendOne(db, env, item);
-        hooks.outcome?.(outcome);
         if (outcome.type === "sent") {
+          // Out of the queue before the screen hears the answer: a screen showing the server's
+          // copy must not also show this change as still waiting (a part listed twice).
           await deleteItem(db, item);
           done++;
+          hooks.outcome?.(outcome);
         } else if (outcome.type === "refused") {
+          hooks.outcome?.(outcome);
           if (hooks.attached?.(item.id)) await deleteItem(db, item);
           else await putItem(db, { ...item, state: "failed", error: outcome.data.error || outcome.data.message, errorData: outcome.data, errorCode: outcome.code });
         } else {
+          hooks.outcome?.(outcome);
           const attempts = item.attempts + 1;
           await putItem(db, { ...item, state: "waiting", attempts, nextTry: item.kind === "media" ? Date.now() + backoff(attempts) : undefined });
           hooks.changed?.();
@@ -186,8 +190,8 @@ const stamped = (value: string) => (/Z$|[+-]\d\d:\d\d$/.test(value) ? value : `$
 async function sendMedia(db: OfflineDB, env: SendEnv, item: QueueItem): Promise<Outcome> {
   const blob = await getBlob(db, item.id);
   if (!blob || !item.media || !item.jobId) return { type: "refused", item, status: 410, data: {}, code: "missing" };
-  const { kind, contentType, size, name } = item.media;
-  const reserve = await call(env, item, "POST", `/jobs/${item.jobId}/files`, { kind, content_type: contentType, size, name });
+  const { kind, contentType, size, name, formField } = item.media;
+  const reserve = await call(env, item, "POST", `/jobs/${item.jobId}/files`, { kind, content_type: contentType, size, name, form_field: formField });
   const refused = await verdict(item, reserve);
   if (refused) return refused;
   const reserved = (await (reserve as Response).json()) as { file_id: number; ready?: boolean; upload?: { method: string; url: string; headers: Record<string, string> } };

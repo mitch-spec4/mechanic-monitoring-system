@@ -9,8 +9,8 @@ Usage (from backend/, with DATABASE_URL pointing at Postgres): python scripts/ba
   can't reach both.
 - Without it, the copy is written to BACKUP_DIR (default backups/), to try it out.
 
-Needs pg_dump from the same major Postgres version as the database, or newer. The restore test
-(scripts/restore_check.py) checks that a copy can actually be brought back.
+Uses pg_dump from the database's own major Postgres version when it's installed (see pg_tool). The
+restore test (scripts/restore_check.py) checks that a copy can actually be brought back.
 """
 import os
 import subprocess
@@ -20,6 +20,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 PREFIX = "backups/"
+# Where Debian and Ubuntu keep each Postgres version's tools: /usr/lib/postgresql/16/bin/pg_dump.
+PG_LIB = Path("/usr/lib/postgresql")
 
 
 def postgres_url(url):
@@ -28,6 +30,26 @@ def postgres_url(url):
         if url.startswith(prefix):
             return "postgresql://" + url[len(prefix):]
     return url
+
+
+def server_major(url):
+    """The database server's major version: 16 for 16.4."""
+    from sqlalchemy import create_engine, text
+
+    engine = create_engine("postgresql+psycopg://" + url[len("postgresql://"):])
+    try:
+        with engine.connect() as connection:
+            return int(connection.execute(text("show server_version_num")).scalar()) // 10000
+    finally:
+        engine.dispose()
+
+
+def pg_tool(name, url):
+    """pg_dump or pg_restore from the server's own major version when it's installed, else the one on
+    the PATH. A newer pg_dump can write copies an older pg_restore can't read, and pg_restore 17 and
+    later start with a setting (transaction_timeout) that Postgres 16 refuses."""
+    matching = PG_LIB / str(server_major(url)) / "bin" / name
+    return str(matching) if matching.exists() else name
 
 
 def bucket():
@@ -43,7 +65,7 @@ def bucket():
 
 
 def dump(url, path):
-    subprocess.run(["pg_dump", "--format=custom", "--no-owner", "--no-privileges", f"--dbname={url}", f"--file={path}"], check=True)
+    subprocess.run([pg_tool("pg_dump", url), "--format=custom", "--no-owner", "--no-privileges", f"--dbname={url}", f"--file={path}"], check=True)
 
 
 def main():

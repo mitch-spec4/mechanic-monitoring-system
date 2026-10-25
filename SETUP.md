@@ -109,7 +109,7 @@ A **repeat fault** is equipment that needed fixing twice or more in 90 days: com
 
 **Team Map** asks for positions every 15 seconds while it's open. A position older than 15 minutes is faded: the technician's phone has stopped sending (the app is closed, or there's no signal).
 
-**Long lists.** Jobs, service requests, service records, reviews and notifications load 25 at a time, newest first, with **Previous** and **Next**. Their search runs on the server, over the whole list (a job is also found by its customer's or equipment's name). Customers, technicians and equipment load whole and show 25 (or 10 customers' equipment) a page. A technician's own jobs load whole, because their phone keeps them for working offline. For the API: `GET /api/jobs?page=2&per_page=25&q=pump` returns `jobs` with `page`, `per_page`, `total` and `pages`; without `page`, the whole list comes back as before.
+**Long lists.** Jobs, service requests, service records, reviews and notifications load 25 at a time, newest first, with **Previous** and **Next**. Their search runs on the server, over the whole list (a job is also found by its customer's or equipment's name). Customers, technicians and equipment load whole and show 25 (or 10 customers' equipment) a page. A technician's own jobs load whole, because their phone keeps them for working offline. The manager's dashboard, which refreshes every 30 seconds, loads the newest 25 jobs and requests, the unfinished jobs and the counts, never the whole history. For the API: `GET /api/jobs?page=2&per_page=25&q=pump` returns `jobs` with `page`, `per_page`, `total` and `pages`; without `page`, the whole list comes back as before. `?open=1` keeps only unfinished jobs (or requests, on `/api/customers/requests`), and a manager can add `?mechanic_id=` to jobs and reviews for one technician.
 
 **A technician's phone.** On a phone, technicians get a bar along the bottom (**Today**, **Jobs**, **Shifts**, **Alerts**, and **More** for everything else) instead of the sidebar; managers and customers keep the sidebar. The dashboard opens with **Today's jobs**: the job in progress (**Open**), paused jobs (**Resume**), then jobs due today or overdue (**Start work**). In the demo data, Mitch's generator job is in progress and Brian's mixer job is paused.
 
@@ -133,13 +133,15 @@ To change or add wording, wrap the English in `t("...")` (or `mark("...")` for l
 
 **Forgot password?** on the sign-in page emails a link to choose a new password. It works once, for 1 hour, and opening it also confirms the email address. The answer on screen is the same whether or not the address has an account. For someone who can't get to their email, the manager can still click **Reset password** next to them under **Technicians** or **Customers**; the person enters that one-time code under **Forgot password? → Have a reset code from your manager?** It expires after 24 hours. Anyone can change their own password under **Settings**. Changing or resetting a password signs that account out everywhere else.
 
-**Two-step sign-in.** Everyone signs in with their password and a 6-digit code from an authenticator app on their phone. Anyone without it set up (new managers, people who just joined) is taken to a setup screen before anything else: scan the QR code (or type the key), confirm a code, and save the 10 backup codes shown once, each usable one time instead of a code. **Remember this device for 30 days** skips the code on that browser; changing or resetting the password forgets every remembered device. Under **Settings** people see whether it's on and how many backup codes are left, make new backup codes (asks for the password), or set it up on a new phone. A manager can **Reset two-step sign-in** next to a technician or customer who lost their phone and backup codes; the person is signed out and sets it up again at their next sign-in. A manager who lost both is reset from the server with `flask --app run.py reset-2fa their@email`. "Try the demo" copies don't ask for it. Outside production it can be turned off with `TWO_FACTOR_REQUIRED=0`; in production it's always on.
+**Two-step sign-in.** Everyone signs in with their password and a 6-digit code from an authenticator app on their phone. Anyone without it set up (new managers, people who just joined) is taken to a setup screen before anything else: scan the QR code (or type the key), confirm a code, and save the 10 backup codes shown once, each usable one time instead of a code. **Remember this device for 30 days** skips the code on that browser; changing or resetting the password forgets every remembered device. Under **Settings** people see whether it's on and how many backup codes are left, make new backup codes (asks for the password), or set it up on a new phone (also asks for the password, so someone at an unlocked computer can't move it to their own phone). A manager can **Reset two-step sign-in** next to a technician or customer who lost their phone and backup codes; the person is signed out and sets it up again at their next sign-in. A manager who lost both is reset from the server with `flask --app run.py reset-2fa their@email`. "Try the demo" copies don't ask for it. Outside production it can be turned off with `TWO_FACTOR_REQUIRED=0`; in production it's always on.
+
+**When someone leaves.** **Remove** next to a technician under **Technicians** (or a customer's login, from the API) ends their access: they're signed out everywhere, can't sign in or reset their password, and their email address can be invited again. Anyone who never did any work is deleted outright. Anyone with history (jobs, shifts, records, messages, reviews) is kept as a name only, so that history still says who did it; they're left out of every list, of assignments and of the plan's technician count. A technician with unfinished jobs must have them reassigned first, and a manager can't remove themselves. Under **Customers**, **Delete** removes a customer with their sites, logins and messages, and on a piece of equipment's page **Delete** removes it with its documents and plans; both are refused once there's equipment or service history (mark equipment **Retired** instead). Each removal is in **Activity**.
 
 **Lockout.** Five wrong passwords or codes in a row lock the account for 15 minutes, and its owner gets an email saying so. A right password and code resets the count.
 
 **Activity log.** Managers see **Activity** in the sidebar: sign-ins, wrong attempts and lockouts, password and two-step sign-in changes, invitations, people joining and being removed, deleted jobs, customers and equipment, plan payments, exports and deletion requests, with who, when and from which IP address. Entries are kept for 12 months.
 
-**Export your data.** Under **Settings**, a manager downloads everything the company has (after typing their password) as a ZIP: a CSV per kind of record (opens in Excel or Google Sheets), the same as one `data.json`, and a `files.csv` listing every photo, video and signature with a download link that works for 7 days. The files aren't inside the ZIP, as a company can have up to 100 GB. Passwords, two-step keys and backup codes are never exported. Three exports an hour per company (`EXPORT_RATE_LIMIT`).
+**Export your data.** Under **Settings**, a manager downloads everything the company has (after typing their password) as a ZIP: a CSV per kind of record (opens in Excel or Google Sheets), the same as one `data.json`, and a `files.csv` listing every photo, video and signature with a download link that works for 7 days. The files aren't inside the ZIP, as a company can have up to 100 GB. Passwords, two-step keys and backup codes are never exported. Text that starts like a spreadsheet formula (`=`, `+`, `-`, `@`) is written with a leading `'`, so a job title typed as a formula can't run when the file is opened; the Insights workbook stores such text as text. Three exports an hour per company (`EXPORT_RATE_LIMIT`).
 
 **Deleting a company.** Under **Settings → Delete your company**, a manager types the company's name and their password. Everyone is signed out at once, a banner shows the deletion date to anyone who signs in, and any manager can **Cancel the deletion** for 30 days. After that, the daily clean-up deletes the company, its people and every file. Demo companies can't be deleted this way (they delete themselves).
 
@@ -158,6 +160,85 @@ To change or add wording, wrap the English in `t("...")` (or `mark("...")` for l
 **Job costing (managers).** On the **Technicians** page, **Pay rate** sets what an hour of each technician's time costs the company. On a job's page, **Costs and margin** lists each technician's time on the job (from the worksheet) × their pay rate, each part × its unit cost (typed there), the total, what the customer was charged, and the margin. Anything without a rate or a cost is left out of the total and listed, so a gap never looks free. Amounts are in the company's currency (KSh), typed like `1500` or `1500.50`. Technicians and customers never see costs, rates or margins. The Excel download of **Insights** has each completed job's labour, parts, charged and margin columns.
 
 In the demo data, routes start from DK Engineering's workshop in Industrial Area, every site has a pin, Mitch has the generator job under way and the compressor job due today, and the technicians' pay rates are KSh 600, 650 and 550 an hour. The conveyor inspection was charged KSh 12,000 and the mixer inspection KSh 6,500; the generator's thermostat has no cost yet.
+
+## Services you offer
+
+**The catalog (managers).** Under **Settings → Services you offer**, a company lists the work it does most, for example "Generator 500-hour service". Each service has:
+
+- a name and description;
+- the type of equipment it's for (empty for any equipment);
+- a checklist from the **Checklists** page;
+- its usual time;
+- the skills the work needs (shown on its jobs; matching technicians to them comes later);
+- how customers book it.
+
+There are no prices: quotes stay in the chat.
+
+**A job from a service.** On a piece of equipment's page, **Start a job** lists the services that fit it. One tap creates the job, unassigned, with the service's name, description, checklist and time, and opens it to assign a technician. The **Create job** form has **Start from a service**, which fills in the same fields; anything typed there wins. A job made from a service shows the service, its skills and the estimated time. Managers can change the estimate when editing the job.
+
+**Customers booking a service.** On **Request service**, after choosing the equipment, a customer sees the services they can book for it, plus **Something else**:
+
+| Booking | What happens |
+| --- | --- |
+| Managers only | Customers don't see it. |
+| Customers book an inspection first | As for any request: a technician inspects, then the customer books the work. The work's length is the service's time unless a manager sets another. |
+| Customers book it directly | No inspection: the customer picks a time for the work itself, as long as the service takes (Submitted → Service booked → Completed). |
+
+The job for the work gets the service's checklist.
+
+**Scheduling.** Times offered for a service's visit are as long as the service. On **Routes**, each stop shows its estimated time. The plan adds up the day's work (the stops' estimates and booked visits) plus the driving, and warns when that's more than the working day (the booking hours under **Settings → Online booking**).
+
+**Changing or removing a service.** Changes apply to new jobs and requests only. A service that jobs or requests were made from can't be deleted: turn it off instead, so it stops being offered and its jobs keep it. Deleting a checklist leaves its services without one.
+
+**In the demo data:**
+
+| Service | Booking | Time | Checklist | Skills |
+| --- | --- | --- | --- | --- |
+| Generator 500-hour service | Directly | 3 h | Preventive maintenance | Generators, Electrical |
+| Compressor full service | Directly | 2 h | Preventive maintenance | Compressors |
+| Breakdown call-out | Inspection first | 2 h of work | Repair | |
+| Conveyor belt replacement | Managers only | 4 h | Repair | Conveyors, Welding |
+
+Mitch's compressor job was made from the compressor service. With the generator job (2½ h), his route for today shows about 4½ h of work.
+
+## Custom forms and certificates
+
+**Building a form (managers, Professional and Business plans).** The **Forms** page lists the company's forms; **New form** opens the builder:
+
+- a name and description;
+- **Jobs that get it**: any job types (from **Checklists**) and services (from **Settings → Services you offer**). A job gets every form in use that's on its job type or its service;
+- **Required**: the job can't be completed until the form is;
+- **A certificate**: the customer can see and download it once it's completed. Otherwise it's for the team only;
+- the questions, in order. Each one is a section heading, text (short or long), a number, yes / no, a choice (one of a list), a date, photos, or a signature (drawn, with the signer's name), and can be marked required;
+- **When to ask**: a question can be asked only when an earlier yes / no or choice question has a given answer ("Why not?" only when "Load test done" is "No"). A hidden question is never required, and its answer is dropped.
+
+**Preview** shows the form as a technician sees it, with the show-and-hide rules working; nothing is saved.
+
+**Changing a form.** Its name, jobs and settings change at once. Once a form has been filled in on any job, changing its questions makes a new version: forms already filled in keep the questions they answered, and new ones get the new version. A form that has been filled in can't be deleted; turn it off (**In use**) and it stops being added to jobs, while the jobs that have it keep it.
+
+**Filling it in (technicians and managers).** The job's page has a **Forms** card listing its forms (Not started, Started, Completed by…). **Fill in** opens the form; only the questions its answers so far call for are shown. **Save** keeps a draft; **Complete the form** first checks that every required question shown is answered, and lists any that aren't. A completed form can still be corrected until the job is finished, and the job's history notes who completed it. Photos can be added once work has started (as on the worksheet). The assigned technician fills in their own jobs' forms; a manager can fill in any job's until it's finished.
+
+**With no signal.** Forms work offline like the rest of the worksheet: answers and completion are saved on the phone, shown as "waiting to sync" and sent when the signal returns; photos upload on a good connection. If a form was changed in two places, the most recent change wins and the other goes into the job's history. A form's questions are kept with the job on the phone, so a form changed meanwhile is filled in with the version the phone showed.
+
+**The PDF.** A completed form has a **PDF**: the company's logo and name, the customer, equipment, site and job, who completed it and when, each question that was asked with its answer, its photos and signatures, and the form's version. Managers and the job's technician can open any completed form's PDF; customers only certificates.
+
+**Where customers see certificates.** On the job's page (**Certificates**) and on the equipment's page, which lists every certificate completed on that equipment's jobs, newest first. There, managers see every completed form, and technicians the ones from their own jobs (**Forms and certificates**).
+
+**The logo.** Under **Settings → Logo**, a manager adds a PNG or JPEG of up to 1 MB. It's printed at the top of certificates and of the job's service report. A wide logo on a white background prints best.
+
+**Plans.** On Starter, the **Forms** page is locked and no form can be filled in or required. Forms already filled in stay on their jobs, with their PDFs.
+
+**Also:** the data export has `forms.csv`, `form_versions.csv` (each version's questions) and `form_answers.csv` (each form filled in on a job). Deleting a company deletes its forms, everything filled in and its logo.
+
+**In the demo data:**
+
+| Form | On | Required | Certificate |
+| --- | --- | --- | --- |
+| Generator load test certificate | Service: Generator 500-hour service | Yes | Yes |
+| Inspection certificate | Job type: Inspection | No | Yes |
+| Site safety check | Job type: Repair | No | No (team only) |
+
+DK Engineering has a logo. The generator certificate shows the rule: its load and voltage questions appear only when "Load test done" is "Yes", and "Why not?" only when it's "No". Brian completed the inspection certificate on the conveyor inspection, so XYZ Factory can download it from the conveyor's page. His mixer repair has the site safety check, not started yet.
 
 ## Checks
 
@@ -293,11 +374,13 @@ Once a day, six things should be cleared away: demo companies whose 24 hours are
 
 Run it in the morning, company time, so "tomorrow's visit" reminders arrive the day before.
 
+If one part fails (the payment service is down, say), the others still run, and so does each renewal after a failed one. The run then lists the part under `failed` in its answer, the URL answers 500 and `flask --app run.py daily` exits with 1, so the host's cron shows it as failed; the error and its stack trace are in the log (and in Sentry when `SENTRY_DSN` is set). Running it again is safe: nothing is sent or charged twice. A renewal the provider hasn't decided yet (an M-Pesa prompt not answered) is asked about the next day, not charged again.
+
 Without a `CRON_SECRET`, the URL doesn't exist.
 
 ## File storage
 
-Photos, videos and signatures are stored in one of two ways, chosen by `STORAGE_BACKEND`:
+Photos, videos, signatures, documents and the company's logo are stored in one of two ways, chosen by `STORAGE_BACKEND`:
 
 - **`local`** (the default) saves files on the server's disk, under `backend/instance/uploads` or `STORAGE_LOCAL_DIR`. Use it for development, or a single server with a lasting disk; back that folder up with the database.
 - **`s3`** uses any S3-compatible bucket: Cloudflare R2, Backblaze B2, AWS S3 or MinIO. Use it on serverless hosts (their disks don't last, and they cap request sizes) and whenever more than one server runs the app.
@@ -334,14 +417,14 @@ The homepage (`/`) shows the plans; **Get started** (or **Choose** on a plan) cr
 | Plan | Monthly | Yearly | Technicians | Storage | Also includes |
 | --- | --- | --- | --- | --- | --- |
 | Starter | KSh 1,500 | KSh 15,000 | 3 | 2 GB | Everything else in the app |
-| Professional | KSh 4,500 | KSh 45,000 | 10 | 20 GB | Insights and exports; planned maintenance and reminders |
+| Professional | KSh 4,500 | KSh 45,000 | 10 | 20 GB | Insights and exports; planned maintenance and reminders; custom forms and certificates |
 | Business | KSh 12,000 | KSh 120,000 | 30 | 100 GB | Also route planning; job costing and margins |
 
 **Extra technicians**, on any plan, are KSh 500 a month each (KSh 5,000 a year), chosen on Billing before paying. Yearly billing charges ten months (two months free).
 
 **What every plan includes**: jobs, worksheets (time, parts, checklists, notes), equipment and customers, photos, videos, the customer's sign-off and PDF reports, clock-in and the team map, customer requests with booking and chat, offline mode, two languages, and everything in Settings.
 
-**Features a plan doesn't include** are locked for that company: the API refuses them (403, saying which plan has it), the sidebar shows a lock, and the page shows what it is with a **See plans** button. Nothing already made is lost by moving to a smaller plan: existing maintenance plans stay listed but stop creating jobs; costs, pay rates and planned routes stay saved, out of view. A smaller plan must still fit the team (technicians plus open invitations) and the files, or checkout says what to change. Companies created before plans existed have no limits and every feature.
+**Features a plan doesn't include** are locked for that company: the API refuses them (403, saying which plan has it), the sidebar shows a lock, and the page shows what it is with a **See plans** button. Nothing already made is lost by moving to a smaller plan: existing maintenance plans stay listed but stop creating jobs; forms already filled in stay on their jobs with their PDFs; costs, pay rates and planned routes stay saved, out of view. A smaller plan must still fit the team (technicians plus open invitations) and the files, or checkout says what to change. Companies created before plans existed have no limits and every feature.
 
 **Trials.** Every new company starts with a 14-day free trial of the plan it chose; no card is needed. Managers see the days left in a banner on every page, and get a reminder (in the app and by email) three days before it ends.
 
@@ -372,7 +455,7 @@ To try it locally with the test provider: open http://localhost:5173, choose a p
 
 Technicians can do their whole day with no signal; managers' and customers' screens stay online only and say "You're offline" when there's no connection.
 
-**What works offline:** clocking in and out (with location sharing agreed), starting, pausing, resuming and completing jobs (with the customer's signature), time entries, parts, checklist ticks, the service summary, notes, photos and videos, and the position stamps that go with them.
+**What works offline:** clocking in and out (with location sharing agreed), starting, pausing, resuming and completing jobs (with the customer's signature), time entries, parts, checklist ticks, the service summary, notes, filling in forms, photos and videos, and the position stamps that go with them.
 
 **How it works:**
 
@@ -394,7 +477,7 @@ Technicians can do their whole day with no signal; managers' and customers' scre
 | A status change or clock-in dated before the job's or shift's last update | Refused: it would be out of order. |
 | Completing was refused | The list says exactly what's missing. |
 
-**Limits:** iPhones delete the data of sites that haven't been opened for 7 days, unless the app was added to the Home Screen; a phone whose clock is changed while it's offline can shift the times of its changes; the first sign-in (with its two-step code), the team map and its tiles, and photos already on the server need a connection.
+**Limits:** iPhones delete the data of sites that haven't been opened for 7 days, unless the app was added to the Home Screen; a phone whose clock is changed while it's offline can shift the times of its changes; the first sign-in (with its two-step code), the team map and its tiles, and photos already on the server need a connection. The time a change was made comes from the phone, so the server can't tell a wrong clock from a deliberately backdated one: beyond refusing future times and times more than 30 days back, it trusts the phone, and the history line shows both times ("Done offline at 10:42, synced at 13:05") for a manager to question.
 
 **The installable app:** a production build (`npm run build`) adds the web app manifest, icons and a service worker (`src/sw.ts`) that keeps the app's own files so it opens with no signal. It never keeps API data. Android shows an **Install app** button on the technician's dashboard; iPhones show the steps (Share, then Add to Home Screen). When a new version is deployed, a bar offers **Reload**; nothing reloads on its own, so nobody loses a half-filled form.
 
@@ -492,7 +575,7 @@ Then run **Actions → Backup → Run workflow**, and after it **Restore test �
 
 To restore for real: create a new database in Render, run `RESTORE_DATABASE_URL=<its URL> python scripts/restore_check.py` from `backend/` (it restores the newest copy and checks it; it refuses the live `DATABASE_URL`), then point the app's `DATABASE_URL` at it. The files on the app's disk (photos, videos, signatures) are not in these copies: Render snapshots the disk daily (**Disks** on the app, **Restore**), and a bucket keeps its own copies once uploads move to one.
 
-Locally, with Postgres: `python scripts/backup.py` writes a copy to `backend/backups/` (or `BACKUP_DIR`; git ignores both `backups/` and `*.dump` files), and `RESTORE_DATABASE_URL=... python scripts/restore_check.py` restores it. `tests/test_deploy.py` does exactly this against `TEST_DATABASE_URL`.
+Locally, with Postgres: `python scripts/backup.py` writes a copy to `backend/backups/` (or `BACKUP_DIR`; git ignores both `backups/` and `*.dump` files), and `RESTORE_DATABASE_URL=... python scripts/restore_check.py` restores it. `tests/test_deploy.py` does exactly this against `TEST_DATABASE_URL`. Both scripts use the Postgres tools of the database's own version when they're installed (`/usr/lib/postgresql/16/bin` on Debian and Ubuntu, from `postgresql-client-16`), because a newer `pg_restore` can't restore into Postgres 16.
 
 ## Errors, logs and the health check
 

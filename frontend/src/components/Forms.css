@@ -1,0 +1,350 @@
+/* Forms on a job (the list, filling one in), certificates, and the form builder. */
+.formRows,
+.certificateList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.formRows li,
+.certificateList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.formRows li > div:first-child,
+.certificateList li > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.formRows strong,
+.certificateList strong {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+.formRows small,
+.certificateList small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.certificateList li > svg {
+  flex: none;
+  color: var(--accent);
+}
+.formTag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+.formTag.required {
+  border-color: color-mix(in srgb, var(--st-pending) 35%, transparent);
+  background: color-mix(in srgb, var(--st-pending) 10%, var(--surface));
+  color: var(--st-pending);
+}
+.formRowActions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+.appMain .formRowActions .primary,
+.formRowActions .primary {
+  width: auto;
+  padding-inline: 14px;
+}
+.formFill {
+  display: grid;
+  gap: 14px;
+}
+.formHeading {
+  margin: 6px 0 -4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 15px;
+}
+.formLabel,
+.formChoices legend {
+  font-size: 13px;
+  font-weight: 700;
+}
+.formHelp {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+.formChoices {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.formChoices > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.formChoices label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+.formChoices label.chosen {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+  color: var(--accent);
+}
+.formChoices input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+}
+.formPhotos,
+.formSignature,
+.formAnswer {
+  display: grid;
+  gap: 8px;
+}
+.formAnswer p {
+  margin: 0;
+}
+.formPhotos ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.formPhotos li {
+  position: relative;
+}
+.formPhotos img {
+  display: block;
+  width: 96px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+}
+.formPhotoButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  cursor: pointer;
+}
+.formSignature .signOffView img {
+  max-width: 220px;
+}
+.formSignature > button,
+.appMain .formSignature > button {
+  width: fit-content;
+}
+.formDone {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--st-done) 10%, var(--surface));
+  color: var(--ink-2);
+  font-size: 13px;
+}
+.formFillActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.formFillActions > button {
+  flex: 1 1 160px;
+}
+@media (max-width: 560px) {
+  .formRows li,
+  .certificateList li {
+    flex-wrap: wrap;
+  }
+  .formRowActions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* The Forms page and the form builder. */
+.formsManager {
+  display: grid;
+  gap: 16px;
+  padding: 14px 18px 18px;
+}
+.formCard small {
+  display: block;
+}
+.formCard .checklistCardHead > span {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.formCardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 0;
+  margin: 0;
+}
+.formCardMeta:empty {
+  display: none;
+}
+.formAttach {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.formAttach legend {
+  padding-inline: 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.formQuestionsHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+}
+.formQuestionsHead h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.questionList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.questionEditor {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.questionEditor.isHeading {
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+}
+.questionTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.questionTop select {
+  flex: 1;
+  min-width: 0;
+}
+.questionNumber {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+.questionMoves {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+.questionOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.questionRule {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.questionRule select {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.questionAdd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.questionAdd select {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+.appMain .questionAdd .secondary,
+.questionAdd .secondary {
+  width: auto;
+}
+.formPreview {
+  padding: 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+
+/* Settings → Logo. */
+.logoRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.logoPreview {
+  max-width: 220px;
+  max-height: 70px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  object-fit: contain;
+}
+.logoEmpty {
+  color: var(--muted);
+  font-size: 13px;
+}
+.logoPick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  cursor: pointer;
+}
+.logoPick.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}

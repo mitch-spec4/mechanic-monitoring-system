@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify
 
 from app import db
 from app.models.job import Job
+from app.models.service import ServiceTemplate
 from app.models.worksheet import ChecklistTemplate, ChecklistTemplateItem
 from app.utils.auth import current_user, roles
 from app.utils.validation import ValidationError, json_body, text
@@ -97,6 +98,8 @@ def update_checklist(tid):
 def delete_checklist(tid):
     template = ChecklistTemplate.query.filter_by(id=tid, company_id=current_user().company_id).first_or_404()
     ChecklistTemplateItem.query.filter_by(template_id=template.id).delete()
+    # Services that used it carry on without a checklist.
+    ServiceTemplate.query.filter_by(checklist_id=template.id).update({"checklist_id": None})
     db.session.delete(template)
     db.session.commit()
     return jsonify(ok=True)

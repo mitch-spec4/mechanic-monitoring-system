@@ -9,7 +9,7 @@ import { EQUIPMENT_STATUSES } from "../lib/labels";
 import { mark, t } from "../i18n";
 
 // Offered while typing a type; any other can be typed.
-const TYPE_SUGGESTIONS = [
+export const TYPE_SUGGESTIONS = [
   mark("Generator"),
   mark("Pump"),
   mark("Compressor"),

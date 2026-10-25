@@ -27,6 +27,8 @@ from app.services.worksheet import (
     reassigned_problem,
     record_event,
 )
+from app.services.catalog import service_summary
+from app.services.forms import job_forms
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
 from app.utils.validation import ValidationError, integer, json_body, money, text
@@ -170,6 +172,9 @@ def job_detail(job, user):
         "scheduled_start": iso(job.scheduled_start),
         "scheduled_end": iso(job.scheduled_end),
         "on_the_way_at": iso(job.on_the_way_at),
+        # The service it was made from (with the skills the work needs) and how long it should take.
+        "service": service_summary(job),
+        "estimated_minutes": job.estimated_minutes,
         "customer": {"id": customer.id, "name": customer.name} if customer else None,
         "machine": {"id": machine.id, "name": machine.name, "serial_no": machine.serial_no} if machine else None,
         "mechanic": {"id": job.mechanic_id, "name": names.get(job.mechanic_id)} if job.mechanic_id else None,
@@ -201,9 +206,12 @@ def job_detail(job, user):
                 "uploaded_by": names.get(f.uploaded_by),
             }
             for f in files
-            if f.kind != "signature"
+            # The sign-off, and the photos and signatures answering forms, are shown with those.
+            if f.kind not in ("signature", "form_photo", "form_signature")
         ],
         "signature": signature_out(job, files),
+        # The job's forms (customers: completed certificates only).
+        "forms": job_forms(job, user, attached=has_feature(job.company_id, "forms")),
         # The PDF report exists once the job is completed.
         "report_url": f"/api/jobs/{job.id}/report.pdf" if job.status == "Completed" else None,
         "record": (

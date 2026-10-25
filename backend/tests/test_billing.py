@@ -228,8 +228,8 @@ def test_plans_list_their_features_and_extra_technicians(client):
     data = client.get("/api/plans").get_json()
     assert {plan["key"]: plan["features"] for plan in data["plans"]} == {
         "starter": [],
-        "professional": ["insights", "maintenance"],
-        "business": ["insights", "maintenance", "routes", "costing"],
+        "professional": ["insights", "maintenance", "forms"],
+        "business": ["insights", "maintenance", "forms", "routes", "costing"],
     }
     assert data["extra_mechanic_cents"] == 50_000 and data["max_extra_mechanics"] == 100
 
@@ -237,7 +237,7 @@ def test_plans_list_their_features_and_extra_technicians(client):
 def test_features_follow_the_plan(client, auth, data):
     # Companies from before plans have everything.
     me = client.get("/api/users/me", headers=boss(auth)).get_json()["user"]
-    assert me["features"] == ["insights", "maintenance", "routes", "costing"] and me["subscription"] is None
+    assert me["features"] == ["insights", "maintenance", "forms", "routes", "costing"] and me["subscription"] is None
     subscription = give_plan(data["acme"], "starter")
     mech = client.get("/api/users/me", headers=auth("mech@acme.test")).get_json()["user"]
     assert mech["features"] == [] and mech["subscription"] is None
@@ -337,7 +337,7 @@ def test_renewals_charge_the_saved_card(client, auth, data, outbox):
     subscription.current_period_end = old_end
     db.session.commit()
 
-    assert renew_due() == {"charged": 1, "failed": 0, "reminded": 0}
+    assert renew_due() == {"charged": 1, "failed": 0, "reminded": 0, "errors": 0}
     db.session.refresh(subscription)
     assert subscription.current_period_end == add_period(old_end, "month") and subscription.past_due_since is None
     # A receipt to each manager, and a notification.
@@ -345,7 +345,7 @@ def test_renewals_charge_the_saved_card(client, auth, data, outbox):
     assert outbox[0]["Subject"] == "Receipt: KSh 4,500 for MechanicPro Professional"
     assert Notification.query.filter_by(user_id=data["boss"], title="Payment received").count() == 2  # the checkout and the renewal
     # Paid up: nothing more to do.
-    assert renew_due() == {"charged": 0, "failed": 0, "reminded": 0}
+    assert renew_due() == {"charged": 0, "failed": 0, "reminded": 0, "errors": 0}
     payments = client.get("/api/billing", headers=boss(auth)).get_json()["payments"]
     assert [(p["kind"], p["status"]) for p in payments] == [("renewal", "paid"), ("checkout", "paid")]
 
@@ -360,14 +360,14 @@ def test_a_declined_renewal_gives_grace_days_then_limits(client, auth, data, out
     subscription.current_period_end = end
     db.session.commit()
 
-    assert renew_due() == {"charged": 0, "failed": 1, "reminded": 0}
+    assert renew_due() == {"charged": 0, "failed": 1, "reminded": 0, "errors": 0}
     assert outbox[0]["Subject"] == "Your MechanicPro payment failed"
     body = outbox[0].get_body(("plain",)).get_content()
     assert "Declined (test card)" in body and "Nothing is deleted" in body
     plan = client.get("/api/billing", headers=boss(auth)).get_json()["subscription"]
     assert plan["state"] == "active" and plan["payment_problem"] is True and plan["grace_ends_at"]
     # Tried once a day, up to RENEWAL_ATTEMPTS times.
-    assert renew_due() == {"charged": 0, "failed": 0, "reminded": 0}
+    assert renew_due() == {"charged": 0, "failed": 0, "reminded": 0, "errors": 0}
     for day in range(1, RENEWAL_ATTEMPTS + 2):
         renew_due(utcnow() + timedelta(days=day))
     failed = [p for p in client.get("/api/billing", headers=boss(auth)).get_json()["payments"] if p["status"] == "failed"]
@@ -416,7 +416,7 @@ def test_demo_companies_are_never_charged(client, data):
 
     db.session.get(Company, data["acme"]).demo_expires_at = utcnow() + timedelta(hours=5)
     give_plan(data["acme"], "business", current_period_end=utcnow() + timedelta(hours=2), payment_token="test_card_4242")
-    assert renew_due() == {"charged": 0, "failed": 0, "reminded": 0}
+    assert renew_due() == {"charged": 0, "failed": 0, "reminded": 0, "errors": 0}
 
 
 def signed(app, payload):
@@ -514,7 +514,7 @@ def test_paystack_checkout_webhooks_and_renewals(app, client, auth, data, monkey
     subscription.current_period_end = utcnow() + timedelta(hours=3)
     db.session.commit()
     answers["/transaction/charge_authorization"] = {"status": True, "data": {"status": "failed", "gateway_response": "Insufficient Funds", "amount": 1_200_000, "currency": "KES"}}
-    assert renew_due() == {"charged": 0, "failed": 1, "reminded": 0}
+    assert renew_due() == {"charged": 0, "failed": 1, "reminded": 0, "errors": 0}
     method, path, body = calls[-1]
     assert path == "/transaction/charge_authorization" and body["authorization_code"] == "AUTH_abc" and body["amount"] == 1_200_000
     failed = client.get("/api/billing", headers=boss(auth)).get_json()["payments"][0]

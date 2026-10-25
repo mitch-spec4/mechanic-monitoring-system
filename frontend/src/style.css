@@ -832,7 +832,7 @@ header {
 }
 .settingsView {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1px;
   background: #e8edf2;
 }
@@ -848,6 +848,7 @@ header {
 }
 .settingsView strong {
   font-size: 11px;
+  overflow-wrap: anywhere;
 }
 .success {
   background: #eefaf1;
@@ -1409,6 +1410,7 @@ body {
 /* ---------- Settings ---------- */
 .settingsStack {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   max-width: 720px;
 }
@@ -1849,4 +1851,53 @@ body {
   .languageSuggestion {
     animation: none;
   }
+}
+
+/* Radio choices as cards, each with a line of explanation (a service's booking, a customer's service). */
+.choiceCards {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.choiceCards legend {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.choiceCards label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.choiceCards label.chosen {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+}
+.choiceCards input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 1px 0 0;
+  padding: 0;
+  border-radius: 50%;
+  background: none;
+  accent-color: var(--accent);
+}
+.choiceCards span {
+  display: grid;
+  gap: 2px;
+}
+.choiceCards b {
+  font-size: 13px;
+}
+.choiceCards small {
+  color: var(--muted);
+  font-size: 12px;
 }

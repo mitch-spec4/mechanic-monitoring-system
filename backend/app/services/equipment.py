@@ -187,9 +187,9 @@ def send_due_reminders(now=None):
             sent["maintenance_jobs"] += 1
         plan.reminded_for = plan.next_due
         values = {"title": plan.title, "machine": machine.name, "date": plan.next_due}
-        for boss in User.query.filter_by(company_id=plan.company_id, role="boss").all():
+        for boss in User.query.filter_by(company_id=plan.company_id, role="boss", removed_at=None).all():
             tell(boss, company, N_("Service due"), N_("{title} for {machine} is due on {date}. Its job is waiting to be assigned."), f"/equipment/{machine.id}", **values)
-        for person in User.query.filter_by(company_id=plan.company_id, customer_id=machine.customer_id, role="customer").all():
+        for person in User.query.filter_by(company_id=plan.company_id, customer_id=machine.customer_id, role="customer", removed_at=None).all():
             tell(person, company, N_("Service due"), N_("{title} for your {machine} is due on {date}. We'll be in touch to arrange the visit."), f"/equipment/{machine.id}", **values)
         sent["service_due_reminders"] += 1
     return sent

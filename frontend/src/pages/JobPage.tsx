@@ -42,7 +42,7 @@ import { uploadMedia } from "../lib/media";
 import { changeJobStatus } from "../components/Shift";
 import { mapLink } from "../lib/location";
 import { directionsLink } from "../lib/directions";
-import { asDate, currencyName, errorMessage, formatDate, formatDay as dayOf, formatDistance, formatMoney, formatTime as timeOf, formatVisit, fromZoneInput } from "../lib/format";
+import { asDate, currencyName, errorMessage, formatDate, formatDay as dayOf, formatDistance, formatMinutes, formatMoney, formatTime as timeOf, formatVisit, fromZoneInput } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
 import type { User } from "../services/api";
 import type { ChecklistItem, Costing, JobDetail, JobEvent, JobFile, LocationPoint, Part, Payload, WorkEntry } from "../services/types";
@@ -51,6 +51,8 @@ import { Trans } from "../i18n/Trans";
 import "./JobPage.css";
 import { Loading } from "../components/States";
 import Field from "../components/Field";
+import { SkillTags } from "../components/ServiceCatalog";
+import JobFormsCard from "../components/JobFormsCard";
 
 type Props = { jobId: number; user: User; onBack: () => void; onOpenMachine?: (id: number) => void };
 
@@ -81,12 +83,14 @@ const EDITED_FIELDS: Record<string, string> = {
   location: mark("site"),
   "due date": mark("due date"),
   machine: mark("equipment"),
+  "estimated minutes": mark("estimated time"),
 };
 const FILE_KINDS: Record<string, string> = {
   "before photo": mark("a before photo"),
   "after photo": mark("an after photo"),
   photo: mark("a photo"),
   video: mark("a video"),
+  "form photo": mark("a photo for a form"),
 };
 const after = (note: string, prefix: RegExp) => note.replace(prefix, "").trim();
 // A booked visit the technician can still set off for.
@@ -141,6 +145,8 @@ function historyText(event: JobEvent): string {
       return t("recorded the customer's signature ({name})", { name: after(note, /^Signed by/) });
     case "not_signed":
       return t("completed without a signature: {reason}", { reason: note });
+    case "form_completed":
+      return t("completed the form {name}", { name: note });
     case "change_not_applied":
       return t("made a change offline that wasn't applied: a newer change was kept");
     case "replaced":
@@ -181,7 +187,9 @@ function VersionNote({ note }: { note: string | null }) {
         ? t("Time entry started {time}", { time: stamp(version.label) })
         : version.item === "checklist"
           ? `“${version.label ?? ""}”`
-          : "";
+          : version.item === "form"
+            ? t("The form {name}", { name: version.label ?? "" })
+            : "";
   return (
     <blockquote className="versionNote">
       {title && <strong>{title}</strong>}
@@ -312,6 +320,16 @@ export default function JobPage({ jobId, user, onBack, onOpenMachine }: Props) {
             <Meta label={t("Due")} value={formatDate(job.due_date) || t("Not set")} />
           )}
           {!isMechanic && <Meta label={t("Technician")} value={job.mechanic?.name || t("Not assigned")} />}
+          {job.estimated_minutes ? <Meta label={t("Estimated time")} value={formatMinutes(job.estimated_minutes)} icon={<Clock size={13} />} /> : null}
+          {job.service && !isCustomer && (
+            <div>
+              <dt>{t("Service")}</dt>
+              <dd className="jobService">
+                {job.service.name}
+                <SkillTags skills={job.service.skills} />
+              </dd>
+            </div>
+          )}
         </dl>
 
         {!isCustomer && (
@@ -508,6 +526,8 @@ export default function JobPage({ jobId, user, onBack, onOpenMachine }: Props) {
             <Empty text={t("The summary for the customer is written when the job is completed.")} />
           )}
         </Card>
+
+        <JobFormsCard job={job} user={user} reload={load} />
 
         <MediaCard job={job} busy={busy} run={run} />
 

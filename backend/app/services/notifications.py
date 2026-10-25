@@ -18,5 +18,5 @@ def notify(user_id, title, message, kind="info", translate=(), /, **values):
 
 
 def notify_bosses(company_id, title, message, kind="info", translate=(), /, **values):
-    for boss in User.query.filter_by(company_id=company_id, role="boss").all():
+    for boss in User.query.filter_by(company_id=company_id, role="boss", removed_at=None).all():
         notify(boss.id, title, message, kind, translate, **values)

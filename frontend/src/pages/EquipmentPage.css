@@ -6,6 +6,17 @@
   align-items: center;
   gap: 6px;
 }
+.appMain .equipmentPage .equipmentActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-self: start;
+}
+.appMain .equipmentPage .equipmentActions .listAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .equipmentPage .jobHeroTop .machineStatus {
   font-size: 11px;
 }
@@ -223,4 +234,36 @@
     grid-template-columns: 1fr;
     gap: 2px;
   }
+}
+
+/* "Start a job": one button per service that fits this equipment. */
+.serviceShortcuts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+.appMain .serviceShortcut,
+.serviceShortcut {
+  display: grid;
+  gap: 3px;
+  justify-items: start;
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  text-align: start;
+  cursor: pointer;
+}
+.serviceShortcut:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+}
+.serviceShortcut b {
+  font-size: 13px;
+}
+.serviceShortcut small {
+  color: var(--muted);
+  font-size: 12px;
 }

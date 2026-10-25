@@ -31,6 +31,7 @@ def roles(*allowed, before_two_factor=False):
                 or user.company_id != claims.get("company_id")
                 or user.customer_id != claims.get("customer_id")
                 or user.token_version != claims.get("tv")
+                or user.removed_at is not None
             ):
                 return jsonify(error=_("Your account has changed. Please sign in again.")), 401
             if user.role not in allowed:

@@ -19,7 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.backup import PREFIX, bucket, postgres_url  # noqa: E402
+from scripts.backup import PREFIX, bucket, pg_tool, postgres_url  # noqa: E402
 
 
 def newest_backup(scratch):
@@ -48,7 +48,7 @@ def check(url, backup):
     import app.models  # noqa: F401  (the tables the app uses)
 
     print(f"Restoring {backup} ...")
-    subprocess.run(["pg_restore", "--clean", "--if-exists", "--no-owner", "--no-privileges", f"--dbname={url}", str(backup)], check=True)
+    subprocess.run([pg_tool("pg_restore", url), "--clean", "--if-exists", "--no-owner", "--no-privileges", f"--dbname={url}", str(backup)], check=True)
 
     problems = []
     config = Config()

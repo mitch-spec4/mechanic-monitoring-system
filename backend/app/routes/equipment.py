@@ -9,6 +9,7 @@ from app.models.customer import Customer
 from app.models.equipment import MaintenancePlan, Site
 from app.models.job import Job
 from app.models.machine import Machine
+from app.models.forms import FormSubmission, FormTemplate
 from app.models.media import JobFile
 from app.models.service_record import ServiceRecord
 from app.models.user import User
@@ -112,6 +113,35 @@ def can_open_job(user, job):
     return True
 
 
+def certificates_out(machine, job_by_id, user):
+    """Forms completed on this equipment's jobs, newest first: customers see the certificates."""
+    submissions = (
+        FormSubmission.query.filter(FormSubmission.status == "completed")
+        .filter((FormSubmission.machine_id == machine.id) | (FormSubmission.job_id.in_(list(job_by_id) or [0])))
+        .order_by(FormSubmission.completed_at.desc(), FormSubmission.id.desc())
+        .all()
+    )
+    forms = {form.id: form for form in FormTemplate.query.filter(FormTemplate.id.in_({s.form_id for s in submissions} or {0})).all()}
+    jobs = {job.id: job for job in Job.query.filter(Job.id.in_({s.job_id for s in submissions} or {0})).all()}
+    out = []
+    for submission in submissions:
+        form, job = forms[submission.form_id], jobs[submission.job_id]
+        if not can_open_job(user, job) or (user.role == "customer" and not form.customer_visible):
+            continue
+        out.append(
+            {
+                "form_id": form.id,
+                "name": form.name,
+                "job_id": job.id,
+                "job_title": job.title,
+                "completed_at": iso(submission.completed_at),
+                "customer_visible": form.customer_visible,
+                "pdf_url": f"/api/jobs/{job.id}/forms/{form.id}/certificate.pdf",
+            }
+        )
+    return out
+
+
 def detail_out(machine, user):
     company_today = equipment.company_today(machine_company(machine))
     customer = db.session.get(Customer, machine.customer_id)
@@ -136,8 +166,9 @@ def detail_out(machine, user):
         photos=[
             {"id": f.id, "kind": f.kind, "content_type": f.content_type, "url": f"/api/files/{f.id}", "job_id": f.job_id, "created_at": iso(f.created_at)}
             for f in files
-            if f.job_id and f.kind not in ("signature", "document") and can_open_job(user, job_by_id[f.job_id])
+            if f.job_id and f.kind not in ("signature", "document", "form_photo", "form_signature") and can_open_job(user, job_by_id[f.job_id])
         ],
+        certificates=certificates_out(machine, job_by_id, user),
         jobs=[
             {
                 "id": job.id,

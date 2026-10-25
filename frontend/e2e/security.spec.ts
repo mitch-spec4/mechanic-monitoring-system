@@ -71,10 +71,30 @@ test("a manager resets a technician's two-step sign-in and sees it in the activi
   await expect(page.locator(".activityLog")).toContainText("Signed in");
   await signOut(page);
 
-  // Amina sets it up again with her phone before she can do anything else.
+  // Amina sets it up again with her phone before she can do anything else. The key on screen never
+  // changes while she scans it, even when an older request for one answers last (the screen asks
+  // twice in development).
+  let first = true;
+  let answered = () => {};
+  const lateAnswer = new Promise<void>((resolve) => (answered = resolve));
+  await page.route("**/api/auth/two-factor/setup", async (route) => {
+    if (!first) return route.continue();
+    first = false;
+    const response = await route.fetch();
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.fulfill({ response });
+    answered();
+  });
   await page.getByLabel("Email").fill("amina@mechanicpro.test");
   await page.getByLabel("Password").fill(DEMO_PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
+  const key = page.getByTestId("setup-key");
+  await expect(key).toBeVisible();
+  const shown = (await key.textContent()) ?? "";
+  await lateAnswer;
+  await page.waitForTimeout(200);
+  await expect(key).toHaveText(shown);
+  await page.unroute("**/api/auth/two-factor/setup");
   await setUpTwoFactor(page, "amina@mechanicpro.test");
   await expect(page.locator(".sidebarUser")).toContainText("Amina Otieno");
   noErrors();

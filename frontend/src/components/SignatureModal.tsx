@@ -16,6 +16,9 @@ type Props = {
   /** Called after the job is completed and the celebration has played. */
   onDone: () => void;
   onClose: () => void;
+  /** A form's signature question instead of the job's sign-off: the question is the heading,
+   *  there's no "customer not present", and it closes as soon as it's saved. */
+  question?: string;
 };
 
 type Point = { x: number; y: number; w: number };
@@ -82,7 +85,7 @@ function exportSignature(strokes: Stroke[]) {
 }
 
 /** The customer signs on the mechanic's phone when the job is completed. */
-export default function SignatureModal({ jobTitle, facts = [], onSubmit, onDone, onClose }: Props) {
+export default function SignatureModal({ jobTitle, facts = [], onSubmit, onDone, onClose, question }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const tip = useRef<HTMLSpanElement>(null);
   const strokes = useRef<Stroke[]>([]);
@@ -204,12 +207,13 @@ export default function SignatureModal({ jobTitle, facts = [], onSubmit, onDone,
       signOff = { no_signature_reason: reason.trim() };
     } else {
       if (!name.trim()) return setProblem(t("Enter the name of the person signing."));
-      if (!hasInk) return setProblem(t("Ask the customer to sign in the box."));
+      if (!hasInk) return setProblem(question ? t("Sign in the box.") : t("Ask the customer to sign in the box."));
       signOff = { signature: { name: name.trim(), image: exportSignature(strokes.current) } };
     }
     setBusy(true);
     try {
       await onSubmit(signOff);
+      if (question) return onDone();
       setDone(absent ? "recorded" : "signed");
       window.setTimeout(onDone, CELEBRATE_MS);
     } catch (error) {
@@ -238,13 +242,13 @@ export default function SignatureModal({ jobTitle, facts = [], onSubmit, onDone,
           <div className="signHeroTop">
             <div className="signBadge">
               <PenLine size={14} />
-              <h2 id="sign-title">{t("Customer sign-off")}</h2>
+              <h2 id="sign-title">{question ? t("Signature") : t("Customer sign-off")}</h2>
             </div>
             <button type="button" className="signClose" aria-label={t("Close")} onClick={onClose} disabled={busy}>
               <X size={18} />
             </button>
           </div>
-          <p className="signLead">{t("Completing")}</p>
+          <p className="signLead">{question ?? t("Completing")}</p>
           <h3 className="signJob">{jobTitle}</h3>
           {facts.length > 0 && (
             <ul className="signFacts">
@@ -264,19 +268,21 @@ export default function SignatureModal({ jobTitle, facts = [], onSubmit, onDone,
         </div>
 
         <form className="signBody" onSubmit={submit}>
-          <div className="signSwitch" style={{ "--pos": absent ? 1 : 0 } as React.CSSProperties}>
-            <span className="signThumb" aria-hidden="true" />
-            <button type="button" aria-pressed={!absent} onClick={() => setAbsent(false)} disabled={busy}>
-              <PenLine size={15} /> {t("Customer signs")}
-            </button>
-            <button type="button" aria-pressed={absent} onClick={() => setAbsent(true)} disabled={busy}>
-              <UserX size={15} /> {t("Customer not present")}
-            </button>
-          </div>
+          {!question && (
+            <div className="signSwitch" style={{ "--pos": absent ? 1 : 0 } as React.CSSProperties}>
+              <span className="signThumb" aria-hidden="true" />
+              <button type="button" aria-pressed={!absent} onClick={() => setAbsent(false)} disabled={busy}>
+                <PenLine size={15} /> {t("Customer signs")}
+              </button>
+              <button type="button" aria-pressed={absent} onClick={() => setAbsent(true)} disabled={busy}>
+                <UserX size={15} /> {t("Customer not present")}
+              </button>
+            </div>
+          )}
 
           {!absent ? (
             <>
-              <p className="signHint">{t("Hand the phone to the customer to confirm the work.")}</p>
+              <p className="signHint">{question ? t("Write the name of the person signing, then sign in the box.") : t("Hand the phone to the customer to confirm the work.")}</p>
               <Field wrap className="signField" label={<span>{t("Name of the person signing")}</span>}>
                 <input
                   value={name}
@@ -308,7 +314,7 @@ export default function SignatureModal({ jobTitle, facts = [], onSubmit, onDone,
                   <span>✕</span>
                 </div>
                 <p className="signCaption">
-                  {name.trim() || t("Customer name")} · {today}
+                  {name.trim() || (question ? t("Name") : t("Customer name"))} · {today}
                 </p>
                 {done === "signed" && (
                   <div className="signStamp" aria-hidden="true">
@@ -369,7 +375,7 @@ export default function SignatureModal({ jobTitle, facts = [], onSubmit, onDone,
           )}
           <button className="primary signSubmit" disabled={busy}>
             <CheckCircle2 size={18} />
-            {busy && !done ? t("Completing…") : t("Complete job")}
+            {question ? (busy ? t("Saving…") : t("Save signature")) : busy && !done ? t("Completing…") : t("Complete job")}
           </button>
         </form>
 

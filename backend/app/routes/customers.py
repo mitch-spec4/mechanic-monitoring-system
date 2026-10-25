@@ -9,15 +9,13 @@ from app.models.equipment import Site
 from app.models.invitation import Invitation
 from app.models.job import Job
 from app.models.machine import Machine
-from app.models.notification import Notification
 from app.models.request import CustomerMessage, ServiceRequest
 from app.models.review import Review
-from app.models.security import PasswordReset
 from app.models.service_record import ServiceRecord
 from app.models.user import User
 from app.routes.machines import out as machine_out
 from app.routes.services import out as record_out
-from app.services.accounts import send_invitation
+from app.services.accounts import forget_sign_in, send_invitation
 from app.services.billing import check_mechanic_limit, require_active
 from app.services.machine_work import with_work
 from app.utils.auth import current_user, roles
@@ -25,7 +23,7 @@ from app.utils.time import utcnow
 from app.utils.validation import ValidationError, json_body, text
 from app.utils.validation import email as read_email
 from app.i18n import _
-from app.services import audit, two_factor
+from app.services import audit
 from app.models.security import AuditEvent
 
 bp = Blueprint("customers", __name__)
@@ -33,7 +31,7 @@ INVITATION_DAYS = 7
 
 
 def customer_out(customer):
-    login_user = User.query.filter_by(customer_id=customer.id, role="customer").first()
+    login_user = User.query.filter_by(customer_id=customer.id, role="customer", removed_at=None).first()
     return {
         "id": customer.id,
         "name": customer.name,
@@ -123,8 +121,10 @@ def invite():
     if not user.email_verified_at:
         # Invitations are emailed, so an unconfirmed account can't make the app email strangers.
         raise ValidationError(
-            f"Confirm your email address first: open the link we sent to {user.email}. "
-            "You can send a new link from the banner at the top of the page.",
+            _(
+                "Confirm your email address first: open the link we sent to {email}. You can send a new link from the banner at the top of the page.",
+                email=user.email,
+            ),
             403,
         )
     require_active(user.company_id, _("invite people"))
@@ -178,9 +178,7 @@ def delete_customer(cid):
     CustomerMessage.query.filter_by(customer_id=customer.id).delete()
     Site.query.filter_by(customer_id=customer.id).delete()
     for customer_user in User.query.filter_by(customer_id=customer.id).all():
-        Notification.query.filter_by(user_id=customer_user.id).delete()
-        PasswordReset.query.filter_by(user_id=customer_user.id).delete()
-        two_factor.disable(customer_user)
+        forget_sign_in(customer_user)
         AuditEvent.query.filter_by(user_id=customer_user.id).update({"user_id": None})
         db.session.delete(customer_user)
     db.session.flush()

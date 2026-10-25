@@ -7,11 +7,13 @@ import {
   deleteFile,
   onTheWay,
   removePart,
+  saveFormAnswers,
   saveRecord,
   setLocationConsent,
   updateChecklistItem,
   updateEntry,
   updateJob,
+  type FormAnswers,
 } from "../services/api";
 import type { Job, JobDetail, Payload, ShiftStatus } from "../services/types";
 import type { PositionResult } from "../lib/location";
@@ -91,6 +93,13 @@ export async function queueMediaRemoval(job: JobRef, fileId: number) {
   if (fileId < 0 && (await withdraw(fileId))) return undefined;
   return submit<WithJob>({ kind: "media_remove", method: "DELETE", path: `/files/${ref(fileId)}`, jobId: job.id, title: job.title }, () => deleteFile(fileId));
 }
+
+/** A form's answers on a job (a draft, or `complete: true`), with any new signature as a PNG. */
+export const queueForm = (job: JobRef, form: { form_id: number; name: string }, data: FormAnswers) =>
+  submit<WithJob>(
+    { kind: "form", method: "PUT", path: `/jobs/${job.id}/forms/${form.form_id}`, body: data, jobId: job.id, title: job.title, detail: form.name },
+    () => saveFormAnswers(job.id, form.form_id, data),
+  );
 
 export const queueConsent = (consent: boolean) =>
   submit<ShiftStatus>({ kind: "consent", method: "POST", path: "/shifts/consent", body: { consent } }, () => setLocationConsent(consent));

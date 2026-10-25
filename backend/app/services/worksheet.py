@@ -107,6 +107,11 @@ def completion_problems(job):
     missing = JobChecklistItem.query.filter_by(job_id=job.id, required=True, done=False).count()
     if missing:
         problems.append(_("Tick 1 required checklist item") if missing == 1 else _("Tick {count} required checklist items", count=missing))
+    from app.services.billing import has_feature
+    from app.services.forms import unfinished_required
+
+    if has_feature(job.company_id, "forms"):
+        problems.extend(_("Complete the form: {name}", name=name) for name in unfinished_required(job))
     return problems
 
 

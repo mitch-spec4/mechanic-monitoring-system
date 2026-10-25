@@ -1,4 +1,5 @@
-import type { ChecklistItem, Job, JobDetail, JobEvent, JobFile, Part, ShiftStatus, WorkEntry } from "../services/types";
+import type { ChecklistItem, FormAnswer, Job, JobDetail, JobEvent, JobFile, JobForm, Part, ShiftStatus, WorkEntry } from "../services/types";
+import { keptAnswers } from "../lib/forms";
 import { t } from "../i18n";
 import { idIn, type QueueItem } from "./types";
 
@@ -27,8 +28,21 @@ export function completionBlockers(job: JobDetail) {
   const missing = job.checklist.filter((item) => item.required && !item.done).length;
   if (missing === 1) blockers.push(t("Tick 1 required checklist item"));
   else if (missing > 1) blockers.push(t("Tick {count} required checklist items", { count: missing }));
+  for (const form of job.forms ?? []) {
+    if (form.required && form.submission?.status !== "completed") blockers.push(t("Complete the form: {name}", { name: form.name }));
+  }
   return blockers;
 }
+
+const emptySubmission = (): NonNullable<JobForm["submission"]> => ({
+  status: "draft",
+  answers: {},
+  updated_at: null,
+  updated_by: null,
+  completed_by: null,
+  photos: {},
+  signatures: {},
+});
 
 function stopTimer(job: JobDetail, at: string) {
   for (const entry of job.entries ?? []) {
@@ -142,6 +156,18 @@ export function overlayJob(server: JobDetail, items: QueueItem[], ctx: Context):
         job.history.push(event(item, ctx, { action: "on_the_way" }));
         break;
       case "media": {
+        const question = item.media?.formField?.split(":");
+        const form = question ? job.forms?.find((candidate) => String(candidate.form_id) === question[0]) : undefined;
+        if (question && form) {
+          // A photo answering a form's question: shown on the form, waiting to upload.
+          form.submission ??= emptySubmission();
+          form.submission.photos[question[1]] = [
+            ...(form.submission.photos[question[1]] ?? []),
+            { id: item.temp ?? -1, url: ctx.previews.get(item.id) ?? "", content_type: item.media?.contentType ?? "image/jpeg", pending: true },
+          ];
+          form.submission.pending = true;
+          break;
+        }
         const file: JobFile = {
           id: item.temp ?? -1,
           kind: item.media?.kind ?? "other",
@@ -153,6 +179,29 @@ export function overlayJob(server: JobDetail, items: QueueItem[], ctx: Context):
           pending: true,
         };
         job.files.push(file);
+        break;
+      }
+      case "form": {
+        const form = job.forms?.find((candidate) => String(candidate.form_id) === segment(item.path, "forms"));
+        if (!form) continue;
+        const submission = (form.submission ??= emptySubmission());
+        const sent = (body.answers ?? {}) as Record<string, FormAnswer | { name: string; image?: string } | null>;
+        const answers = { ...submission.answers };
+        for (const [id, value] of Object.entries(sent)) {
+          if (value === null || value === "") delete answers[id];
+          else if (typeof value === "object") {
+            // A new signature: shown from the drawing until the server has stored it.
+            answers[id] = { name: value.name };
+            if ("image" in value && value.image) submission.signatures[id] = { url: value.image, name: value.name, signed_at: at };
+          } else answers[id] = value;
+        }
+        submission.answers = keptAnswers(form.version?.fields ?? [], answers);
+        if (body.complete === true && submission.status !== "completed") {
+          submission.status = "completed";
+          job.history.push(event(item, ctx, { action: "form_completed", note: form.name }));
+        }
+        submission.updated_at = at;
+        submission.pending = true;
         break;
       }
       case "media_remove": {

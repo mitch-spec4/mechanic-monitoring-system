@@ -256,6 +256,16 @@ def create_app(overrides=None):
     init_billing(app)
     init_email(app)
     CORS(app, origins=app.config["CORS_ORIGINS"], supports_credentials=True)
+
+    @app.url_value_preprocessor
+    def ids_in_range(_endpoint, values):
+        """/api/jobs/<int:jid> and the like: an ID too big for the database is simply not found,
+        instead of reaching the database and failing there."""
+        from app.utils.validation import DB_INTEGER_MAX
+
+        if any(isinstance(value, int) and value > DB_INTEGER_MAX for value in (values or {}).values()):
+            abort(404)
+
     db.init_app(app)
     jwt.init_app(app)
     migrate.init_app(app, db, render_as_batch=True)
@@ -266,11 +276,13 @@ def create_app(overrides=None):
     from app import models  # noqa: F401  (register models for migrations)
     from app.routes.auth import bp as auth
     from app.routes.billing import bp as billing
+    from app.routes.catalog import bp as catalog
     from app.routes.checklists import bp as checklists
     from app.routes.company import bp as company
     from app.routes.customers import bp as customers
     from app.routes.demo import bp as demo
     from app.routes.equipment import bp as equipment
+    from app.routes.forms import bp as forms
     from app.routes.jobs import bp as jobs
     from app.routes.maintenance import bp as maintenance
     from app.routes.legal import bp as legal
@@ -294,6 +306,7 @@ def create_app(overrides=None):
     app.register_blueprint(jobs, url_prefix="/api/jobs")
     app.register_blueprint(worksheet, url_prefix="/api/jobs")
     app.register_blueprint(checklists, url_prefix="/api/checklists")
+    app.register_blueprint(catalog, url_prefix="/api/catalog")
     app.register_blueprint(customers, url_prefix="/api/customers")
     app.register_blueprint(requests, url_prefix="/api/customers/requests")
     app.register_blueprint(messages, url_prefix="/api/messages")
@@ -307,6 +320,7 @@ def create_app(overrides=None):
     app.register_blueprint(routes, url_prefix="/api/routes")
     app.register_blueprint(media, url_prefix="/api")
     app.register_blueprint(equipment, url_prefix="/api")
+    app.register_blueprint(forms, url_prefix="/api")
     app.register_blueprint(shifts, url_prefix="/api/shifts")
     app.register_blueprint(location, url_prefix="/api/location")
     app.register_blueprint(billing, url_prefix="/api")
@@ -410,7 +424,10 @@ def create_app(overrides=None):
 
         from app.routes.maintenance import run_daily
 
-        print(json.dumps(run_daily(), indent=2))
+        removed = run_daily()
+        print(json.dumps(removed, indent=2))
+        if removed.get("failed"):
+            sys.exit(1)
 
     @app.cli.command("purge-activity")
     def purge_activity():

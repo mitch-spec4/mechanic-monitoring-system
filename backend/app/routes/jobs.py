@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify
 
 from app import db
-from app.models.constants import DEFAULT_PRIORITY, PRIORITIES
+from app.models.constants import ACTIVE_JOB_STATUSES, DEFAULT_PRIORITY, PRIORITIES
 from app.models.customer import Customer
 from app.models.equipment import Site
 from app.models.job import Job
@@ -13,6 +13,7 @@ from app.models.user import User
 from app.models.worksheet import WorkEntry
 from app.services.billing import require_active
 from app.services.booking import tell_customer, visit_moved
+from app.services.catalog import find_service, service_job_type, service_summary
 from app.services.equipment import plan_job_moved, site_label
 from app.services.location import shift_at, stamp_job
 from app.services.notifications import notify, notify_bosses
@@ -32,7 +33,7 @@ from app.services.worksheet import (
     stop_timer,
 )
 from app.utils.auth import current_user, roles
-from app.utils.pages import listing, matches
+from app.utils.pages import listing, matches, only, wanted
 from app.utils.validation import ValidationError, choice, integer, iso_date, json_body, text
 from app.i18n import N_, _, local_time
 from app.services import audit
@@ -87,6 +88,9 @@ def out(job):
         # Its place in the technician's planned route for that day.
         "route_date": job.route_date.isoformat() if job.route_date else None,
         "route_order": job.route_order,
+        # The service it was made from (with the skills the work needs), and how long it should take.
+        "service": service_summary(job),
+        "estimated_minutes": job.estimated_minutes,
     }
 
 
@@ -100,7 +104,7 @@ def find_machine(company_id, machine_id, customer_id=None):
 
 
 def find_mechanic(company_id, mechanic_id):
-    mechanic = User.query.filter_by(id=mechanic_id, company_id=company_id, role="mechanic").first()
+    mechanic = User.query.filter_by(id=mechanic_id, company_id=company_id, role="mechanic", removed_at=None).first()
     if not mechanic:
         raise ValidationError(_("Technician not found"), 404)
     return mechanic
@@ -115,6 +119,10 @@ def list_jobs():
         query = query.filter_by(mechanic_id=user.id)
     if user.role == "customer":
         query = query.filter_by(customer_id=user.customer_id)
+    if user.role == "boss":
+        query = only(query, Job.mechanic_id, "mechanic_id", "Technician")
+    if wanted("open"):
+        query = query.filter(Job.status.in_(ACTIVE_JOB_STATUSES))
     match = matches([Job.title, Job.description, Job.location, Job.job_type, Job.status])
     if match is not None:
         # A search also finds jobs by their customer's or equipment's name.
@@ -130,12 +138,15 @@ def create_job():
     user = current_user()
     require_active(user.company_id, _("add new jobs"))
     data = json_body()
-    title = text(data, "title", required=True, max_length=200)
-    description = text(data, "description", required=True)
+    service_id = integer(data, "service_id", "Service")
+    # From a service: its name, description, checklist and time, unless the form says otherwise.
+    title = text(data, "title", required=not service_id, max_length=200)
+    description = text(data, "description", required=not service_id)
     priority = choice(data, "priority", PRIORITIES, default=DEFAULT_PRIORITY)
     mechanic_id = integer(data, "mechanic_id", "Technician")
     customer_id = integer(data, "customer_id", "Customer")
     machine_id = integer(data, "machine_id", "Equipment")
+    estimated_minutes = integer(data, "estimated_minutes", "Estimated time (minutes)", minimum=5, maximum=24 * 60)
 
     if mechanic_id:
         find_mechanic(user.company_id, mechanic_id)
@@ -144,6 +155,11 @@ def create_job():
     machine = find_machine(user.company_id, machine_id, customer_id) if machine_id else None
     if machine:
         customer_id = machine.customer_id
+    service = find_service(user.company_id, service_id, machine) if service_id else None
+    if service:
+        title = title or service.name
+        description = description or service.description or service.name
+        estimated_minutes = estimated_minutes or service.duration_minutes
     # The equipment's site, unless another place is given.
     location = text(data, "location", max_length=200) or (site_label(db.session.get(Site, machine.site_id)) if machine and machine.site_id else None)
 
@@ -152,13 +168,15 @@ def create_job():
         title=title,
         description=description,
         priority=priority,
-        job_type=text(data, "job_type", "Job type", max_length=80),
+        job_type=text(data, "job_type", "Job type", max_length=80) or service_job_type(service),
         location=location,
         due_date=iso_date(data, "due_date", "Due date"),
         customer_id=customer_id,
         machine_id=machine.id if machine else None,
         mechanic_id=mechanic_id,
         status="Assigned" if mechanic_id else "Pending",
+        service_id=service.id if service else None,
+        estimated_minutes=estimated_minutes,
     )
     db.session.add(job)
     db.session.flush()
@@ -242,7 +260,7 @@ def update_job(jid):
     return jsonify(job=out(job))
 
 
-EDITABLE_FIELDS = ("title", "description", "priority", "job_type", "location", "due_date", "machine_id")
+EDITABLE_FIELDS = ("title", "description", "priority", "job_type", "location", "due_date", "machine_id", "estimated_minutes")
 
 
 def edit_details(job, data):
@@ -258,6 +276,8 @@ def edit_details(job, data):
         job.job_type = text(data, "job_type", "Job type", max_length=80)
     if "location" in data:
         job.location = text(data, "location", max_length=200)
+    if "estimated_minutes" in data:
+        job.estimated_minutes = integer(data, "estimated_minutes", "Estimated time (minutes)", minimum=5, maximum=24 * 60)
     if "due_date" in data:
         job.due_date = iso_date(data, "due_date", "Due date")
     if "machine_id" in data:

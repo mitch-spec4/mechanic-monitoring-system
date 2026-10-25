@@ -4,6 +4,7 @@ import {
   BarChart3,
   Bell,
   CheckCircle2,
+  ClipboardCheck,
   ClipboardList,
   Clock,
   Cog,
@@ -17,20 +18,22 @@ import {
   Route as RouteIcon,
   Search,
   Star,
+  type LucideIcon,
   UserRound,
   Users,
   Wrench,
-  type LucideIcon,
 } from "lucide-react";
 import {
   company,
   customers,
+  deleteCustomer,
   jobs,
   jobsPage,
   machines,
   mechanics,
   notificationsPage,
   PAGE_SIZE,
+  removePerson,
   reports,
   requestsPage,
   resetTwoFactor,
@@ -54,6 +57,7 @@ import type {
   ServiceRequest,
 } from "../services/types";
 import ChecklistManager from "../components/ChecklistManager";
+import FormsManager from "../components/FormsManager";
 import Messages from "../components/Messages";
 import MachinesByCustomer from "../components/MachinesByCustomer";
 import { machineSummary } from "./BossDashboard";
@@ -196,6 +200,7 @@ const resources: Record<string, Resource> = {
   Profile: { label: mark("Profile"), description: mark("Your account details and access."), icon: UserRound },
   "Help & Support": { label: mark("Help & support"), description: mark("Support resources for your service workspace."), icon: HelpCircle },
   Checklists: { label: mark("Checklists"), description: mark("Checklists your technicians complete for each type of job."), icon: ListChecks },
+  Forms: { label: mark("Forms"), description: mark("Forms your technicians fill in on jobs, and the certificates they make."), icon: ClipboardCheck },
   "Team Map": { label: mark("Clocked-in technicians"), description: mark("Where your clocked-in technicians were last seen."), icon: MapIcon },
   Routes: { label: mark("Route planner"), description: mark("The shortest order to visit a technician's jobs on a day."), icon: RouteIcon },
   Shifts: { label: mark("Shifts"), description: mark("Clock-in and clock-out times and hours for your team."), icon: Clock },
@@ -306,6 +311,40 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
       toast(errorMessage(problem), "error");
     }
   };
+  // A technician who leaves: deleted, or (with work in the history) their access ends.
+  const removeTechnician = async (person: { id: number; name: string }) => {
+    const ok = await confirmAction({
+      title: t("Remove {name}?", { name: person.name }),
+      message: t("They're signed out and can't sign in again. Jobs, shifts and records they worked on keep their name."),
+      confirmLabel: t("Remove"),
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await removePerson(person.id);
+      toast(t("{name} was removed", { name: person.name }));
+      setReloadKey((key) => key + 1);
+    } catch (problem) {
+      toast(errorMessage(problem), "error");
+    }
+  };
+  // Only a customer with no equipment or service history can be deleted (the API says why not).
+  const removeCustomer = async (customer: { id: number; name: string }) => {
+    const ok = await confirmAction({
+      title: t("Delete {name}?", { name: customer.name }),
+      message: t("Their sign-in, sites and messages are deleted too. A customer with equipment or service history can't be deleted."),
+      confirmLabel: t("Delete customer"),
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await deleteCustomer(customer.id);
+      toast(t("{name} was deleted", { name: customer.name }));
+      setReloadKey((key) => key + 1);
+    } catch (problem) {
+      toast(errorMessage(problem), "error");
+    }
+  };
   const rowActions = (item: ListItem) => {
     if (!isBoss) return null;
     // Customers and technicians can be helped back in: a customer through their sign-in account.
@@ -333,6 +372,16 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
             {t("Pay rate")}
           </button>
         )}
+        {"pay_rate_cents" in item && (
+          <button className="listAction danger" onClick={() => removeTechnician(item)}>
+            {t("Remove")}
+          </button>
+        )}
+        {"machine_count" in item && (
+          <button className="listAction danger" onClick={() => removeCustomer(item)}>
+            {t("Delete")}
+          </button>
+        )}
       </>
     );
   };
@@ -352,6 +401,8 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
         );
       case "Checklists":
         return <ChecklistManager />;
+      case "Forms":
+        return can(user, "forms") ? <FormsManager /> : <PlanLocked feature="forms" user={user} />;
       case "Team Map":
         return <TeamMap onOpenJob={onOpenJob} />;
       case "Routes":

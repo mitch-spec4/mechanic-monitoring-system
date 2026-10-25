@@ -55,7 +55,7 @@ def reset_token(user):
 def user_for_reset(token):
     data = _read("reset", token, RESET_HOURS)
     user = db.session.get(User, data.get("u")) if isinstance(data, dict) else None
-    if not user or user.token_version != data.get("v"):
+    if not user or user.removed_at or user.token_version != data.get("v"):
         raise ValidationError(_("This reset link is invalid, expired or already used. Ask for a new one."))
     return user
 
@@ -129,3 +129,17 @@ def send_invitation(invitation, inviter):
             layout(_("Join {company}", company=company.name), paragraphs, (_("Accept the invitation"), link), footer),
             company_id=invitation.company_id,
         )
+
+
+def forget_sign_in(user):
+    """Everything that lets someone in, or only matters while they can sign in: their notifications,
+    remembered offline changes, reset codes, two-step sign-in and remembered browsers."""
+    from app.models.notification import Notification
+    from app.models.security import PasswordReset
+    from app.models.sync import ClientRequest
+    from app.services import two_factor
+
+    Notification.query.filter_by(user_id=user.id).delete()
+    ClientRequest.query.filter_by(user_id=user.id).delete()
+    PasswordReset.query.filter((PasswordReset.user_id == user.id) | (PasswordReset.created_by == user.id)).delete()
+    two_factor.disable(user)

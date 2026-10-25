@@ -24,6 +24,9 @@ from app.models import (
     Company,
     Customer,
     CustomerMessage,
+    FormSubmission,
+    FormTemplate,
+    FormVersion,
     Invitation,
     Job,
     JobChecklistItem,
@@ -37,6 +40,7 @@ from app.models import (
     Review,
     ServiceRecord,
     ServiceRequest,
+    ServiceTemplate,
     Shift,
     Site,
     Subscription,
@@ -73,6 +77,10 @@ def _tables(company_id):
         "job_checklists": (JobChecklistItem, JobChecklistItem.query.filter(JobChecklistItem.job_id.in_(jobs))),
         "checklist_templates": (ChecklistTemplate, ChecklistTemplate.query.filter_by(company_id=company_id)),
         "checklist_template_items": (ChecklistTemplateItem, ChecklistTemplateItem.query.filter(ChecklistTemplateItem.template_id.in_(templates))),
+        "services": (ServiceTemplate, ServiceTemplate.query.filter_by(company_id=company_id)),
+        "forms": (FormTemplate, FormTemplate.query.filter_by(company_id=company_id)),
+        "form_versions": (FormVersion, FormVersion.query.filter(FormVersion.form_id.in_(db.session.query(FormTemplate.id).filter(FormTemplate.company_id == company_id)))),
+        "form_answers": (FormSubmission, FormSubmission.query.filter_by(company_id=company_id)),
         "service_records": (ServiceRecord, ServiceRecord.query.filter_by(company_id=company_id)),
         "service_requests": (ServiceRequest, ServiceRequest.query.filter_by(company_id=company_id)),
         "customer_messages": (CustomerMessage, CustomerMessage.query.filter_by(company_id=company_id)),
@@ -93,6 +101,24 @@ def _plain(value):
     # Quantities like 1.50: written exactly as stored, not rounded through a float.
     if isinstance(value, Decimal):
         return str(value)
+    return value
+
+
+# Text starting with one of these runs as a formula when the CSV is opened in Excel or Google
+# Sheets ("=HYPERLINK(...)" typed as a job title, say).
+FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
+
+
+def cell(value):
+    """A value as a spreadsheet cell: a list of names (a service's skills) as "Electrical;
+    Welding", anything else structured (a form's questions or answers) as JSON. Text that would
+    start a formula gets a leading apostrophe, so it stays text."""
+    if isinstance(value, list) and all(isinstance(item, (str, int, float)) for item in value):
+        value = "; ".join(map(str, value))
+    elif isinstance(value, (list, dict)):
+        value = json.dumps(value, ensure_ascii=False)
+    if isinstance(value, str) and value.startswith(FORMULA_START):
+        return "'" + value
     return value
 
 
@@ -133,7 +159,7 @@ def build_export(company_id):
             writer = csv.DictWriter(text, fieldnames=columns)
             writer.writeheader()
             for row in everything[name]:
-                writer.writerow(row)
+                writer.writerow({key: cell(value) for key, value in row.items()})
             # The byte order mark makes Excel read the file as UTF-8 (names like "Wanjirū").
             zipped.writestr(f"{name}.csv", "﻿" + text.getvalue())
         zipped.writestr(

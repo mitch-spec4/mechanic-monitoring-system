@@ -2,20 +2,16 @@ import secrets
 from datetime import timedelta
 
 from flask import Blueprint, jsonify
+from sqlalchemy.exc import IntegrityError
 
 from app import db
 from app.models.job import Job
-from app.models.notification import Notification
-from app.models.review import Review
 from app.models.security import AuditEvent, PasswordReset
-from app.models.service_record import ServiceRecord
 from app.models.user import User
 from app.models.location import Shift
-from app.models.sync import ClientRequest
-from app.models.worksheet import JobEvent
 from app.routes.auth import hash_code, user_payload
 from app.services import audit, two_factor
-from app.services.accounts import send_verification
+from app.services.accounts import forget_sign_in, send_verification
 from app.services.billing import require_feature
 from app.i18n import LANGUAGES
 from app.utils.auth import current_user, roles
@@ -35,14 +31,14 @@ def out(user):
 @bp.get("")
 @roles("boss")
 def list_users():
-    users = User.query.filter_by(company_id=current_user().company_id).order_by(User.name).all()
+    users = User.query.filter_by(company_id=current_user().company_id, removed_at=None).order_by(User.name).all()
     return jsonify(users=[out(user) for user in users])
 
 
 @bp.get("/mechanics")
 @roles("boss")
 def mechanics():
-    users = User.query.filter_by(company_id=current_user().company_id, role="mechanic").order_by(User.name).all()
+    users = User.query.filter_by(company_id=current_user().company_id, role="mechanic", removed_at=None).order_by(User.name).all()
     return jsonify(
         mechanics=[
             {"id": user.id, "name": user.name, "email": user.email, "two_factor_enabled": user.totp_enabled_at is not None, "pay_rate_cents": user.pay_rate_cents}
@@ -70,7 +66,7 @@ def update_me():
 @bp.patch("/<int:uid>")
 @roles("boss")
 def update_user(uid):
-    user = User.query.filter_by(id=uid, company_id=current_user().company_id).first_or_404()
+    user = User.query.filter_by(id=uid, company_id=current_user().company_id, removed_at=None).first_or_404()
     data = json_body()
     if "name" in data:
         user.name = text(data, "name", "Name", required=True, max_length=120)
@@ -101,7 +97,7 @@ def issue_reset_code(uid):
     manager = current_user()
     if uid == manager.id:
         return jsonify(error=_("Use Change password in Settings for your own account")), 400
-    user = User.query.filter_by(id=uid, company_id=manager.company_id).first_or_404()
+    user = User.query.filter_by(id=uid, company_id=manager.company_id, removed_at=None).first_or_404()
     PasswordReset.query.filter_by(user_id=user.id, used=False).update({"used": True})
     code = "RS-" + secrets.token_hex(5).upper()
     reset = PasswordReset(
@@ -123,7 +119,7 @@ def reset_two_factor(uid):
     manager = current_user()
     if uid == manager.id:
         return jsonify(error=_("Use your backup codes, or ask another manager, to reset your own two-step sign-in.")), 400
-    user = User.query.filter_by(id=uid, company_id=manager.company_id).first_or_404()
+    user = User.query.filter_by(id=uid, company_id=manager.company_id, removed_at=None).first_or_404()
     two_factor.disable(user)
     user.token_version = (user.token_version or 0) + 1
     audit.record("two_factor_reset", user=manager, detail=user.email)
@@ -134,28 +130,42 @@ def reset_two_factor(uid):
 @bp.delete("/<int:uid>")
 @roles("boss")
 def delete_user(uid):
-    if uid == current_user().id:
+    """Remove someone from the company. Without work in the history they're deleted; otherwise
+    their access ends and their account is kept, so jobs, shifts, payments, messages and forms
+    still name them. Either way they're signed out everywhere and left out of every list."""
+    manager = current_user()
+    if uid == manager.id:
         return jsonify(error=_("You cannot delete your own account")), 400
-    user = User.query.filter_by(id=uid, company_id=current_user().company_id).first_or_404()
-    if user.role == "mechanic":
-        has_history = (
-            Job.query.filter_by(mechanic_id=user.id).first()
-            or ServiceRecord.query.filter_by(mechanic_id=user.id).first()
-            or Review.query.filter_by(mechanic_id=user.id).first()
-        )
-        if has_history:
-            return jsonify(error=_("This technician has jobs or service history and cannot be deleted.")), 409
-    if JobEvent.query.filter_by(user_id=user.id).first():
-        return jsonify(error=_("This person appears in job history and cannot be deleted.")), 409
-    if Shift.query.filter_by(user_id=user.id).first():
-        return jsonify(error=_("This technician has shift records and cannot be deleted.")), 409
-    Notification.query.filter_by(user_id=user.id).delete()
-    ClientRequest.query.filter_by(user_id=user.id).delete()
-    PasswordReset.query.filter((PasswordReset.user_id == user.id) | (PasswordReset.created_by == user.id)).delete()
-    two_factor.disable(user)
-    # The activity log keeps their name, not a link to an account that no longer exists.
-    AuditEvent.query.filter_by(user_id=user.id).update({"user_id": None})
-    audit.record("member_removed", user=current_user(), detail=user.email)
-    db.session.delete(user)
+    user = User.query.filter_by(id=uid, company_id=manager.company_id, removed_at=None).first_or_404()
+    open_jobs = Job.query.filter(Job.mechanic_id == user.id, Job.status.notin_(("Completed", "Cancelled"))).count()
+    if open_jobs:
+        return jsonify(error=_("Reassign {name}'s open jobs first ({count}).", name=user.name, count=open_jobs)), 409
+    email = user.email
+    try:
+        with db.session.begin_nested():
+            forget_sign_in(user)
+            # The activity log keeps their name, not a link to an account that no longer exists.
+            AuditEvent.query.filter_by(user_id=user.id).update({"user_id": None})
+            db.session.delete(user)
+            db.session.flush()
+        kept = False
+    except IntegrityError:
+        # Their work is in the history: end their access and keep the account.
+        remove_access(user)
+        kept = True
+    audit.record("member_removed", user=manager, detail=email)
     db.session.commit()
-    return jsonify(ok=True)
+    return jsonify(ok=True, kept=kept)
+
+
+def remove_access(user):
+    """Someone whose work is in the history: they can't sign in again (no password, no email
+    that resets one, every session ended) and are left out of lists, but stay named in it."""
+    forget_sign_in(user)
+    shift = Shift.query.filter_by(user_id=user.id, clocked_out_at=None).first()
+    if shift:
+        shift.clocked_out_at = utcnow()
+    user.removed_at = utcnow()
+    user.set_password(secrets.token_urlsafe(32))  # also ends every session (token_version)
+    # Frees the address for a new invitation; the activity log keeps the old one.
+    user.email = f"removed-{user.id}@removed.invalid"

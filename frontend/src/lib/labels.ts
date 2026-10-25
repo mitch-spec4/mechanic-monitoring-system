@@ -8,6 +8,7 @@ export const REQUEST_STATUSES = [
   mark("Inspection booked"),
   mark("Inspected"),
   mark("Repair booked"),
+  mark("Service booked"),
   mark("Completed"),
   mark("Declined"),
   mark("Cancelled"),

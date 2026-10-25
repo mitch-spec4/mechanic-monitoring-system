@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Request } from "@playwright/test";
 import { failOnPageErrors, finishSignIn, goTo, openPage, signIn } from "./helpers";
 
 // Each test puts back what it changes: the database is shared with the other spec files.
@@ -85,6 +85,29 @@ test("a manager changes the company's units", async ({ page }) => {
   await company.getByLabel("Units").selectOption("metric");
   await company.getByRole("button", { name: "Save company settings" }).click();
   await expect(page.locator(".toast").last()).toContainText("Company settings saved");
+});
+
+test("an answer that comes late doesn't undo a change in Settings", async ({ page }) => {
+  // In development React loads each form twice; here the first load answers last, after the
+  // manager has already changed something.
+  await signIn(page, "james@mechanicpro.test");
+  let loads = 0;
+  let delayed: Request | undefined;
+  await page.route("**/api/company/settings", async (route) => {
+    if (route.request().method() === "GET" && ++loads === 1) {
+      delayed = route.request();
+      await new Promise((done) => setTimeout(done, 1500));
+    }
+    await route.continue();
+  });
+  const late = page.waitForEvent("requestfinished", { predicate: (request) => request === delayed, timeout: 20_000 });
+  await openPage(page, "Settings");
+  const units = page.locator(".settingsSection", { hasText: "Company settings" }).getByLabel("Units");
+  await units.selectOption("imperial");
+  await late;
+  await page.waitForTimeout(300); // time for the late answer to reach the form
+  expect(await units.inputValue()).toBe("imperial");
+  await page.unroute("**/api/company/settings");
 });
 
 test("technicians and customers don't see company settings", async ({ page }) => {

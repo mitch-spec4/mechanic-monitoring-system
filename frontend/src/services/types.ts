@@ -25,12 +25,39 @@ export type Job = {
   /** Its place in the technician's planned route for route_date. */
   route_date?: string | null;
   route_order?: number | null;
+  /** The service it was made from, and how long the work should take. */
+  service?: JobService | null;
+  estimated_minutes?: number | null;
   /** Changed on this phone, not yet on the server. */
   pending_status?: boolean;
 };
 
-/** A booked visit: the inspection, or the repair after it. */
-export type Visit = "inspection" | "repair";
+/** A booked visit: the inspection, the repair after it, or a service booked directly. */
+export type Visit = "inspection" | "repair" | "service";
+
+/** The service a job or request was made from, with the skills the work needs. */
+export type JobService = { id: number; name: string; skills: string[] };
+
+/** How customers book a service: not at all, an inspection first, or the service directly. */
+export type BookingType = "none" | "inspection" | "direct";
+
+/** A service in the company's catalog (app/routes/catalog.py). */
+export type CatalogService = {
+  id: number;
+  name: string;
+  description: string | null;
+  equipment_type: string | null;
+  checklist: { id: number; job_type: string; items: number } | null;
+  duration_minutes: number;
+  skills: string[];
+  booking: BookingType;
+  active: boolean;
+  /** How many jobs were made from it. */
+  jobs: number;
+};
+
+/** What a customer sees of a service they can book. */
+export type BookableService = Pick<CatalogService, "id" | "name" | "description" | "equipment_type" | "duration_minutes" | "booking">;
 
 /** Why a piece of equipment needs work: an open job or request, or its status. */
 export type WorkReason =
@@ -102,6 +129,8 @@ export type EquipmentDetail = Machine & {
   records: ServiceRecord[];
   can_edit: boolean;
   can_add_documents: boolean;
+  /** Forms completed on its jobs (customers: the certificates). */
+  certificates: Certificate[];
   document_mb: number;
 };
 
@@ -154,6 +183,9 @@ export type ServiceRequest = {
   status: string;
   created_at: string;
   updated_at?: string | null;
+  /** The service picked from the catalog, and whether it's booked directly or after an inspection. */
+  service?: JobService | null;
+  booking?: "inspection" | "direct";
 };
 
 /** A visit as a request's page shows it; findings and photos once it's done. */
@@ -316,6 +348,8 @@ export type JobDetail = {
   scheduled_start?: string | null;
   scheduled_end?: string | null;
   on_the_way_at?: string | null;
+  service?: JobService | null;
+  estimated_minutes?: number | null;
   customer: { id: number; name: string } | null;
   machine: { id: number; name: string; serial_no: string } | null;
   mechanic: { id: number; name: string | null } | null;
@@ -340,6 +374,8 @@ export type JobDetail = {
   can_upload?: boolean;
   media_limits?: MediaLimits;
   completion_blockers?: string[];
+  /** The forms on the job (customers: completed certificates only). */
+  forms?: JobForm[];
   // Changed on this phone, not yet on the server:
   pending_status?: boolean;
   record_pending?: boolean;
@@ -368,7 +404,7 @@ export type Subscription = {
 };
 
 /** What a plan can include beyond the basics (see backend/app/services/plans.py). */
-export type Feature = "insights" | "maintenance" | "routes" | "costing";
+export type Feature = "insights" | "maintenance" | "routes" | "costing" | "forms";
 
 export type Payment = {
   reference: string;
@@ -488,6 +524,70 @@ export type Costing = {
   missing_costs: string[];
 };
 
+/** What a question asks for (backend/app/services/forms.py). */
+export type FormFieldType = "heading" | "text" | "number" | "yesno" | "choice" | "date" | "photo" | "signature";
+
+/** One question of a form's version. */
+export type FormField = {
+  id: string;
+  type: FormFieldType;
+  label: string;
+  help?: string;
+  required?: boolean;
+  /** Text: a box for longer answers. */
+  long?: boolean;
+  /** Choice: what can be picked. */
+  options?: string[];
+  /** Only asked when an earlier yes/no or choice question has this answer. */
+  show_if?: { field: string; equals: string };
+};
+
+/** An answer as stored: text, a number, "yes"/"no", a choice, a date, or a signer's name. */
+export type FormAnswer = string | number | { name: string };
+
+/** A form built by the managers (the Forms page). */
+export type CustomForm = {
+  id: number;
+  name: string;
+  description: string | null;
+  job_types: string[];
+  service_ids: number[];
+  required: boolean;
+  customer_visible: boolean;
+  active: boolean;
+  version: { id: number; number: number; fields: FormField[] } | null;
+  /** How many jobs it was filled in on. */
+  submissions: number;
+};
+
+/** A form on a job, and what was filled in. */
+export type JobForm = {
+  form_id: number;
+  name: string;
+  description: string | null;
+  required: boolean;
+  customer_visible: boolean;
+  /** The certificate, once completed. */
+  pdf_url: string | null;
+  completed_at: string | null;
+  // Left out for customers:
+  version?: { id: number; number: number; fields: FormField[] } | null;
+  submission?: {
+    status: "draft" | "completed";
+    answers: Record<string, FormAnswer>;
+    updated_at: string | null;
+    updated_by: string | null;
+    completed_by: string | null;
+    photos: Record<string, { id: number; url: string; content_type: string; pending?: boolean }[]>;
+    signatures: Record<string, { url: string | null; name: string | null; signed_at: string | null }>;
+    /** Changed on this phone, not yet on the server. */
+    pending?: boolean;
+  } | null;
+};
+
+/** A completed form on a piece of equipment's jobs. */
+export type Certificate = { form_id: number; name: string; job_id: number; job_title: string; completed_at: string | null; customer_visible: boolean; pdf_url: string };
+
 export type RouteStop = {
   job_id: number;
   title: string;
@@ -497,6 +597,7 @@ export type RouteStop = {
   priority: string;
   due_date: string | null;
   scheduled_start: string | null;
+  estimated_minutes: number | null;
   latitude: number | null;
   longitude: number | null;
   /** On planned stops: its number and the drive to it. */
@@ -509,6 +610,8 @@ export type RouteStop = {
 export type RoutePlan = {
   date: string;
   mechanic: { id: number; name: string };
+  /** The day's work (estimates and booked visits) against the working day, in minutes. */
+  work: { minutes: number; unestimated: number; day_minutes: number };
   start: { kind: "position" | "base" | "first_stop"; latitude: number | null; longitude: number | null };
   estimate: "straight_line" | "openrouteservice";
   fell_back: boolean;

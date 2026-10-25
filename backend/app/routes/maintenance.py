@@ -22,22 +22,34 @@ bp = Blueprint("maintenance", __name__)
 
 
 def run_daily():
-    removed = {"demo_companies": purge_expired()}
-    removed["abandoned_uploads"] = purge_abandoned_uploads()
-    removed["old_live_locations"] = purge_old_live_points()
-    removed["old_activity"] = purge_old_events()
-    removed["old_offline_changes"] = purge_old_requests()
-    db.session.commit()
-    # Not a clean-up: visit reminders, "book the repair" reminders and follow-ups (sent once each).
-    removed["reminders"] = send_reminders()
-    db.session.commit()
-    # Planned maintenance coming due: its job and the reminders (app/services/equipment.py).
-    removed["maintenance"] = send_due_reminders()
-    db.session.commit()
-    # Plans: renewals with the saved card, and reminders of trials and plans ending (commits).
-    removed["billing"] = renew_due()
-    # Companies whose 30 days after "Delete my company" are up (commits each one).
-    removed["deleted_companies"] = delete_due_companies()
+    """Every part runs even if one before it fails (an email or payment service down, say); the
+    parts that failed are listed under "failed" and logged with their error."""
+    removed, failed = {}, []
+    steps = (
+        ("demo_companies", purge_expired),
+        ("abandoned_uploads", purge_abandoned_uploads),
+        ("old_live_locations", purge_old_live_points),
+        ("old_activity", purge_old_events),
+        ("old_offline_changes", purge_old_requests),
+        # Not a clean-up: visit reminders, "book the repair" reminders and follow-ups (sent once each).
+        ("reminders", send_reminders),
+        # Planned maintenance coming due: its job and the reminders (app/services/equipment.py).
+        ("maintenance", send_due_reminders),
+        # Plans: renewals with the saved card, and reminders of trials and plans ending.
+        ("billing", renew_due),
+        # Companies whose 30 days after "Delete my company" are up.
+        ("deleted_companies", delete_due_companies),
+    )
+    for name, work in steps:
+        try:
+            removed[name] = work()
+            db.session.commit()
+        except Exception:  # noqa: BLE001
+            db.session.rollback()
+            current_app.logger.exception("The daily run's %s step failed", name)
+            failed.append(name)
+    if failed:
+        removed["failed"] = failed
     return removed
 
 
@@ -48,4 +60,6 @@ def daily():
         abort(404)
     if not hmac.compare_digest(request.headers.get("Authorization", "").encode(), f"Bearer {secret}".encode()):
         abort(401)
-    return jsonify(removed=run_daily())
+    removed = run_daily()
+    # A failed part makes the scheduler's run fail too, so someone notices (the rest still ran).
+    return jsonify(removed=removed), 500 if removed.get("failed") else 200

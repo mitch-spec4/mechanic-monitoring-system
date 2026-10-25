@@ -7,6 +7,9 @@ from flask import request
 from app.i18n import _
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+# The largest whole number a database INTEGER column holds (IDs, minutes, quantities). Anything
+# bigger can't match a record or be stored, and the database would fail on it.
+DB_INTEGER_MAX = 2_147_483_647
 
 
 class ValidationError(Exception):
@@ -80,6 +83,8 @@ def integer(data, field, label=None, required=False, minimum=None, maximum=None)
         raise ValidationError(_("{label} must be a whole number", label=label)) from None
     if (minimum is not None and number < minimum) or (maximum is not None and number > maximum):
         raise ValidationError(_("{label} must be between {minimum} and {maximum}", label=label, minimum=minimum, maximum=maximum))
+    if abs(number) > DB_INTEGER_MAX:
+        raise ValidationError(_("{label} is too large", label=label))
     return number
 
 

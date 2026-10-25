@@ -166,6 +166,14 @@
   box-shadow: 0 6px 14px -8px var(--btn-glow);
 }
 
+/* Remove, Delete: the same button in red. */
+.appShell .listAction.danger {
+  --btn: #c62f2f;
+  --btn-light: #e04848;
+  --btn-dark: #a52222;
+  --btn-glow: rgba(198, 47, 47, 0.55);
+}
+
 /* ---------- Text links: an underline that draws itself ---------- */
 :is(.appShell, .login) :is(.link, .loginSwitch, .markAll) {
   color: var(--btn);

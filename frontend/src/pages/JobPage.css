@@ -277,7 +277,7 @@
   color: #5b6b80;
 }
 .jobPage textarea,
-.jobPage input:not([type="checkbox"]) {
+.jobPage input:not([type="checkbox"], [type="radio"], .visuallyHidden) {
   width: 100%;
   box-sizing: border-box;
   padding: 10px 11px;
@@ -836,4 +836,12 @@
   color: #12407a;
   font-size: 13px;
   font-weight: 700;
+}
+
+/* The service a job was made from, with the skills it needs. */
+.jobService {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
 }

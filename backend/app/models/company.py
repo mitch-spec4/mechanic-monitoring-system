@@ -34,6 +34,9 @@ class Company(db.Model):
     deletion_requested_at = db.Column(db.DateTime)
     deletion_requested_by = db.Column(db.Integer)
     deletion_due_at = db.Column(db.DateTime, index=True)
+    # The company's logo (PNG or JPEG), shown on certificates and service reports.
+    logo_key = db.Column(db.String(255))
+    logo_content_type = db.Column(db.String(40))
 
     @property
     def is_demo(self):

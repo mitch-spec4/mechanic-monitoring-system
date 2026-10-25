@@ -603,7 +603,7 @@ body {
 .appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus):is(.pending, .submitted) {
   --st: var(--st-pending);
 }
-.appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus):is(.assigned, .received, .reviewing, .mechanicassigned, .scheduled, .inspectionbooked, .repairbooked) {
+.appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus):is(.assigned, .received, .reviewing, .mechanicassigned, .scheduled, .inspectionbooked, .repairbooked, .servicebooked) {
   --st: var(--st-assigned);
 }
 .appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus):is(.accepted, .approved, .inspected) {
@@ -835,7 +835,9 @@ body {
 
 /* ---------- Pages arrive with a short rise ---------- */
 .appShell #content > * > * {
-  animation: rise 0.42s var(--ease) both;
+  /* backwards, not both: a transform left after the rise would trap the dialogs opened inside
+     (a transformed parent is what position: fixed measures from, and it clips them). */
+  animation: rise 0.42s var(--ease) backwards;
 }
 .appShell #content > * > *:nth-child(2) {
   animation-delay: 0.04s;
@@ -939,6 +941,30 @@ body {
   }
   .appShell .subPageStats > div > svg {
     grid-row: auto;
+  }
+}
+/* Phones: the search box and the add button wrap under the list's title, and a long email
+   address breaks, so nothing runs off the right edge of the screen. */
+@media (max-width: 760px) {
+  .appShell .subPagePanelHead {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .appShell .subPageTools {
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .appShell .searchBox {
+    flex: 1 1 150px;
+    min-width: 0;
+  }
+  .appShell .searchBox input,
+  .appShell .searchBox input:is(:hover, :focus) {
+    width: 100%;
+    min-width: 0;
   }
 }
 

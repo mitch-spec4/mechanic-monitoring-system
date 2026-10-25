@@ -224,9 +224,14 @@ function Screens() {
   // The saved profile is brought up to date once a session starts (the plan may have changed).
   useEffect(() => {
     if (!user) return;
+    // An answer that comes after signing out (or switching demo role) mustn't sign anyone back in.
+    let current = true;
     me()
-      .then((data) => updateUser(data.user))
+      .then((data) => current && updateUser(data.user))
       .catch(() => {});
+    return () => {
+      current = false;
+    };
   }, [user?.id]);
 
   // The server asked for two-step sign-in to be set up first (e.g. a manager reset it): reload

@@ -1,8 +1,12 @@
+import base64
+import binascii
 import io
 import re
+import uuid
 from zoneinfo import available_timezones
 
 from flask import Blueprint, jsonify, request, send_file
+from PIL import Image
 from sqlalchemy import or_
 
 from app import db
@@ -17,6 +21,7 @@ from app.services import audit, rate_limit
 from app.services.company_data import cancel_deletion, request_deletion
 from app.services.booking import minutes_of
 from app.services.data_export import build_export
+from app.services.storage import storage
 from app.i18n import LANGUAGES, N_, _
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
@@ -34,7 +39,7 @@ bp = Blueprint("company", __name__)
 def company():
     user = current_user()
     record = db.get_or_404(Company, user.company_id)
-    bosses = User.query.filter_by(company_id=user.company_id, role="boss").order_by(User.name).all()
+    bosses = User.query.filter_by(company_id=user.company_id, role="boss", removed_at=None).order_by(User.name).all()
     return jsonify(
         company={
             "id": record.id,
@@ -69,7 +74,7 @@ def setup():
         {"key": "customer", "done": has_customer or invited(company.id, "customer")},
         # Machines belong to a customer, so this waits until one has joined.
         {"key": "machine", "done": Machine.query.filter_by(company_id=company.id).first() is not None, "waiting": not has_customer},
-        {"key": "mechanic", "done": User.query.filter_by(company_id=company.id, role="mechanic").first() is not None or invited(company.id, "mechanic")},
+        {"key": "mechanic", "done": User.query.filter_by(company_id=company.id, role="mechanic", removed_at=None).first() is not None or invited(company.id, "mechanic")},
         {"key": "job", "done": Job.query.filter_by(company_id=company.id).first() is not None},
     ]
     return jsonify(dismissed=company.setup_dismissed_at is not None, steps=steps)
@@ -93,7 +98,13 @@ def settings_out(company):
         "booking": booking_out(company),
         # Where technicians start the day: the first point of a planned route.
         "base": {"latitude": company.base_latitude, "longitude": company.base_longitude} if company.base_latitude is not None else None,
+        # On certificates and service reports. The address changes with each new logo.
+        "logo_url": logo_url(company),
     }
+
+
+def logo_url(company):
+    return f"/api/company/logo?v={company.logo_key.rsplit('-', 1)[-1].split('.')[0][:12]}" if company.logo_key else None
 
 
 def booking_out(company):
@@ -255,3 +266,64 @@ def cancel_company_deletion():
     audit.record("deletion_cancelled", user=user)
     db.session.commit()
     return jsonify(ok=True)
+
+
+LOGO_TYPES = {"image/png": (".png", b"\x89PNG\r\n\x1a\n"), "image/jpeg": (".jpg", b"\xff\xd8\xff")}
+MAX_LOGO_BYTES = 1024 * 1024
+MAX_LOGO_PIXELS = 4000 * 4000
+
+
+@bp.put("/logo")
+@roles("boss")
+def upload_logo():
+    """The company's logo, as a PNG or JPEG data URL of up to 1 MB."""
+    company = db.get_or_404(Company, current_user().company_id)
+    image = json_body().get("image")
+    match = re.match(r"^data:(image/(?:png|jpeg));base64,(.+)$", image, re.S) if isinstance(image, str) else None
+    if not match:
+        raise ValidationError(_("The logo must be a PNG or JPEG image"))
+    content_type = match.group(1)
+    try:
+        data = base64.b64decode(match.group(2), validate=True)
+    except (binascii.Error, ValueError):
+        raise ValidationError(_("The logo must be a PNG or JPEG image")) from None
+    extension, magic = LOGO_TYPES[content_type]
+    if len(data) > MAX_LOGO_BYTES:
+        raise ValidationError(_("The logo is too large; the limit is {size} MB.", size=1), 413)
+    try:
+        picture = Image.open(io.BytesIO(data))
+        valid = data.startswith(magic) and picture.width * picture.height <= MAX_LOGO_PIXELS
+        picture.verify()
+    except Exception:  # noqa: BLE001 - anything Pillow can't read isn't a logo
+        valid = False
+    if not valid:
+        raise ValidationError(_("The logo must be a PNG or JPEG image"))
+    old = company.logo_key
+    company.logo_key = f"{company.id}/logo-{uuid.uuid4().hex}{extension}"
+    company.logo_content_type = content_type
+    storage().put(company.logo_key, data, content_type)
+    db.session.commit()
+    if old:
+        storage().delete(old)
+    return jsonify(settings=settings_out(company))
+
+
+@bp.delete("/logo")
+@roles("boss")
+def delete_logo():
+    company = db.get_or_404(Company, current_user().company_id)
+    if company.logo_key:
+        old = company.logo_key
+        company.logo_key = company.logo_content_type = None
+        db.session.commit()
+        storage().delete(old)
+    return jsonify(settings=settings_out(company))
+
+
+@bp.get("/logo")
+@roles("boss", "mechanic", "customer")
+def logo():
+    company = db.get_or_404(Company, current_user().company_id)
+    if not company.logo_key:
+        return jsonify(error=_("No logo")), 404
+    return send_file(io.BytesIO(storage().read(company.logo_key)), mimetype=company.logo_content_type, max_age=3600)

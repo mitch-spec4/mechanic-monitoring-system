@@ -31,6 +31,7 @@ from app.models.equipment import Site
 from app.models.job import Job
 from app.models.location import LocationPoint, Shift
 from app.models.machine import Machine
+from app.services.booking import minutes_of
 from app.utils.time import utcnow
 
 ROAD_FACTOR = 1.3
@@ -236,6 +237,7 @@ def plan_day(company, mechanic, day, now=None):
             "priority": job.priority,
             "due_date": job.due_date.isoformat() if job.due_date else None,
             "scheduled_start": job.scheduled_start.isoformat() if job.scheduled_start else None,
+            "estimated_minutes": job.estimated_minutes,
             "latitude": position[0] if position else None,
             "longitude": position[1] if position else None,
         }
@@ -244,9 +246,19 @@ def plan_day(company, mechanic, day, now=None):
         {**job_out(job), "stop": number, "leg_seconds": round(leg_s), "leg_metres": round(leg_m)}
         for number, ((leg_s, leg_m), job) in enumerate(zip(legs, suggested_jobs), start=1)
     ]
+    # The day's work against the working day: the stops' estimates (from their services, or set on
+    # the job) and the booked visits' lengths. Stops without an estimate are counted apart.
+    work_minutes = sum(job.estimated_minutes or 0 for job in suggested_jobs) + sum(
+        round((job.scheduled_end - job.scheduled_start).total_seconds() / 60) for job in booked if job.scheduled_end
+    )
     return {
         "date": day.isoformat(),
         "mechanic": {"id": mechanic.id, "name": mechanic.name},
+        "work": {
+            "minutes": work_minutes,
+            "unestimated": sum(1 for job in suggested_jobs if not job.estimated_minutes),
+            "day_minutes": minutes_of(company.booking_end) - minutes_of(company.booking_start),
+        },
         "start": start,
         "estimate": estimate,
         "fell_back": fell_back,

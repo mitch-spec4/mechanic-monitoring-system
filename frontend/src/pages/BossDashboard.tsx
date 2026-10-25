@@ -2,11 +2,13 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { Ban, Pencil, Plus, ClipboardList, Wrench, Trash2, CheckCircle2 } from "lucide-react";
 import {
   customers,
-  jobs,
+  jobsPage,
   machines,
   mechanics,
   checklists,
-  requests,
+  openJobs,
+  reports,
+  requestsPage,
   updateJob,
   deleteJob,
 } from "../services/api";
@@ -23,7 +25,7 @@ import { errorMessage, formatDate, greeting } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
 import { PRIORITIES, statusClass } from "../lib/labels";
 import type { User } from "../services/api";
-import type { CustomerSummary, Job, Machine, Mechanic, ServiceRequest } from "../services/types";
+import type { CustomerSummary, Job, Machine, Mechanic, Report, ServiceRequest } from "../services/types";
 import { t } from "../i18n";
 import Field from "../components/Field";
 
@@ -35,10 +37,12 @@ type Props = {
   onUserChanged?: (user: User) => void;
 };
 
-const FINISHED = ["Completed", "Cancelled", "Declined"];
-
 export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenRequest = () => {}, onUserChanged = () => {} }: Props) {
+  // The newest jobs, the unfinished ones and the counts: never every job the company ever had,
+  // which only grows and is asked for again every 30 seconds.
   const [data, setData] = useState<Job[]>([]);
+  const [upcoming, setUpcoming] = useState<Job[]>([]);
+  const [counts, setCounts] = useState<Report | null>(null);
   const [cs, setCs] = useState<CustomerSummary[]>([]);
   const [ms, setMs] = useState<Mechanic[]>([]);
   const [rs, setRs] = useState<ServiceRequest[]>([]);
@@ -50,9 +54,11 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenRequ
   const [jobTypes, setJobTypes] = useState<string[]>([]);
   const [selectedMechanic, setSelectedMechanic] = useState<Mechanic | null>(null);
   const load = () =>
-    Promise.all([jobs(), customers(), mechanics(), requests(), machines(), checklists()])
-      .then(([j, c, m, r, mc, cl]) => {
+    Promise.all([jobsPage(1), openJobs(), reports(), customers(), mechanics(), requestsPage(1), machines(), checklists()])
+      .then(([j, open, report, c, m, r, mc, cl]) => {
         setData(j.jobs);
+        setUpcoming(open.jobs);
+        setCounts(report);
         setCs(c.customers);
         setMs(m.mechanics);
         setRs(r.requests);
@@ -76,8 +82,7 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenRequ
     }
     load();
   };
-  const activeRequestCount = rs.filter((x) => !FINISHED.includes(x.status)).length;
-  const upcoming = data.filter((job) => !FINISHED.includes(job.status));
+  const activeRequestCount = counts?.totals.open_requests ?? 0;
   return (
     <>
       <Header u={u} />
@@ -99,10 +104,10 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenRequ
           </div>
         )}
         <div className="stats">
-          <Stat icon={<ClipboardList />} n={data.length} label={t("Total jobs")} />
+          <Stat icon={<ClipboardList />} n={counts?.jobs.total ?? 0} label={t("Total jobs")} />
           <Stat icon={<ClipboardList />} n={activeRequestCount} label={t("Pending requests")} />
-          <Stat icon={<Wrench />} n={data.filter((x) => ["In Progress", "Paused"].includes(x.status)).length} label={t("In progress")} />
-          <Stat icon={<CheckCircle2 />} n={data.filter((x) => x.status === "Completed").length} label={t("Completed jobs")} />
+          <Stat icon={<Wrench />} n={counts?.jobs.in_progress ?? 0} label={t("In progress")} />
+          <Stat icon={<CheckCircle2 />} n={counts?.jobs.completed ?? 0} label={t("Completed jobs")} />
         </div>
         <div className="grid2">
           <Panel
@@ -205,7 +210,7 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenRequ
                     <b>{mechanic.name}</b>
                     <span>{mechanic.email}</span>
                   </div>
-                  <strong>{t("{count} active", { count: data.filter((job) => job.mechanic_id === mechanic.id && !FINISHED.includes(job.status)).length })}</strong>
+                  <strong>{t("{count} active", { count: upcoming.filter((job) => job.mechanic_id === mechanic.id).length })}</strong>
                 </button>
               ))
             )}
@@ -276,9 +281,14 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenRequ
                 <input name="due_date" type="date" defaultValue={editingJob.due_date || ""} />
               </Field>
             </div>
-            <Field label={t("Job type")}>
-              <JobTypeSelect types={jobTypes} value={editingJob.job_type} />
-            </Field>
+            <div className="row">
+              <Field label={t("Job type")}>
+                <JobTypeSelect types={jobTypes} value={editingJob.job_type} />
+              </Field>
+              <Field label={t("Estimated time (minutes)")} optional>
+                <input name="estimated_minutes" type="number" min={5} max={1440} step={5} defaultValue={editingJob.estimated_minutes ?? ""} />
+              </Field>
+            </div>
             <button className="primary">{t("Save changes")}</button>
           </form>
         </Modal>

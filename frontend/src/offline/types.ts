@@ -15,9 +15,11 @@ export type ChangeKind =
   | "consent"
   | "clock_in"
   | "clock_out"
-  | "on_the_way";
+  | "on_the_way"
+  | "form";
 
-export type MediaInfo = { kind: string; contentType: string; size: number; name: string };
+/** A photo or video waiting to upload; a form's photo says which question it answers ("<form id>:<question id>"). */
+export type MediaInfo = { kind: string; contentType: string; size: number; name: string; formField?: string };
 
 /**
  * A change a technician made, kept on the phone until the server has it. Sent one at a time,

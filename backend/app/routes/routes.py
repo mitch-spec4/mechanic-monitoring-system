@@ -21,7 +21,7 @@ def day_asked(company, data):
 
 
 def technician(company_id, mechanic_id):
-    person = User.query.filter_by(id=mechanic_id, company_id=company_id, role="mechanic").first()
+    person = User.query.filter_by(id=mechanic_id, company_id=company_id, role="mechanic", removed_at=None).first()
     if not person:
         raise ValidationError(_("Technician not found"), 404)
     return person
