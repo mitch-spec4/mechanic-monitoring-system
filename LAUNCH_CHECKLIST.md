@@ -6,7 +6,7 @@ Everything to do before MechanicPro takes real customers. The steps are in [SETU
 
 - [ ] Deployed from `render.yaml` (or another host with the same settings), and `/api/health` answers `"status": "ok"` with the deployed commit as `version`.
 - [ ] **Try the demo** works on the live site, as a manager, a technician and a customer.
-- [ ] The daily run works: **mechanicpro-daily → Trigger Run** succeeds, and its log lists every part (`demo_companies`, `reminders`, `maintenance`, `billing`, `deleted_companies`...).
+- [ ] The daily run works: **mechanicpro-daily → Trigger Run** succeeds, and its log lists every part (`demo_companies`, `reminders`, `maintenance`, `billing`, `deleted_companies`...) with no `failed` entry. A failed part makes the run fail, so turn on Render's failure emails for the cron job.
 - [ ] `APP_ENV=production` (not `staging`), and the app starts with it, which means the secrets, `APP_URL` and email are set properly.
 - [ ] `SECRET_KEY` and `JWT_SECRET_KEY` are the generated values, kept somewhere safe outside Render (a password manager). `SECRET_KEY` must never change: it encrypts the two-step sign-in keys.
 - [ ] `seed.py` has never been run on the live database (it has a known demo password).
@@ -51,6 +51,10 @@ Everything to do before MechanicPro takes real customers. The steps are in [SETU
 - [ ] Nobody shares the Render, GitHub, email-provider or payment-provider accounts' passwords; each has two-step sign-in on.
 - [ ] Only the people who need it can deploy (GitHub repository access and Render workspace members).
 - [ ] `.env` files were never committed (`git log --all -- '*.env'` shows nothing).
+
+## Languages
+
+- [ ] A native Kiswahili speaker has reviewed the Kiswahili (SETUP.md, Kiswahili review): it was drafted without one.
 
 ## People
 
