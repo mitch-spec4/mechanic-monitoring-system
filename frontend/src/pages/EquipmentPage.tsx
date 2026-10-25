@@ -20,7 +20,7 @@ import {
   UserRound,
   Wrench,
 } from "lucide-react";
-import { apiUrl, catalog, createJob, createPlan, createPlanJob, deleteDocument, deletePlan, machineDetail, updatePlan, uploadDocument, type User } from "../services/api";
+import { apiUrl, catalog, createJob, createPlan, createPlanJob, deleteDocument, deleteMachine, deletePlan, machineDetail, updatePlan, uploadDocument, type User } from "../services/api";
 import type { CatalogService, EquipmentDetail, MaintenancePlan } from "../services/types";
 import { servicesFor } from "../components/JobForms";
 import { CertificateList } from "../components/JobFormsCard";
@@ -82,6 +82,24 @@ export default function EquipmentPage({ machineId, user, onBack, onOpenJob, onOp
       })
       .catch((problem) => setError(errorMessage(problem)));
   usePolling(load, 30000, true);
+  // Only equipment with no service history can go; the API says why not (Retired keeps its history).
+  const remove = async () => {
+    if (!machine) return;
+    const ok = await confirmAction({
+      title: t("Delete {name}?", { name: machine.name }),
+      message: t("Its documents and maintenance plans are deleted too. Equipment with service history can't be deleted: mark it Retired instead."),
+      confirmLabel: t("Delete equipment"),
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await deleteMachine(machine.id);
+      toast(t("{name} was deleted", { name: machine.name }));
+      onBack();
+    } catch (problem) {
+      toast(errorMessage(problem), "error");
+    }
+  };
 
   if (!machine) {
     return (
@@ -146,9 +164,14 @@ export default function EquipmentPage({ machineId, user, onBack, onOpenJob, onOp
           </div>
         </dl>
         {machine.can_edit && (
-          <button className="secondary equipmentEdit" onClick={() => setEditing(true)}>
-            <Pencil size={14} /> {t("Edit details")}
-          </button>
+          <div className="equipmentActions">
+            <button className="secondary equipmentEdit" onClick={() => setEditing(true)}>
+              <Pencil size={14} /> {t("Edit details")}
+            </button>
+            <button className="listAction danger" onClick={() => void remove()}>
+              <Trash2 size={14} /> {t("Delete")}
+            </button>
+          </div>
         )}
       </section>
 

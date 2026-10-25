@@ -161,7 +161,8 @@ export function FormFill({ job, form, editable, onClose, onSaved, reload }: Fill
 
   const save = async (complete: boolean) => {
     setProblem("");
-    if (complete) {
+    // A completed form stays complete: its required questions stay answered.
+    if (complete || completed) {
       const gaps = missingAnswers(form, answers, photos);
       if (gaps.length) {
         setMissing(gaps);

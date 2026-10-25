@@ -108,6 +108,29 @@ export async function setUpTwoFactor(page: Page, email: string) {
   return codes;
 }
 
+/** Settings → Set up on a new phone, in its dialog: the new key replaces the old one, and the
+ *  password is asked for too. A wrong password is refused first when `wrongPassword` is given. */
+export async function setUpOnNewPhone(page: Page, email: string, password: string, wrongPassword?: string) {
+  const dialog = page.getByRole("dialog", { name: "Set up two-step sign-in" });
+  const key = dialog.getByTestId("setup-key");
+  await expect(key).toBeVisible();
+  const secret = ((await key.textContent()) || "").replace(/\s/g, "");
+  if (wrongPassword) {
+    await dialog.locator(".codeInput").fill(totp(secret, await freshStep(email)));
+    await dialog.getByLabel("Your password").fill(wrongPassword);
+    await dialog.getByRole("button", { name: "Turn on two-step sign-in" }).click();
+    await expect(dialog.getByRole("alert")).toHaveText("Your current password is incorrect");
+  }
+  await dialog.locator(".codeInput").fill(totp(secret, await freshStep(email)));
+  await dialog.getByLabel("Your password").fill(password);
+  await dialog.getByRole("button", { name: "Turn on two-step sign-in" }).click();
+  await expect(dialog.getByTestId("backup-codes")).toBeVisible();
+  secrets.set(email, secret);
+  devices.delete(email);
+  await dialog.getByRole("button", { name: "I've saved my backup codes" }).click();
+  await expect(dialog).toHaveCount(0);
+}
+
 /** Go to a page by its English name, in any language: from the sidebar on computers, or on a
  *  technician's phone from the bottom bar (or its More sheet). */
 export async function goTo(page: Page, name: string) {

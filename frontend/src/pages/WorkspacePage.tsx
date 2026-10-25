@@ -26,12 +26,14 @@ import {
 import {
   company,
   customers,
+  deleteCustomer,
   jobs,
   jobsPage,
   machines,
   mechanics,
   notificationsPage,
   PAGE_SIZE,
+  removePerson,
   reports,
   requestsPage,
   resetTwoFactor,
@@ -309,6 +311,40 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
       toast(errorMessage(problem), "error");
     }
   };
+  // A technician who leaves: deleted, or (with work in the history) their access ends.
+  const removeTechnician = async (person: { id: number; name: string }) => {
+    const ok = await confirmAction({
+      title: t("Remove {name}?", { name: person.name }),
+      message: t("They're signed out and can't sign in again. Jobs, shifts and records they worked on keep their name."),
+      confirmLabel: t("Remove"),
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await removePerson(person.id);
+      toast(t("{name} was removed", { name: person.name }));
+      setReloadKey((key) => key + 1);
+    } catch (problem) {
+      toast(errorMessage(problem), "error");
+    }
+  };
+  // Only a customer with no equipment or service history can be deleted (the API says why not).
+  const removeCustomer = async (customer: { id: number; name: string }) => {
+    const ok = await confirmAction({
+      title: t("Delete {name}?", { name: customer.name }),
+      message: t("Their sign-in, sites and messages are deleted too. A customer with equipment or service history can't be deleted."),
+      confirmLabel: t("Delete customer"),
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await deleteCustomer(customer.id);
+      toast(t("{name} was deleted", { name: customer.name }));
+      setReloadKey((key) => key + 1);
+    } catch (problem) {
+      toast(errorMessage(problem), "error");
+    }
+  };
   const rowActions = (item: ListItem) => {
     if (!isBoss) return null;
     // Customers and technicians can be helped back in: a customer through their sign-in account.
@@ -334,6 +370,16 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
         {"pay_rate_cents" in item && can(user, "costing") && (
           <button className="listAction" onClick={() => setPaying(item)}>
             {t("Pay rate")}
+          </button>
+        )}
+        {"pay_rate_cents" in item && (
+          <button className="listAction danger" onClick={() => removeTechnician(item)}>
+            {t("Remove")}
+          </button>
+        )}
+        {"machine_count" in item && (
+          <button className="listAction danger" onClick={() => removeCustomer(item)}>
+            {t("Delete")}
           </button>
         )}
       </>

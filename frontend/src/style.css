@@ -832,7 +832,7 @@ header {
 }
 .settingsView {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1px;
   background: #e8edf2;
 }
@@ -848,6 +848,7 @@ header {
 }
 .settingsView strong {
   font-size: 11px;
+  overflow-wrap: anywhere;
 }
 .success {
   background: #eefaf1;
@@ -1409,6 +1410,7 @@ body {
 /* ---------- Settings ---------- */
 .settingsStack {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   max-width: 720px;
 }

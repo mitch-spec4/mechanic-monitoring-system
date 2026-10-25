@@ -6,6 +6,17 @@
   align-items: center;
   gap: 6px;
 }
+.appMain .equipmentPage .equipmentActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-self: start;
+}
+.appMain .equipmentPage .equipmentActions .listAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .equipmentPage .jobHeroTop .machineStatus {
   font-size: 11px;
 }

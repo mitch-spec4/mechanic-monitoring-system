@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { X, Star, CheckCircle2, Clock, Wrench } from "lucide-react";
-import { jobs, reviews } from "../services/api";
+import { technicianJobs, technicianReviews } from "../services/api";
 import type { Job, Mechanic, Review } from "../services/types";
 import { t } from "../i18n";
 
@@ -11,12 +11,17 @@ export default function MechanicProfile({ mechanic, onClose }: Props) {
   const [reviewsData, setReviewsData] = useState<Review[]>([]);
 
   useEffect(() => {
-    Promise.all([jobs(), reviews()])
+    let current = true;
+    Promise.all([technicianJobs(mechanic.id), technicianReviews(mechanic.id)])
       .then(([j, r]) => {
-        setJobsData(j.jobs.filter((job) => job.mechanic_id === mechanic.id));
-        setReviewsData(r.reviews.filter((review) => review.mechanic_id === mechanic.id));
+        if (!current) return;
+        setJobsData(j.jobs);
+        setReviewsData(r.reviews);
       })
       .catch(() => {});
+    return () => {
+      current = false;
+    };
   }, [mechanic.id]);
 
   const completed = jobsData.filter((x) => x.status === "Completed").length;

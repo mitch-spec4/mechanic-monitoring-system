@@ -943,6 +943,30 @@ body {
     grid-row: auto;
   }
 }
+/* Phones: the search box and the add button wrap under the list's title, and a long email
+   address breaks, so nothing runs off the right edge of the screen. */
+@media (max-width: 760px) {
+  .appShell .subPagePanelHead {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .appShell .subPageTools {
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .appShell .searchBox {
+    flex: 1 1 150px;
+    min-width: 0;
+  }
+  .appShell .searchBox input,
+  .appShell .searchBox input:is(:hover, :focus) {
+    width: 100%;
+    min-width: 0;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .appShell :is(.appMain .welcome, .dashHeading),

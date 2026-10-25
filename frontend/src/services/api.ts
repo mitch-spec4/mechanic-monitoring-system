@@ -198,8 +198,8 @@ type WithJob = { job: JobDetail };
 export const login = (email: string, password: string) => post<Signed | { two_factor_required: true; ticket: string }>("/auth/login", { email, password });
 export const verifyTwoFactor = (ticket: string, code: string, remember: boolean) => post<Signed>("/auth/two-factor/verify", { ticket, code, remember });
 export const startTwoFactorSetup = () => post<TwoFactorSetup>("/auth/two-factor/setup", {});
-export const enableTwoFactor = (setupToken: string, code: string) =>
-  post<Signed & { backup_codes: string[] }>("/auth/two-factor/enable", { setup_token: setupToken, code });
+export const enableTwoFactor = (setupToken: string, code: string, password?: string) =>
+  post<Signed & { backup_codes: string[] }>("/auth/two-factor/enable", { setup_token: setupToken, code, password });
 export const twoFactorStatus = () => api<TwoFactorStatus>("/auth/two-factor");
 export const renewBackupCodes = (password: string) => post<{ backup_codes: string[] }>("/auth/two-factor/backup-codes", { password });
 export const resetTwoFactor = (userId: number) => post<Ok>(`/users/${userId}/reset-two-factor`, {});
@@ -281,6 +281,11 @@ export const payTestCheckout = (reference: string, outcome: "success" | "decline
   post<{ payment: Payment; subscription: Subscription | null }>(`/billing/test/${encodeURIComponent(reference)}/pay`, { outcome });
 
 export const jobs = () => api<{ jobs: Job[] }>("/jobs");
+/** Jobs not finished yet: what the manager's dashboard shows, without every job ever done. */
+export const openJobs = () => api<{ jobs: Job[] }>("/jobs?open=1");
+/** One technician's jobs and reviews, for their profile. */
+export const technicianJobs = (mechanicId: number) => api<{ jobs: Job[] }>(`/jobs?mechanic_id=${mechanicId}`);
+export const technicianReviews = (mechanicId: number) => api<{ reviews: Review[] }>(`/reviews?mechanic_id=${mechanicId}`);
 export const notifications = () => api<{ notifications: Notification[] }>("/notifications");
 export const machines = () => api<{ machines: Machine[] }>("/machines");
 export const services = () => api<{ records: ServiceRecord[] }>("/services");
@@ -336,6 +341,10 @@ export const company = () => api<{ company: Company }>("/company");
 export const createJob = (data: Payload) => post<{ job: Job }>("/jobs", data);
 export const updateJob = (id: number, data: Payload) => patch<{ job: Job }>(`/jobs/${id}`, data);
 export const deleteJob = (id: number) => remove(`/jobs/${id}`);
+// Someone with work in the history isn't deleted: their access ends and the history keeps them (kept).
+export const removePerson = (id: number) => remove<{ ok: boolean; kept: boolean }>(`/users/${id}`);
+export const deleteCustomer = (id: number) => remove(`/customers/${id}`);
+export const deleteMachine = (id: number) => remove(`/machines/${id}`);
 export const invite = (data: Payload) => post<{ code: string; expires_at: string; emailed: boolean }>("/customers/invite", data);
 export const createMachine = (data: Payload) => post<{ id: number; machine: Machine }>("/machines", data);
 export const createRequest = (data: Payload) => post<{ id: number }>("/customers/requests", data);

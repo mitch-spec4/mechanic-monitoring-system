@@ -38,13 +38,19 @@
   color: var(--role-color, #0969d7);
 }
 .mapPickerTyped .row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 8px;
 }
 .mapPickerTyped label {
   display: grid;
   gap: 4px;
+  min-width: 0;
   font-size: 12px;
   font-weight: 700;
+}
+.mapPickerTyped input {
+  width: 100%;
+  min-width: 0;
 }
 .pickerPin span {
   display: block;

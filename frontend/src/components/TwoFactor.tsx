@@ -60,10 +60,12 @@ export function BackupCodes({ codes }: { codes: string[] }) {
 }
 
 /** Scan the QR code, type the code the app shows, then save the backup codes. Nothing changes
- *  until the code is confirmed; setting it up again (a new phone) replaces the old app and codes. */
-export function TwoFactorSetupSteps({ onEnabled }: { onEnabled: (user: User) => void }) {
+ *  until the code is confirmed; setting it up again (a new phone) replaces the old app and codes,
+ *  so it asks for the password too. */
+export function TwoFactorSetupSteps({ onEnabled, replacing = false }: { onEnabled: (user: User) => void; replacing?: boolean }) {
   const [details, setDetails] = useState<SetupDetails | null>(null);
   const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<{ user: User; codes: string[] } | null>(null);
@@ -84,7 +86,7 @@ export function TwoFactorSetupSteps({ onEnabled }: { onEnabled: (user: User) => 
     setError("");
     setBusy(true);
     try {
-      const data = await enableTwoFactor(details.setup_token, code);
+      const data = await enableTwoFactor(details.setup_token, code, replacing ? password : undefined);
       setDone({ user: data.user, codes: data.backup_codes });
     } catch (problem) {
       setError(errorMessage(problem));
@@ -152,6 +154,13 @@ export function TwoFactorSetupSteps({ onEnabled }: { onEnabled: (user: User) => 
             />
           </Field>
         </li>
+        {replacing && (
+          <li>
+            <Field wrap label={<strong>{t("Your password")}</strong>} hint={t("This replaces the phone you use now, so it needs your password.")}>
+              <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required />
+            </Field>
+          </li>
+        )}
       </ol>
       <button className="primary" disabled={busy || !details}>
         <ShieldCheck size={15} /> {t("Turn on two-step sign-in")}
@@ -242,6 +251,7 @@ export function TwoFactorSettings({ user, onUserChanged }: SettingsProps) {
       {settingUp && (
         <Modal title={t("Set up two-step sign-in")} icon={<ShieldCheck size={20} />} onClose={() => setSettingUp(false)}>
           <TwoFactorSetupSteps
+            replacing={Boolean(status?.enabled)}
             onEnabled={(changed) => {
               setSettingUp(false);
               onUserChanged({ ...user, ...changed });
