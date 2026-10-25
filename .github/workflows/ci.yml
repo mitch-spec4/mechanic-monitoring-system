@@ -98,11 +98,37 @@ jobs:
           PGPASSWORD=postgres psql -h localhost -U postgres -c "create database mechanic_test"
           pytest -q
 
+  docker:
+    # The image Render (render.yaml) builds and runs: build it, start it as staging, and check
+    # that the API, its database and the web app all answer from one address.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build -t mechanicpro .
+      - name: Start it and check it answers
+        run: |
+          docker run -d --name app -p 8000:8000 \
+            -e APP_ENV=staging \
+            -e SECRET_KEY="$(openssl rand -hex 32)" -e JWT_SECRET_KEY="$(openssl rand -hex 32)" \
+            -e DATABASE_URL=sqlite:////tmp/mechanicpro.db -e APP_URL=https://staging.example.com \
+            mechanicpro
+          for attempt in $(seq 1 30); do curl -fsS localhost:8000/api/health && break; sleep 2; done
+          curl -fsS localhost:8000/api/health | grep -q '"database":"ok"'
+          curl -fsS localhost:8000/ | grep -q '<div id="root">'
+          curl -fsS localhost:8000/api/plans | grep -q '"currency":"KES"'
+          curl -fsSI localhost:8000/sw.js | grep -qi 'cache-control: no-cache'
+      - name: The app's log
+        if: always()
+        run: docker logs app || true
+
   e2e:
     name: e2e (${{ matrix.project }})
     runs-on: ubuntu-latest
-    # A run takes a few minutes; a stuck browser install shouldn't hold the checks for hours.
-    timeout-minutes: 15
+    # The tests take about 5–7 minutes, and installing a browser's system packages has taken up to
+    # 9 on a slow day; a stuck install still shouldn't hold the checks for hours.
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:

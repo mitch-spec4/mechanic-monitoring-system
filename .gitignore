@@ -10,10 +10,12 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 
-# Local databases
+# Local databases, and database backups (they hold real customers' data)
 backend/instance/
 *.db
 *.sqlite3
+backend/backups/
+*.dump
 
 # Environment files (keep the .env.example templates)
 .env

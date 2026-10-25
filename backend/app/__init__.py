@@ -1,14 +1,17 @@
+import logging
 import os
+import sys
 from datetime import timedelta
+from pathlib import Path
 
 import click
 from dotenv import load_dotenv
-from flask import Flask, jsonify
+from flask import Flask, abort, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import MetaData, event, inspect
+from sqlalchemy import MetaData, event, inspect, text
 from sqlalchemy.engine import Engine
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -51,16 +54,25 @@ def _minutes(name, default):
 
 
 def build_config():
-    """Read settings from the environment. Production (the default) fails closed."""
+    """Read settings from the environment. Production (the default) fails closed.
+
+    APP_ENV=staging is a public test copy: production's security (real secrets, secure cookies,
+    two-step sign-in), but emails may go to the server log and payments to the test checkout, so
+    it runs before there's an email provider or a payment account (see SETUP.md, Deploying)."""
     env = os.getenv("APP_ENV", "production").strip().lower()
     is_production = env not in {"development", "test"}
+    is_staging = env == "staging"
 
     secret_key = os.getenv("SECRET_KEY", "")
     jwt_secret_key = os.getenv("JWT_SECRET_KEY", "")
+    # The site's address; on Render, its own onrender.com address until a domain is set.
+    app_url = (os.getenv("APP_URL", "").strip() or os.getenv("RENDER_EXTERNAL_URL", "").strip()).rstrip("/")
     origins = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "").split(",") if origin.strip()]
+    if not origins and is_production and app_url:
+        # The web app is served from the same site as the API (the Docker image).
+        origins = [app_url]
     database_url = os.getenv("DATABASE_URL", "")
-    app_url = os.getenv("APP_URL", "").strip().rstrip("/")
-    email_backend = os.getenv("EMAIL_BACKEND", "smtp" if is_production else "log").strip().lower()
+    email_backend = os.getenv("EMAIL_BACKEND", "smtp" if is_production and not is_staging else "log").strip().lower()
     email_from = os.getenv("EMAIL_FROM", "").strip()
     smtp_host = os.getenv("SMTP_HOST", "").strip()
     test_outbox = os.getenv("TEST_OUTBOX") == "1"
@@ -76,7 +88,9 @@ def build_config():
             problems.append("DATABASE_URL must be set")
         if not app_url.startswith("https://"):
             problems.append("APP_URL must be the https:// address of your site (it goes into links in emails)")
-        if email_backend != "smtp" or not smtp_host or not email_from:
+        if is_staging and email_backend == "log":
+            email_from = email_from or "MechanicPro (staging) <no-reply@mechanicpro.test>"
+        elif email_backend != "smtp" or not smtp_host or not email_from:
             problems.append("Email must be set up: EMAIL_BACKEND=smtp with SMTP_HOST and EMAIL_FROM (see SETUP.md, Email)")
         if test_outbox:
             problems.append("TEST_OUTBOX is only for the browser tests")
@@ -96,6 +110,14 @@ def build_config():
     return {
         "APP_ENV": env,
         "IS_PRODUCTION": is_production,
+        "IS_STAGING": is_staging,
+        # Which build is running, for the health check and error reports (Render sets RENDER_GIT_COMMIT).
+        "VERSION": (os.getenv("GIT_SHA") or os.getenv("RENDER_GIT_COMMIT") or "dev")[:12],
+        # The built web app (frontend/dist), served from the same site as the API. Set in the Docker
+        # image; unset in development, where Vite serves it.
+        "FRONTEND_DIST": os.getenv("FRONTEND_DIST", "").strip(),
+        # Error reports to Sentry (sentry.io) when set; otherwise errors go to the server log only.
+        "SENTRY_DSN": os.getenv("SENTRY_DSN", "").strip(),
         "SECRET_KEY": secret_key,
         "JWT_SECRET_KEY": jwt_secret_key,
         "JWT_ACCESS_TOKEN_EXPIRES": _minutes("JWT_ACCESS_MINUTES", 30),
@@ -145,7 +167,7 @@ def build_config():
         "ROUTE_AVERAGE_KMH": float(os.getenv("ROUTE_AVERAGE_KMH", "25")),
         # Taking payment for plans: "test" (a pretend card page, development only), "paystack"
         # (test keys only for now) or "none" (free trials only). See SETUP.md.
-        "BILLING_PROVIDER": os.getenv("BILLING_PROVIDER", "none" if is_production else "test").strip().lower(),
+        "BILLING_PROVIDER": os.getenv("BILLING_PROVIDER", "none" if is_production and not is_staging else "test").strip().lower(),
         "PAYSTACK_SECRET_KEY": os.getenv("PAYSTACK_SECRET_KEY", "").strip(),
         # Two-step sign-in for everyone (demo copies excepted). Only the API tests turn it off.
         "TWO_FACTOR_REQUIRED": os.getenv("TWO_FACTOR_REQUIRED", "1") != "0" or is_production,
@@ -161,12 +183,65 @@ def build_config():
     }
 
 
+def init_logging(app):
+    """In production, one line per message on stdout (the host keeps the logs), and errors to Sentry
+    when SENTRY_DSN is set. Error reports carry the stack trace and the request's method and path,
+    not its cookies, its body, the visitor's IP address or the values the code was handling."""
+    if app.config["IS_PRODUCTION"] and not app.config.get("TESTING"):
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+        app.logger.handlers = [handler]
+        app.logger.setLevel(logging.INFO)
+    if app.config["SENTRY_DSN"]:
+        import sentry_sdk
+        from sentry_sdk.integrations.flask import FlaskIntegration
+
+        sentry_sdk.init(
+            dsn=app.config["SENTRY_DSN"],
+            integrations=[FlaskIntegration()],
+            environment=app.config["APP_ENV"],
+            release=app.config["VERSION"],
+            send_default_pii=False,
+            max_request_body_size="never",
+            include_local_variables=False,
+            traces_sample_rate=0,
+        )
+
+
+def register_frontend(app):
+    """With FRONTEND_DIST set (the Docker image), the built web app is served from the same site as
+    the API, so sign-in cookies stay first-party. Hashed files under assets/ are cached for a year;
+    the page itself, the service worker and the manifest are always checked, so phones get new
+    versions. The app's pages live after "#", so every other path gets the page."""
+    dist = app.config["FRONTEND_DIST"]
+    if not dist:
+        return
+    root = Path(dist).resolve()
+    if not (root / "index.html").is_file():
+        raise RuntimeError(f"FRONTEND_DIST={dist} has no index.html: build the frontend first (npm run build)")
+
+    @app.get("/", defaults={"path": ""})
+    @app.get("/<path:path>")
+    def web_app(path):
+        if path == "api" or path.startswith("api/"):
+            abort(404)
+        if not path or not (root / path).is_file():
+            path = "index.html"
+        if path.startswith("assets/"):
+            response = send_from_directory(root, path, max_age=31536000)
+            response.cache_control.immutable = True
+            return response
+        # Flask sends other files as "no-cache": checked with the server every time.
+        return send_from_directory(root, path)
+
+
 def create_app(overrides=None):
     load_dotenv()
     app = Flask(__name__)
     app.config.update(build_config())
     if overrides:
         app.config.update(overrides)
+    init_logging(app)
 
     if app.config["TRUSTED_PROXY_COUNT"]:
         # Behind a load balancer: take the client IP (used for rate limiting) from X-Forwarded-For.
@@ -327,6 +402,16 @@ def create_app(overrides=None):
         done = renew_due()
         print(f"Renewed {done['charged']} plan(s); {done['failed']} payment(s) failed; sent {done['reminded']} reminder(s).")
 
+    @app.cli.command("daily")
+    def daily():
+        """Everything the daily run does (clean-up, reminders, maintenance jobs, plan renewals,
+        expired demos, deletions due): the same as /api/cron/daily. Run once a day."""
+        import json
+
+        from app.routes.maintenance import run_daily
+
+        print(json.dumps(run_daily(), indent=2))
+
     @app.cli.command("purge-activity")
     def purge_activity():
         """Delete activity log entries older than 12 months (run daily)."""
@@ -352,7 +437,18 @@ def create_app(overrides=None):
 
     @app.get("/api/health")
     def health():
-        return {"status": "ok"}
+        """For the host's health check: the app answers and its database does (503 if not)."""
+        try:
+            db.session.execute(text("select 1"))
+            database = "ok"
+        except Exception:
+            db.session.rollback()
+            app.logger.exception("Health check: the database didn't answer")
+            database = "unreachable"
+        status = 200 if database == "ok" else 503
+        return {"status": "ok" if status == 200 else "error", "database": database, "version": app.config["VERSION"]}, status
+
+    register_frontend(app)
 
     @app.after_request
     def never_cache_api_data(response):
@@ -361,6 +457,13 @@ def create_app(overrides=None):
         # technician's app keeps its own copy (frontend/src/offline).
         if response.mimetype == "application/json" and "Cache-Control" not in response.headers:
             response.headers["Cache-Control"] = "no-store"
+        # Every answer: no guessing file types, no framing by other sites, no full addresses sent
+        # to other sites; and in production, HTTPS only from the first visit on.
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        if app.config["IS_PRODUCTION"]:
+            response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
         return response
 
     return app
@@ -399,7 +502,7 @@ def register_error_handlers(app):
     @app.errorhandler(Exception)
     def unexpected_error(error):
         db.session.rollback()
-        app.logger.exception("Unhandled error")
+        app.logger.exception("Unhandled error on %s %s", request.method, request.path)
         return jsonify(error=_("Something went wrong. Please try again.")), 500
 
     @jwt.expired_token_loader

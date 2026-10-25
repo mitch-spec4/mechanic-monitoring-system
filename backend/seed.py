@@ -40,5 +40,5 @@ with app.app_context():
         print(
             "Demo data ready: 3 customers with 4 sites, 3 mechanics, 6 machines (2 with maintenance plans, 1 with a repeat fault), 8 jobs with worksheets and history (2 of them visits "
             "customers booked), 3 checklists, shifts and locations, 7 service records, 3 reviews, 3 requests, a customer chat, "
-            "notifications, and a paid Professional plan."
+            "notifications, and a paid Business plan."
         )

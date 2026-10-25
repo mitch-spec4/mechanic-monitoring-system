@@ -1,0 +1,43 @@
+name: Backup
+
+# A copy of the production database every night, kept in a bucket for 30 days (backend/scripts/backup.py).
+# Until the repository secrets below are set, it says so and stops. SETUP.md, "Backups and the restore test".
+on:
+  schedule:
+    - cron: "15 0 * * *" # 03:15 in Nairobi
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    env:
+      DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+      BACKUP_BUCKET: ${{ secrets.BACKUP_BUCKET }}
+      BACKUP_ENDPOINT_URL: ${{ secrets.BACKUP_ENDPOINT_URL }}
+      BACKUP_REGION: ${{ secrets.BACKUP_REGION }}
+      BACKUP_ACCESS_KEY_ID: ${{ secrets.BACKUP_ACCESS_KEY_ID }}
+      BACKUP_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_SECRET_ACCESS_KEY }}
+    steps:
+      - name: Check the settings
+        id: ready
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$BACKUP_BUCKET" ]; then
+            echo "::notice::Backups are off: set the BACKUP_DATABASE_URL and BACKUP_BUCKET secrets (SETUP.md, Backups)."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.ready.outputs.go == 'true'
+      - uses: actions/setup-python@v5
+        if: steps.ready.outputs.go == 'true'
+        with:
+          python-version: "3.12"
+      - name: Back up
+        if: steps.ready.outputs.go == 'true'
+        working-directory: backend
+        run: |
+          # pg_dump and pg_restore 16 or newer, for the Postgres 16 database (usually already on the runner).
+          pg_dump --version | grep -Eq " (1[6-9]|[2-9][0-9])\." || { sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends postgresql-client-16; }
+          pip install boto3
+          python scripts/backup.py
