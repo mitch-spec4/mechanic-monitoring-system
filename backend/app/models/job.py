@@ -29,6 +29,12 @@ class Job(db.Model):
     reminder_sent_at = db.Column(db.DateTime)
     # Made by a maintenance plan: completing it moves the plan's next due date on.
     plan_id = db.Column(db.Integer, db.ForeignKey("maintenance_plan.id"), nullable=True, index=True)
+    # Its place in its technician's planned route for route_date (app/services/routing.py). Where
+    # it is comes from its equipment's site.
+    route_date = db.Column(db.Date)
+    route_order = db.Column(db.Integer)
+    # What the customer is charged, in cents (job costing; managers only).
+    charged_cents = db.Column(db.Integer)
     # Customer sign-off at completion: a signature (stored as a JobFile of kind "signature")
     # with the signer's name, or the reason nobody could sign.
     signed_by_name = db.Column(db.String(120))

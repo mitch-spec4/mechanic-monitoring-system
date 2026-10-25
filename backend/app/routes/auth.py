@@ -47,6 +47,8 @@ def user_payload(user):
         # Times are shown in the company's time zone, so everyone on the team sees the same times.
         "timezone": company.timezone if company else "Africa/Nairobi",
         "units": company.units if company else "metric",
+        # Job costs and pay rates are in the company's currency.
+        "currency": company.currency if company else "KES",
         # Two-step sign-in: whether it's on, and whether this person must set it up before going on.
         "two_factor_enabled": user.totp_enabled_at is not None,
         "two_factor_setup_needed": two_factor.needs_setup(user),

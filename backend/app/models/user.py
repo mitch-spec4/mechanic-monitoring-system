@@ -19,6 +19,8 @@ class User(db.Model):
     email_verified_at = db.Column(db.DateTime)
     # The language this person reads the app, emails and notifications in (see app/i18n).
     language = db.Column(db.String(5), nullable=False, default="en", server_default="en")
+    # Technicians: what an hour of their time costs the company, in cents (job costing; managers only).
+    pay_rate_cents = db.Column(db.Integer)
     # Two-step sign-in with an authenticator app (see app/services/two_factor.py). The secret is
     # stored encrypted; the last code's time step is kept so a code can't be used twice.
     totp_secret = db.Column(db.String(255))

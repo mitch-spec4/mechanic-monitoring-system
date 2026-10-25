@@ -99,6 +99,7 @@
 .jobMeta dd,
 .recordView dd {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   margin: 2px 0 0;
@@ -433,6 +434,127 @@
 .noteForm {
   grid-template-columns: 1fr auto;
   align-items: end;
+}
+
+/* Directions to the job's site, beside its name. */
+.appShell .jobDirections {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: 6px;
+  padding: 2px 9px;
+  font-size: 11px;
+  text-decoration: none;
+}
+
+/* Costs and margin (managers only): a table of what it cost, then charged and margin side by side. */
+.costing {
+  display: grid;
+  gap: 12px;
+}
+.costingTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.costingTable th,
+.costingTable td {
+  padding: 7px 8px;
+  border-bottom: 1px solid #edf1f5;
+  text-align: start;
+  vertical-align: middle;
+}
+.costingTable thead th {
+  font-size: 11px;
+  font-weight: 700;
+  color: #68768a;
+}
+.costingTable tbody th {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.costingTable td:last-child,
+.costingTable th:last-child {
+  text-align: end;
+  white-space: nowrap;
+}
+.costingTable tfoot th,
+.costingTable tfoot td {
+  border-bottom: 0;
+  font-weight: 800;
+}
+.costingTable input {
+  width: 100%;
+  max-width: 130px;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+.costingGap {
+  font-style: normal;
+  font-weight: 700;
+  color: #b54708;
+}
+.costingResult {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 12px;
+}
+.costingMargin {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #ecfdf3;
+  color: #1a7f37;
+}
+.costingMargin span {
+  font-size: 11px;
+  font-weight: 700;
+}
+.costingMargin strong {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.costingMargin small {
+  font-size: 12px;
+  color: #475467;
+}
+.costingMargin.loss {
+  background: #fef3f2;
+  color: #b42318;
+}
+.costingMargin.unknown {
+  background: #f4f6f9;
+  color: #475467;
+}
+.costingGaps {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-block: 10px;
+  padding-inline: 28px 12px;
+  border-radius: 10px;
+  background: #fffaeb;
+  color: #93370d;
+  font-size: 12px;
+}
+.appMain .costingSave {
+  justify-self: start;
+  width: auto;
+  padding: 10px 16px;
+  font-size: 13px;
+}
+@media (max-width: 560px) {
+  .costingResult {
+    grid-template-columns: 1fr;
+  }
+  .costingTable th,
+  .costingTable td {
+    padding: 6px 4px;
+  }
 }
 
 /* Service summary */

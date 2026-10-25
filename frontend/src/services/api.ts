@@ -10,6 +10,7 @@ import type {
   CustomerSummary,
   EquipmentDetail,
   ErrorBody,
+  Insights,
   IssuedCode,
   Job,
   JobDetail,
@@ -17,6 +18,9 @@ import type {
   Machine,
   Mechanic,
   Notification,
+  Paging,
+  Position,
+  RoutePlan,
   Payload,
   Payment,
   Pricing,
@@ -66,6 +70,7 @@ export type User = {
   language: string;
   timezone: string;
   units: string;
+  currency?: string;
   two_factor_enabled: boolean;
   two_factor_setup_needed: boolean;
   /** Set while the company waits to be deleted: when it happens. */
@@ -230,7 +235,7 @@ export type BookingSettings = {
   notice_hours: number;
   window_days: number;
 };
-export type CompanySettings = { timezone: string; currency: string; units: string; language: string; booking: BookingSettings };
+export type CompanySettings = { timezone: string; currency: string; units: string; language: string; booking: BookingSettings; base: Position | null };
 export type CompanySettingsOptions = { timezones: string[]; currencies: string[]; units: string[]; languages: { code: string; name: string }[] };
 export const companySettings = () => api<{ settings: CompanySettings } & CompanySettingsOptions>("/company/settings");
 export const saveCompanySettings = (settings: Partial<Omit<CompanySettings, "booking">> & { booking?: Partial<BookingSettings> }) =>
@@ -265,6 +270,48 @@ export const mechanics = () => api<{ mechanics: Mechanic[] }>("/users/mechanics"
 export const reviews = () => api<{ reviews: Review[] }>("/reviews");
 export const requests = () => api<{ requests: ServiceRequest[] }>("/customers/requests");
 export const reports = () => api<Report>("/reports");
+
+// Technicians' routes and job costing (managers; technicians see their own route)
+export const routePlan = (mechanicId: number, date: string) => api<{ plan: RoutePlan }>(`/routes?mechanic_id=${mechanicId}&date=${date}`);
+export const saveRoute = (mechanicId: number, date: string, jobIds: number[]) => post<{ plan: RoutePlan }>("/routes", { mechanic_id: mechanicId, date, job_ids: jobIds });
+export const myRoute = (date: string) => api<{ plan: RoutePlan }>(`/routes/mine?date=${date}`);
+export const saveCosting = (jobId: number, data: { charged?: string | null; parts?: { id: number; unit_cost: string | null }[] }) =>
+  patch<{ job: JobDetail }>(`/jobs/${jobId}/costing`, data);
+export const setPayRate = (userId: number, payRate: string | null) => patch<{ user: unknown }>(`/users/${userId}`, { pay_rate: payRate });
+
+// Long lists a page at a time (?page=, ?q= to search); without a page the whole list comes back.
+export const PAGE_SIZE = 25;
+const paged = (path: string, page: number, q: string) =>
+  `${path}?page=${page}&per_page=${PAGE_SIZE}${q.trim() ? `&q=${encodeURIComponent(q.trim())}` : ""}`;
+export const jobsPage = (page: number, q = "") => api<{ jobs: Job[] } & Paging>(paged("/jobs", page, q));
+export const servicesPage = (page: number, q = "") => api<{ records: ServiceRecord[] } & Paging>(paged("/services", page, q));
+export const reviewsPage = (page: number, q = "") => api<{ reviews: Review[] } & Paging>(paged("/reviews", page, q));
+export const notificationsPage = (page: number, q = "") => api<{ notifications: Notification[] } & Paging>(paged("/notifications", page, q));
+export const requestsPage = (page: number, q = "") => api<{ requests: ServiceRequest[] } & Paging>(paged("/customers/requests", page, q));
+
+// Insights for managers, for a range of days (YYYY-MM-DD, in the company's time zone).
+const range = (start: string, end: string) => `start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+export const insights = (start: string, end: string) => api<{ insights: Insights }>(`/insights?${range(start, end)}`);
+
+/** Save the insights as an Excel workbook or a PDF: the browser's own download. */
+export async function downloadInsights(kind: "xlsx" | "pdf", start: string, end: string) {
+  const response = await fetch(apiUrl(`/api/insights/export.${kind}?${range(start, end)}`), { credentials: "include" }).catch(() => {
+    throw new ApiError(t("The download failed. Check your connection and try again."), 0, {});
+  });
+  if (!response.ok) {
+    const data: ErrorBody = await response.json().catch(() => ({}));
+    throw new ApiError(data.error || t("The download failed. Check your connection and try again."), response.status, data);
+  }
+  const name = /filename="?([^";]+)"?/.exec(response.headers.get("Content-Disposition") || "")?.[1] || `insights.${kind}`;
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(await response.blob());
+  link.download = name;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(link.href), 10_000);
+  return name;
+}
 export const company = () => api<{ company: Company }>("/company");
 
 export const createJob = (data: Payload) => post<{ job: Job }>("/jobs", data);

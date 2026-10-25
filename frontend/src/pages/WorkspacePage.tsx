@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   BarChart3,
@@ -14,6 +14,7 @@ import {
   Map as MapIcon,
   MessageSquare,
   Plus,
+  Route as RouteIcon,
   Search,
   Star,
   UserRound,
@@ -25,14 +26,17 @@ import {
   company,
   customers,
   jobs,
+  jobsPage,
   machines,
   mechanics,
-  notifications,
+  notificationsPage,
+  PAGE_SIZE,
   reports,
-  requests,
+  requestsPage,
   resetTwoFactor,
-  reviews,
-  services,
+  reviewsPage,
+  servicesPage,
+  setPayRate,
   updateCustomer,
   type User,
 } from "../services/api";
@@ -57,6 +61,9 @@ import "./CustomerPage.css";
 import { AddMachine, EditForm, EditMachine } from "../components/MachineForms";
 import ShiftsView from "../components/ShiftsView";
 import TeamMap from "../components/TeamMap";
+import RoutePlanner from "../components/RoutePlanner";
+import Insights from "../components/Insights";
+import Pager from "../components/Pager";
 import InviteForm from "../components/InviteForm";
 import VerifyBanner from "../components/VerifyBanner";
 import ResetPassword from "../components/ResetPassword";
@@ -64,7 +71,7 @@ import SettingsPanel from "../components/SettingsPanel";
 import { ActivityLog } from "../components/CompanyData";
 import { confirmAction, toast } from "../components/Feedback";
 import { ROLE_NAMES } from "../components/Sidebar";
-import { errorMessage, formatBytes, formatDate } from "../lib/format";
+import { currencyName, errorMessage, formatBytes, formatDate, formatMoney } from "../lib/format";
 import { mark, t } from "../i18n";
 import { EmptyState, Loading } from "../components/States";
 import Field from "../components/Field";
@@ -89,13 +96,18 @@ type Resource = {
   /** One line under the page title. */
   description: string;
   icon: Icon;
-  /** The page's list, loaded when it opens. */
+  /** The page's list, loaded whole when it opens (and shown a page at a time). */
   list?: () => Promise<ListItem[]>;
+  /** Or, for lists that grow without end, one page at a time from the server, searched there. */
+  page?: (page: number, q: string) => Promise<Found>;
   /** What "Add" says on pages where managers can add to the list. */
   addLabel?: string;
 };
 
+type Found = { items: ListItem[]; total: number; pages: number };
+
 const isActiveJob = (job: Job) => !["Completed", "Cancelled"].includes(job.status);
+// A technician's own jobs come whole: the phone keeps them for when there's no signal.
 const jobList = () => jobs().then((data) => data.jobs);
 
 // Keys are the page names the sidebar uses (in English); labels and descriptions are shown translated.
@@ -104,7 +116,7 @@ const resources: Record<string, Resource> = {
     label: mark("Jobs / requests"),
     description: mark("Every job across your team."),
     icon: ClipboardList,
-    list: jobList,
+    page: (page, q) => jobsPage(page, q).then((data) => ({ items: data.jobs, total: data.total, pages: data.pages })),
   },
   "My Jobs": {
     label: mark("Jobs"),
@@ -143,25 +155,25 @@ const resources: Record<string, Resource> = {
     label: mark("Service records"),
     description: mark("A searchable history of completed service work."),
     icon: FileText,
-    list: () => services().then((data) => data.records),
+    page: (page, q) => servicesPage(page, q).then((data) => ({ items: data.records, total: data.total, pages: data.pages })),
   },
   "Service History": {
     label: mark("Service history"),
     description: mark("Every service visit recorded on your equipment."),
     icon: FileText,
-    list: () => services().then((data) => data.records),
+    page: (page, q) => servicesPage(page, q).then((data) => ({ items: data.records, total: data.total, pages: data.pages })),
   },
   Reviews: {
     label: mark("Reviews"),
     description: mark("Ratings and feedback visible according to your role."),
     icon: Star,
-    list: () => reviews().then((data) => data.reviews),
+    page: (page, q) => reviewsPage(page, q).then((data) => ({ items: data.reviews, total: data.total, pages: data.pages })),
   },
   Notifications: {
     label: mark("Notifications"),
     description: mark("Updates about your jobs, requests, and reviews."),
     icon: Bell,
-    list: () => notifications().then((data) => data.notifications),
+    page: (page, q) => notificationsPage(page, q).then((data) => ({ items: data.notifications, total: data.total, pages: data.pages })),
   },
   "My Equipment": {
     label: mark("My equipment"),
@@ -173,7 +185,7 @@ const resources: Record<string, Resource> = {
     label: mark("Service requests"),
     description: mark("Each request, where it is, and its booked visits."),
     icon: ClipboardList,
-    list: () => requests().then((data) => data.requests),
+    page: (page, q) => requestsPage(page, q).then((data) => ({ items: data.requests, total: data.total, pages: data.pages })),
   },
   "My Company": { label: mark("My company"), description: mark("The service company that looks after your equipment."), icon: Users },
   Reports: { label: mark("Reports"), description: mark("Operational performance for the data you are allowed to see."), icon: BarChart3 },
@@ -183,6 +195,7 @@ const resources: Record<string, Resource> = {
   "Help & Support": { label: mark("Help & support"), description: mark("Support resources for your service workspace."), icon: HelpCircle },
   Checklists: { label: mark("Checklists"), description: mark("Checklists your technicians complete for each type of job."), icon: ListChecks },
   "Team Map": { label: mark("Clocked-in technicians"), description: mark("Where your clocked-in technicians were last seen."), icon: MapIcon },
+  Routes: { label: mark("Route planner"), description: mark("The shortest order to visit a technician's jobs on a day."), icon: RouteIcon },
   Shifts: { label: mark("Shifts"), description: mark("Clock-in and clock-out times and hours for your team."), icon: Clock },
   "My Shifts": { label: mark("My shifts"), description: mark("Your clock-in and clock-out times and hours."), icon: Clock },
   Activity: {
@@ -203,7 +216,13 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<ListItem | null>(null);
   const [resetting, setResetting] = useState<{ id: number; name: string } | null>(null);
+  const [paying, setPaying] = useState<Mechanic | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [found, setFound] = useState({ total: 0, pages: 1 });
+  // The search, a moment after typing stops (server-paged lists search on the server).
+  const [search, setSearch] = useState("");
+  const asked = useRef(0);
   // The Equipment page groups equipment under its customer.
   const [customerList, setCustomerList] = useState<CustomerSummary[]>([]);
   const isBoss = user.role === "boss";
@@ -215,6 +234,8 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
     setError("");
     setAdding(false);
     setQuery("");
+    setSearch("");
+    setPageNumber(1);
     const failed = (problem: unknown) => setError(errorMessage(problem));
     resource.list?.().then(setItems).catch(failed);
     if (title === "Reports") reports().then(setSummary).catch(failed);
@@ -230,7 +251,35 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
     }
   }, [title, reloadKey]);
 
-  const filtered = items.filter((item) => JSON.stringify(item).toLowerCase().includes(query.toLowerCase()));
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearch(query), 300);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+  useEffect(() => setPageNumber(1), [search]);
+  useEffect(() => {
+    if (!resource.page) return;
+    // Only the newest answer counts: pages can come back out of order.
+    const ask = ++asked.current;
+    resource
+      .page(pageNumber, search)
+      .then((result) => {
+        if (ask !== asked.current) return;
+        setItems(result.items);
+        setFound({ total: result.total, pages: result.pages });
+      })
+      .catch((problem) => ask === asked.current && setError(errorMessage(problem)));
+  }, [title, reloadKey, pageNumber, search]);
+
+  const serverPaged = Boolean(resource.page);
+  const filtered = serverPaged ? items : items.filter((item) => JSON.stringify(item).toLowerCase().includes(query.toLowerCase()));
+  const total = serverPaged ? found.total : filtered.length;
+  const pages = serverPaged ? found.pages : Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(pageNumber, pages);
+  const onPage = (rows: ListItem[]) => (serverPaged ? rows : rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE));
+  const turnPage = (next: number) => {
+    setPageNumber(next);
+    document.querySelector(".subPagePanel")?.scrollIntoView({ block: "start" });
+  };
   // Managers see each piece of equipment with what makes it need work.
   const equipment = items.filter((item): item is EquipmentSummary => "serial_no" in item && item.work !== undefined);
   const canAdd = isBoss && !!resource.addLabel;
@@ -277,6 +326,11 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
             {t("Reset two-step sign-in")}
           </button>
         )}
+        {"pay_rate_cents" in item && (
+          <button className="listAction" onClick={() => setPaying(item)}>
+            {t("Pay rate")}
+          </button>
+        )}
       </>
     );
   };
@@ -298,6 +352,8 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
         return <ChecklistManager />;
       case "Team Map":
         return <TeamMap onOpenJob={onOpenJob} />;
+      case "Routes":
+        return <RoutePlanner onOpenJob={onOpenJob} />;
       case "Shifts":
       case "My Shifts":
         return <ShiftsView user={user} />;
@@ -323,11 +379,16 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
       );
     }
     if (!filtered.length) {
-      return <EmptyState icon={<Icon size={26} />} title={t("Nothing here yet")} text={t("New records will appear here as your team uses the workspace.")} />;
+      return query ? (
+        <EmptyState icon={<Search size={26} />} title={t("No matches")} text={t("Try a different search.")} />
+      ) : (
+        <EmptyState icon={<Icon size={26} />} title={t("Nothing here yet")} text={t("New records will appear here as your team uses the workspace.")} />
+      );
     }
     return (
+      <>
       <div className="subPageList">
-        {(title === "Customers" ? sortByNeedsWork(filtered) : filtered).map((item) => (
+        {onPage(title === "Customers" ? sortByNeedsWork(filtered) : filtered).map((item) => (
           <ResourceRow
             key={item.id}
             item={item}
@@ -340,6 +401,8 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
           />
         ))}
       </div>
+      <Pager page={currentPage} pages={pages} total={total} size={PAGE_SIZE} onPage={turnPage} />
+      </>
     );
   };
 
@@ -357,12 +420,15 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
       </div>
       {isBoss && user.email_verified === false && (title === "Customers" || title === "Technicians") && <VerifyBanner user={user} onVerified={onUserChanged} />}
       {summary ? (
-        <ReportSummary summary={summary} />
-      ) : !resource.list ? null : (
+        <>
+          <ReportSummary summary={summary} />
+          {isBoss && <Insights onOpenMachine={onOpenMachine} />}
+        </>
+      ) : !(resource.list || resource.page) ? null : (
         <div className="subPageStats">
           <div>
             <Icon size={20} />
-            <strong>{items.length}</strong>
+            <strong>{serverPaged ? found.total : items.length}</strong>
             <span>{t(resource.label)}</span>
           </div>
           <div>
@@ -381,7 +447,7 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
             {t(resource.label)}
           </h2>
           <div className="subPageTools">
-            {items.length > 0 && (
+            {(items.length > 0 || query) && (
               <label className="searchBox">
                 <Search size={14} />
                 <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("Search")} aria-label={t("Search")} />
@@ -404,7 +470,34 @@ export default function WorkspacePage({ title, user, onOpenJob, onOpenCustomer, 
       {editing && "serial_no" in editing && <EditMachine machine={editing} onClose={() => setEditing(null)} onSaved={added} />}
       {editing && "machine_count" in editing && <EditCustomer customer={editing} onClose={() => setEditing(null)} onSaved={added} />}
       {resetting && <ResetPassword userId={resetting.id} name={resetting.name} onClose={() => setResetting(null)} />}
+      {paying && <PayRate mechanic={paying} onClose={() => setPaying(null)} onSaved={added} />}
     </main>
+  );
+}
+
+/** What an hour of a technician's time costs the company: job costing multiplies their worksheet hours by it. */
+function PayRate({ mechanic, onClose, onSaved }: { mechanic: Mechanic; onClose: () => void; onSaved: () => void }) {
+  return (
+    <EditForm
+      title={t("Pay rate: {name}", { name: mechanic.name })}
+      onClose={onClose}
+      save={async (data) => {
+        await setPayRate(mechanic.id, String(data.pay_rate ?? "").trim() || null);
+        toast(t("Pay rate saved"));
+        onClose();
+        onSaved();
+      }}
+    >
+      <Field label={t("Pay rate per hour ({currency})", { currency: currencyName() })} hint={t("What an hour of their time costs you, used to work out what each job cost. Leave empty to clear it.")} optional>
+        <input
+          id="field-pay_rate"
+          name="pay_rate"
+          inputMode="decimal"
+          defaultValue={mechanic.pay_rate_cents != null ? String(mechanic.pay_rate_cents / 100) : ""}
+          placeholder="600"
+        />
+      </Field>
+    </EditForm>
   );
 }
 
@@ -472,7 +565,10 @@ function describe(item: ListItem): Description {
     const detail = [t(item.priority || "Medium"), item.location || t("No site"), due].filter(Boolean).join(" · ");
     return { heading: item.title, detail, status: item.status, jobId: item.id };
   }
-  // Customers and technicians.
+  // Customers and technicians (with what an hour of their time costs, for job costing).
+  if ("pay_rate_cents" in item && item.pay_rate_cents != null) {
+    return { heading: item.name, detail: `${item.email} · ${t("{amount} an hour", { amount: formatMoney(item.pay_rate_cents) })}` };
+  }
   return { heading: item.name, detail: item.email };
 }
 

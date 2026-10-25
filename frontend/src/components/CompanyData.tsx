@@ -26,6 +26,7 @@ const ACTIONS: Record<string, string> = {
   machine_deleted: mark("Deleted equipment"),
   plan_paid: mark("Plan paid"),
   data_exported: mark("Exported the company's data"),
+  report_exported: mark("Downloaded insights"),
   deletion_requested: mark("Asked to delete the company"),
   deletion_cancelled: mark("Cancelled deleting the company"),
 };

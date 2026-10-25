@@ -20,7 +20,7 @@ from app.services.data_export import build_export
 from app.i18n import LANGUAGES, N_, _
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
-from app.utils.validation import ValidationError, choice, integer, json_body, text
+from app.utils.validation import ValidationError, choice, coordinates, integer, json_body, text
 
 # The currencies a company can show money in (more can be added; amounts are stored in cents).
 CURRENCIES = ("KES", "TZS", "UGX", "RWF", "ETB", "NGN", "GHS", "ZAR", "USD", "EUR", "GBP")
@@ -91,6 +91,8 @@ def settings_out(company):
         "units": company.units,
         "language": company.language,
         "booking": booking_out(company),
+        # Where technicians start the day: the first point of a planned route.
+        "base": {"latitude": company.base_latitude, "longitude": company.base_longitude} if company.base_latitude is not None else None,
     }
 
 
@@ -178,6 +180,8 @@ def update_settings():
         if not isinstance(data["booking"], dict):
             raise ValidationError(_("Send the request as JSON."))
         update_booking(company, data["booking"])
+    if "base" in data:
+        company.base_latitude, company.base_longitude = coordinates(data, "base", N_("Where technicians start"))
     db.session.commit()
     return jsonify(settings=settings_out(company))
 

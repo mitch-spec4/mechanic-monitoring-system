@@ -268,3 +268,24 @@
   color: var(--btn);
   background-size: 100% 1.5px;
 }
+
+/* Previous and Next under a long list. */
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 16px 16px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: #5b6b80;
+}
+.appShell .pager button {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  padding: 6px 12px;
+}

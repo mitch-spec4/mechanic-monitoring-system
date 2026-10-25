@@ -34,6 +34,7 @@ from conftest import make_user
 NOT_ID_SCOPED = {
     "/api/files/export/<token>",  # test_security: export links
     "/api/files/upload/<token>",  # test_media: upload tokens
+    "/api/insights/export.<kind>",  # test_insights: a file format, no record
     "/api/legal/<name>",  # public pages
     "/static/<path:filename>",
 }
@@ -124,6 +125,7 @@ def attempts(ids):
         ("POST", f"/api/jobs/{jid}/on-the-way", {}),
         ("POST", f"/api/jobs/{jid}/parts", {"name": "Stolen", "quantity": 1}),
         ("DELETE", f"/api/jobs/{jid}/parts/{ids['pid']}", None),
+        ("PATCH", f"/api/jobs/{jid}/costing", {"charged": 1, "parts": [{"id": ids["pid"], "unit_cost": 1}]}),
         ("PUT", f"/api/jobs/{jid}/record", {"problem": "Stolen"}),
         ("GET", f"/api/jobs/{jid}/report.pdf", None),
         ("PATCH", f"/api/machines/{ids['mid']}", {"name": "Stolen"}),

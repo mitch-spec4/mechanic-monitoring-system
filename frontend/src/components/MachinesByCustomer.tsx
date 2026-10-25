@@ -1,11 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MachineCard } from "../pages/CustomerPage";
 import { CreateJobModal } from "./JobForms";
 import { EditMachine } from "./MachineForms";
 import type { Customer, EquipmentSummary, Machine } from "../services/types";
 import { t } from "../i18n";
 import { EmptyState } from "./States";
+import Pager from "./Pager";
 import { Wrench } from "lucide-react";
+
+// Customers' groups shown at once; the rest are a page away.
+const GROUPS_PER_PAGE = 10;
 
 type Props = {
   machines: EquipmentSummary[];
@@ -21,6 +25,8 @@ type Props = {
 export default function MachinesByCustomer({ machines, customers, query, onOpenJob, onOpenCustomer, onOpenMachine, onChanged }: Props) {
   const [onlyNeedsWork, setOnlyNeedsWork] = useState(false);
   const [type, setType] = useState("");
+  const [page, setPage] = useState(1);
+  useEffect(() => setPage(1), [query, type, onlyNeedsWork]);
   const [creatingFor, setCreatingFor] = useState<Machine | null>(null);
   const [editing, setEditing] = useState<Machine | null>(null);
   const needle = query.toLowerCase();
@@ -38,6 +44,8 @@ export default function MachinesByCustomer({ machines, customers, query, onOpenJ
         Number(b.machines.some((m) => m.needs_work)) - Number(a.machines.some((m) => m.needs_work)) ||
         a.customer.name.localeCompare(b.customer.name),
     );
+  const pages = Math.max(1, Math.ceil(groups.length / GROUPS_PER_PAGE));
+  const current = Math.min(page, pages);
   const done = () => {
     setCreatingFor(null);
     setEditing(null);
@@ -77,7 +85,7 @@ export default function MachinesByCustomer({ machines, customers, query, onOpenJ
           text={onlyNeedsWork && !type ? t("All equipment is operational, with no open jobs or requests.") : t("Try a different search.")}
         />
       )}
-      {groups.map(({ customer, machines: own }) => (
+      {groups.slice((current - 1) * GROUPS_PER_PAGE, current * GROUPS_PER_PAGE).map(({ customer, machines: own }) => (
         <section className="machineGroup" key={customer.id} aria-label={customer.name}>
           <div className="machineGroupHead">
             <button className="titleLink" onClick={() => onOpenCustomer?.(customer.id)}>
@@ -104,6 +112,7 @@ export default function MachinesByCustomer({ machines, customers, query, onOpenJ
           </ul>
         </section>
       ))}
+      <Pager page={current} pages={pages} total={groups.length} size={GROUPS_PER_PAGE} onPage={setPage} />
       {creatingFor && (
         <CreateJobModal
           preset={{ customer_id: creatingFor.customer_id, machine_id: creatingFor.id, title: t("Service {name}", { name: creatingFor.name }) }}

@@ -19,7 +19,7 @@ from app.services.billing import check_storage
 from app.services.storage import storage
 from app.services.sync import happened_at
 from app.utils.auth import current_user, roles
-from app.utils.validation import ValidationError, choice, integer, iso_date, json_body, text
+from app.utils.validation import ValidationError, choice, coordinates, integer, iso_date, json_body, text
 from app.i18n import _
 
 bp = Blueprint("equipment", __name__)
@@ -59,7 +59,14 @@ def can_add_documents(user, machine):
 
 
 def site_out(site, machine_count=None):
-    data = {"id": site.id, "customer_id": site.customer_id, "name": site.name, "address": site.address, "notes": site.notes}
+    data = {
+        "id": site.id,
+        "customer_id": site.customer_id,
+        "name": site.name,
+        "address": site.address,
+        "notes": site.notes,
+        "position": {"latitude": site.latitude, "longitude": site.longitude} if site.latitude is not None else None,
+    }
     if machine_count is not None:
         data["machine_count"] = machine_count
     return data
@@ -371,6 +378,8 @@ def read_site(data, site=None):
         fields["address"] = text(data, "address", "Address", max_length=255)
     if "notes" in data:
         fields["notes"] = text(data, "notes", "Notes", max_length=2000)
+    if "position" in data:
+        fields["latitude"], fields["longitude"] = coordinates(data, "position", "Position on the map")
     return fields
 
 

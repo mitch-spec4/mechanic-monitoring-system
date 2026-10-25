@@ -1,0 +1,64 @@
+/* Putting a pin on the map (the company's base, a customer's site). */
+.mapPicker {
+  display: grid;
+  gap: 8px;
+}
+.mapPickerCanvas {
+  height: 240px;
+  border-radius: 12px;
+  border: 1px solid #d5dde8;
+  overflow: hidden;
+  cursor: crosshair;
+}
+.mapPickerBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.mapPickerValue {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-inline-end: auto;
+  color: #5b6b80;
+  font-variant-numeric: tabular-nums;
+}
+.appShell .mapPickerBar .listAction {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.mapPickerTyped summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--role-color, #0969d7);
+}
+.mapPickerTyped .row {
+  margin-top: 8px;
+}
+.mapPickerTyped label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.pickerPin span {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border-radius: 50% 50% 50% 0;
+  background: var(--role-color, #0969d7);
+  border: 3px solid #fff;
+  box-shadow: 0 4px 12px #17203340;
+  transform: rotate(-45deg);
+}
+/* The title above a map in a form, styled like a field's label. */
+.fieldTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+}

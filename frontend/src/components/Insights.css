@@ -1,0 +1,383 @@
+/* Insights: a filter row, headline numbers, then charts that each have their numbers in a table.
+   Marks are thin and one colour (the role's accent); text stays in the text colours. */
+.insights {
+  --accent: var(--role-color, #0969d7);
+  --accent-soft: var(--role-soft, #eaf3ff);
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+.insightsHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+}
+.insightsHead h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 18px;
+}
+.insightsHead h2 svg {
+  color: var(--accent);
+}
+.insightsHead p {
+  margin: 2px 0 0;
+  font-size: 12px;
+}
+.insightsExports {
+  display: flex;
+  gap: 8px;
+}
+.appShell .insightsExports button {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* One row of filters above everything they scope. */
+.insightsFilters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.appShell .insightsFilters > button {
+  width: auto;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #d5dde8;
+  background: #fff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+.appShell .insightsFilters > button.chosen {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: #172033;
+}
+.insightsCustom {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.insightsCustom label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.appShell .insightsCustom input {
+  width: auto;
+  min-height: 34px;
+  padding: 4px 8px;
+}
+
+/* A refetch keeps the old numbers, dimmed, instead of flashing a skeleton. */
+.insightsBody {
+  display: grid;
+  gap: 14px;
+  transition: opacity 0.15s;
+}
+.insightsBody.refreshing {
+  opacity: 0.55;
+}
+
+.insightsTiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+  gap: 10px;
+}
+.insightsTile {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid #e1e8f0;
+  background: #fff;
+}
+.insightsTile.warn {
+  border-color: #f3b4b4;
+}
+.insightsTileLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #5b6b80;
+}
+.insightsTileLabel svg {
+  color: var(--accent);
+}
+.insightsTile.warn .insightsTileLabel svg {
+  color: #c2410c;
+}
+.insightsTile strong {
+  font-size: 26px;
+  line-height: 1.15;
+  color: #172033;
+}
+.insightsTile small {
+  font-size: 12px;
+  color: #68768a;
+}
+
+.insightsGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+.chartPanel.insightsPanel {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  border-radius: 12px;
+}
+.insightsPanel .chartHeading {
+  margin-bottom: 0;
+}
+.insightsPanel h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.insightsPanel .chartHeading span {
+  font-size: 12px;
+}
+.insightsEmpty,
+.insightsNote {
+  margin: 0;
+  font-size: 12px;
+}
+.insightsNote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #68768a;
+}
+
+/* Completed jobs: a column a day (or week), capped at 24px wide, 2px apart, round at the top. */
+.columnChart {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  height: 180px;
+}
+.columnAxis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-top: 18px;
+  font-size: 11px;
+  color: #68768a;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+.columns {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  /* Room above the tallest column for its value. */
+  padding-top: 18px;
+  border-bottom: 1px solid #e1e8f0;
+  background: linear-gradient(#eef1f5, #eef1f5) 0 18px / 100% 1px no-repeat;
+}
+.columns li {
+  position: relative;
+  flex: 1 1 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 100%;
+  min-width: 0;
+  outline: none;
+  cursor: default;
+}
+.columns li i {
+  display: block;
+  width: 100%;
+  max-width: 24px;
+  border-radius: 4px 4px 0 0;
+  background: var(--accent);
+}
+.columns li i.zero {
+  height: 0;
+}
+.columns li:hover i,
+.columns li:focus-visible i {
+  filter: brightness(1.15);
+}
+.columns li:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent);
+  border-radius: 4px;
+}
+.columns em {
+  position: absolute;
+  margin-bottom: 2px;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 800;
+  color: #172033;
+}
+.columnTip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  inset-inline-start: 0;
+  z-index: 2;
+  display: none;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: #172033;
+  color: #fff;
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.columnTip b {
+  font-size: 13px;
+}
+/* Columns in the second half open their tooltip leftwards, so it stays inside the card. */
+.columns li.late .columnTip {
+  inset-inline-start: auto;
+  inset-inline-end: 0;
+}
+.columns li:hover .columnTip,
+.columns li:focus .columnTip {
+  display: block;
+}
+.columnLabels {
+  display: flex;
+  justify-content: space-between;
+  padding-inline-start: 24px;
+  font-size: 11px;
+  color: #68768a;
+}
+.chartTable summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.chartTable table {
+  margin-top: 8px;
+}
+
+/* Job types and hours: horizontal bars, 12px tall, values as text beside them. */
+.typeBars,
+.hoursBars {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.typeBars li,
+.hoursBars li {
+  display: grid;
+  grid-template-columns: minmax(90px, 32%) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+.typeBars li > span:first-child,
+.hoursBars li > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.typeBars b,
+.hoursBars b {
+  font-variant-numeric: tabular-nums;
+  color: #172033;
+}
+.typeTrack {
+  display: block;
+  height: 12px;
+}
+.typeTrack i {
+  display: block;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+  background: var(--accent);
+}
+/* The clocked-in time is the track (a lighter step of the accent); job time fills it. */
+.hoursTrack {
+  display: block;
+  height: 12px;
+  border-radius: 0 4px 4px 0;
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px #d5e3f5;
+}
+.hoursTrack i {
+  display: block;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+  background: var(--accent);
+}
+.hoursLegend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.hoursLegend i {
+  display: inline-block;
+  width: 12px;
+  height: 10px;
+  border-radius: 2px;
+}
+.hoursLegend i.onJobs {
+  background: var(--accent);
+}
+.hoursLegend i.clocked {
+  margin-inline-start: 6px;
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px #d5e3f5;
+}
+
+.tableScroll {
+  overflow-x: auto;
+}
+.insightsTable,
+.chartTable table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.insightsTable th,
+.chartTable th {
+  padding: 6px 8px;
+  border-bottom: 1px solid #e1e8f0;
+  color: #68768a;
+  font-weight: 700;
+  text-align: start;
+  white-space: nowrap;
+}
+.insightsTable td,
+.chartTable td {
+  padding: 7px 8px;
+  border-bottom: 1px solid #f1f5f9;
+  font-variant-numeric: tabular-nums;
+}
+.insightsTable small {
+  color: #68768a;
+}
+
+@media (min-width: 900px) {
+  .insightsGrid {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  }
+  .insightsPanel.wide:not(:first-child) {
+    grid-column: 1 / -1;
+  }
+}

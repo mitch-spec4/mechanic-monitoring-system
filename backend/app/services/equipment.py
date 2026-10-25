@@ -114,13 +114,16 @@ def is_routine(job):
 
 
 def fault_counts(company_id, machine_ids, now=None):
-    """{machine_id: separate faults in the last 90 days} (see the module's notes)."""
+    """{machine_id: separate faults in the 90 days up to `now`} (see the module's notes)."""
     counts = {machine_id: set() for machine_id in machine_ids}
     if not machine_ids:
         return {}
-    since = (now or utcnow()) - timedelta(days=REPEAT_FAULT_DAYS)
+    until = now or utcnow()
     records = ServiceRecord.query.filter(
-        ServiceRecord.company_id == company_id, ServiceRecord.machine_id.in_(machine_ids), ServiceRecord.service_date >= since
+        ServiceRecord.company_id == company_id,
+        ServiceRecord.machine_id.in_(machine_ids),
+        ServiceRecord.service_date >= until - timedelta(days=REPEAT_FAULT_DAYS),
+        ServiceRecord.service_date <= until,
     ).all()
     jobs = {job.id: job for job in Job.query.filter(Job.id.in_([r.job_id for r in records if r.job_id])).all()} if records else {}
     for record in records:

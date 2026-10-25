@@ -1,12 +1,13 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { CalendarClock, CheckCircle2, ClipboardList, FileText, MapPin, Play, Star, Wrench } from "lucide-react";
-import { ApiError, jobs, machines, reviews as fetchReviews, services, type User } from "../services/api";
+import { CalendarClock, CheckCircle2, ClipboardList, FileText, MapPin, Navigation, Play, Star, Wrench } from "lucide-react";
+import { ApiError, jobs, machines, myRoute, reviews as fetchReviews, services, type User } from "../services/api";
 import { ClockCard, changeJobStatus, useShift } from "../components/Shift";
 import { InstallCard, Waiting } from "../components/Offline";
 import { offlineState } from "../offline";
 import SignatureModal, { type SignOff } from "../components/SignatureModal";
 import { errorMessage, formatDate, formatDay, formatTime, greeting, toZoneInput } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
+import { routeLink } from "../lib/directions";
 import { t } from "../i18n";
 import { EmptyState } from "../components/States";
 import type { Job, Machine, Review as CustomerReview, ServiceRecord } from "../services/types";
@@ -14,17 +15,22 @@ import type { Job, Machine, Review as CustomerReview, ServiceRecord } from "../s
 type Props = { u: User; onOpenJob: (id: number) => void };
 
 const FINISHED = ["Completed", "Cancelled"];
-// Today's jobs come first: the one being worked on, then paused ones, then by due date.
+// Today's jobs come first: the one being worked on, then paused ones, then the stops of the route
+// the manager planned for today in order, then by due date.
 const TODAY_ORDER: Record<string, number> = { "In Progress": 0, Paused: 1 };
+const today = () => toZoneInput(new Date()).slice(0, 10);
+/** Its stop number on today's planned route, if it has one. */
+const stopToday = (job: Job) => (job.route_date === today() && job.route_order != null ? job.route_order : null);
 
-/** Jobs for today: in progress, paused, or due today or earlier. */
+/** Jobs for today: in progress, paused, on today's route, or due today or earlier. */
 function todaysJobs(jobs: Job[]) {
-  const today = toZoneInput(new Date()).slice(0, 10);
+  const day = today();
   return jobs
-    .filter((job) => job.status in TODAY_ORDER || (job.due_date && job.due_date <= today))
+    .filter((job) => job.status in TODAY_ORDER || stopToday(job) != null || (job.due_date && job.due_date <= day))
     .sort(
       (a, b) =>
         (TODAY_ORDER[a.status] ?? 2) - (TODAY_ORDER[b.status] ?? 2) ||
+        (stopToday(a) ?? Infinity) - (stopToday(b) ?? Infinity) ||
         String(a.due_date).localeCompare(String(b.due_date)) ||
         // Booked visits by their time; others after them.
         String(a.scheduled_start ?? "~").localeCompare(String(b.scheduled_start ?? "~")),
@@ -63,6 +69,25 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
     ? (reviewList.reduce((total, review) => total + review.rating, 0) / reviewList.length).toFixed(1)
     : "—";
   const latestService = serviceList[0] || null;
+  // With a route planned for today: one link that opens the stops in order in the map app.
+  const routedIds = activeJobs.filter((job) => stopToday(job) != null).map((job) => job.id).join(",");
+  const [routeHref, setRouteHref] = useState<string | null>(null);
+  useEffect(() => {
+    if (!routedIds) {
+      setRouteHref(null);
+      return;
+    }
+    myRoute(today())
+      .then(({ plan }) => {
+        const where = new Map(plan.stops.map((stop) => [stop.job_id, stop]));
+        const stops = plan.current.job_ids.flatMap((id) => {
+          const stop = where.get(id);
+          return stop?.latitude != null && stop.longitude != null ? [{ latitude: stop.latitude, longitude: stop.longitude }] : [];
+        });
+        setRouteHref(routeLink(stops));
+      })
+      .catch(() => setRouteHref(null));
+  }, [routedIds]);
   // Start, Resume and Complete wait for a GPS fix, so the job's buttons are disabled meanwhile.
   const [changing, setChanging] = useState<number | null>(null);
   // When the customer's sign-off is all that's missing, the server says so and we ask for it.
@@ -98,7 +123,7 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
       </div>
       <ClockCard />
       <InstallCard />
-      <TodaysJobs jobs={todaysJobs(activeJobs)} changing={changing} onChange={change} onOpenJob={onOpenJob} />
+      <TodaysJobs jobs={todaysJobs(activeJobs)} routeHref={routeHref} changing={changing} onChange={change} onOpenJob={onOpenJob} />
       <div className="kpiGrid">
         <Kpi icon={<FileText />} color="blue" number={activeJobs.length} label={t("Pending work")} detail={t("Needs attention")} />
         <Kpi icon={<CheckCircle2 />} color="green" number={completed} label={t("Completed")} detail={t("Total all time")} />
@@ -221,52 +246,67 @@ export default function MechanicDashboard({ u, onOpenJob }: Props) {
   );
 }
 
-type TodayProps = { jobs: Job[]; changing: number | null; onChange: (id: number, status: string) => void; onOpenJob: (id: number) => void };
+type TodayProps = {
+  jobs: Job[];
+  routeHref: string | null;
+  changing: number | null;
+  onChange: (id: number, status: string) => void;
+  onOpenJob: (id: number) => void;
+};
 
 /** The day's work, one big button each: Open the job being worked on, Resume a paused one, or Start. */
-function TodaysJobs({ jobs, changing, onChange, onOpenJob }: TodayProps) {
-  const today = toZoneInput(new Date()).slice(0, 10);
+function TodaysJobs({ jobs, routeHref, changing, onChange, onOpenJob }: TodayProps) {
+  const day = today();
   return (
     <section className="todayPanel" aria-labelledby="todays-jobs">
       <div className="dashPanelTitle">
         <h2 id="todays-jobs">
           <CalendarClock size={14} /> {t("Today's jobs")}
         </h2>
+        {routeHref && (
+          <a className="listAction todayRoute" href={routeHref} target="_blank" rel="noreferrer">
+            <Navigation size={12} /> {t("Today's route in Maps")}
+          </a>
+        )}
         <span className="pendingCount">{jobs.length}</span>
       </div>
       {jobs.length === 0 ? (
         <p className="todayEmpty">{t("Nothing due today. Your other jobs are below.")}</p>
       ) : (
         <ol className="todayList">
-          {jobs.map((job) => (
-            <li key={job.id} className="todayJob">
-              <div>
-                <strong>{job.title}</strong>
-                <small>
-                  <span className={`jobStatus ${String(job.status).replace(/ /g, "").toLowerCase()}`}>{t(job.status)}</span>
-                  {job.pending_status && <Waiting />}
-                  {job.location || t("No site")}
-                  {job.due_date && job.due_date < today && <em className="overdue">{t("Overdue since {date}", { date: formatDate(job.due_date) })}</em>}
-                  {job.due_date === today &&
-                    (job.scheduled_start ? (
-                      <em>{t("Visit at {time}", { time: formatTime(job.scheduled_start) })}</em>
-                    ) : (
-                      <em>{t("Due today")}</em>
-                    ))}
-                  {job.on_the_way_at && <em>{t("On the way")}</em>}
-                </small>
-              </div>
-              {job.status === "In Progress" ? (
-                <button className="primary todayAction" onClick={() => onOpenJob(job.id)}>
-                  <ClipboardList size={16} /> {t("Open")}
-                </button>
-              ) : (
-                <button className="primary todayAction" disabled={changing === job.id} onClick={() => onChange(job.id, "In Progress")}>
-                  <Play size={16} /> {job.status === "Paused" ? t("Resume") : t("Start work")}
-                </button>
-              )}
-            </li>
-          ))}
+          {jobs.map((job) => {
+            const stop = stopToday(job);
+            return (
+              <li key={job.id} className="todayJob">
+                <div>
+                  <strong>{job.title}</strong>
+                  <small>
+                    {stop != null && <b className="todayStop">{t("Stop {number}", { number: stop })}</b>}
+                    <span className={`jobStatus ${String(job.status).replace(/ /g, "").toLowerCase()}`}>{t(job.status)}</span>
+                    {job.pending_status && <Waiting />}
+                    {job.location || t("No site")}
+                    {job.due_date && job.due_date < day && <em className="overdue">{t("Overdue since {date}", { date: formatDate(job.due_date) })}</em>}
+                    {job.due_date === day &&
+                      (job.scheduled_start ? (
+                        <em>{t("Visit at {time}", { time: formatTime(job.scheduled_start) })}</em>
+                      ) : (
+                        <em>{t("Due today")}</em>
+                      ))}
+                    {job.on_the_way_at && <em>{t("On the way")}</em>}
+                  </small>
+                </div>
+                {job.status === "In Progress" ? (
+                  <button className="primary todayAction" onClick={() => onOpenJob(job.id)}>
+                    <ClipboardList size={16} /> {t("Open")}
+                  </button>
+                ) : (
+                  <button className="primary todayAction" disabled={changing === job.id} onClick={() => onChange(job.id, "In Progress")}>
+                    <Play size={16} /> {job.status === "Paused" ? t("Resume") : t("Start work")}
+                  </button>
+                )}
+              </li>
+            );
+          })}
         </ol>
       )}
     </section>

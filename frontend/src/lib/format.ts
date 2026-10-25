@@ -1,4 +1,5 @@
 import { mark, t } from "../i18n";
+import { money } from "./route";
 
 const MONTHS = [mark("Jan"), mark("Feb"), mark("Mar"), mark("Apr"), mark("May"), mark("Jun"), mark("Jul"), mark("Aug"), mark("Sep"), mark("Oct"), mark("Nov"), mark("Dec")];
 
@@ -13,6 +14,23 @@ export function setTimeZone(next?: string | null) {
   } catch {
     // An unknown zone keeps the previous one.
   }
+}
+
+// Job costs and pay rates are in the company's currency.
+let currency = "KES";
+
+export function setCurrency(next?: string | null) {
+  if (next) currency = next;
+}
+
+/** An amount in the company's currency: "KSh 1,500" (or "TZS 1,500"). */
+export function formatMoney(cents: number) {
+  return money(cents, currency);
+}
+
+/** The company's currency as people write it, for labels like "Pay rate per hour (KSh)". */
+export function currencyName() {
+  return currency === "KES" ? "KSh" : currency;
 }
 
 // Distances follow the company's units setting.

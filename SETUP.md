@@ -95,6 +95,22 @@ A **maintenance plan** says what's done and how often: every N days, weeks or mo
 
 A **repeat fault** is equipment that needed fixing twice or more in 90 days: completed jobs that weren't routine maintenance (no plan, and "maintenance" isn't in the job type), with an inspection and a repair for the same request counted once, plus older service records with a problem written down. It's flagged on the equipment's card and its page, so a manager can look for the cause. In the demo data, ABC Engineering has two sites, the generator's oil change is due in four days, the compressor's half-year service is weeks away, and XYZ Factory's mixer has a repeat fault.
 
+**Insights (managers).** **Reports** starts with the company's totals, then **Insights** for a range of days on the company's calendar: the last 7, 30 or 90 days, this month, or any range up to a year. Everything on it follows the range:
+
+- **Jobs completed**, created and cancelled. A job counts on the day its history says it was completed, which for work done offline is when it really happened, not when it synced.
+- **Time to complete**: the median time from a job's creation to its completion, what the customer waited. The Excel file also has the average, and the hours worked per job.
+- **Hours per technician**: time clocked in and time on jobs (worksheet time), each counting only the part inside the range (a night shift across the first midnight counts from midnight), with jobs completed, their median time to complete and their rating from reviews left in the range. Open shifts and running timers count up to now.
+- **Jobs completed each day** (each week, by the Monday it starts, for ranges over 31 days), and by job type. Every column shows its number on hover or focus, and **Show as a table** lists them.
+- **Repeat faults**: equipment fixed twice or more in the 90 days up to the range's last day (see Equipment above).
+
+**Excel** downloads a workbook with a sheet each for the summary, the technicians, every completed job (customer, equipment, technician, created and completed times, hours), completed jobs over time, job types and repeat faults. **PDF** is the same page for sending on. Both are in the manager's own language with times on the company's clock, and each download is noted in **Activity**.
+
+**Margin** (on Insights, and in both downloads): what the completed jobs in the range were charged, less what they cost. Jobs with nothing charged yet don't count towards it, and the tile says how many jobs are missing a pay rate or a part cost (their cost leaves those out).
+
+**Team Map** asks for positions every 15 seconds while it's open. A position older than 15 minutes is faded: the technician's phone has stopped sending (the app is closed, or there's no signal).
+
+**Long lists.** Jobs, service requests, service records, reviews and notifications load 25 at a time, newest first, with **Previous** and **Next**. Their search runs on the server, over the whole list (a job is also found by its customer's or equipment's name). Customers, technicians and equipment load whole and show 25 (or 10 customers' equipment) a page. A technician's own jobs load whole, because their phone keeps them for working offline. For the API: `GET /api/jobs?page=2&per_page=25&q=pump` returns `jobs` with `page`, `per_page`, `total` and `pages`; without `page`, the whole list comes back as before.
+
 **A technician's phone.** On a phone, technicians get a bar along the bottom (**Today**, **Jobs**, **Shifts**, **Alerts**, and **More** for everything else) instead of the sidebar; managers and customers keep the sidebar. The dashboard opens with **Today's jobs**: the job in progress (**Open**), paused jobs (**Resume**), then jobs due today or overdue (**Start work**). In the demo data, Mitch's generator job is in progress and Brian's mixer job is paused.
 
 **Clock in and location.** Technicians must clock in before they can start or resume a job, and clocking out pauses any job in progress. The first time they clock in, they are asked to agree to location sharing. Clocking in needs a position; clocking out never does. While clocked in, a **Location on** sign is shown. A position is recorded at clock-in and clock-out, when a job starts, resumes or completes, and every few minutes while a job is in progress and the app is open. Nothing is recorded while clocked out. Phones stop sending positions when the app is in the background; only a native app could track in the background. Managers see clocked-in technicians under **Team Map**, and hours under **Shifts**, where they can set the clock-out time of a forgotten shift. In the demo data, Mitch and Amina are clocked in, and Brian is clocked out and hasn't agreed yet.
@@ -130,6 +146,18 @@ To change or add wording, wrap the English in `t("...")` (or `mark("...")` for l
 **Privacy policy and terms.** `#/privacy` and `#/terms` show `backend/legal/privacy.md` and `backend/legal/terms.md`, linked from the homepage footer. **Both are placeholder text: replace them with your own before launch.** The first line of each is `Version: ...`; change it whenever the text changes. Signing up and joining a company need an **I agree** tick, and the version agreed to and when are saved on the account.
 
 **Emails while developing.** In development nothing is sent: each email is written to the backend's log (look for `Email not sent (EMAIL_BACKEND=log)`), links included. Open the link from there to confirm an email or reset a password. See [Email](#email) for sending real emails.
+
+## Routes and job costing
+
+**Pins.** Routes need to know where things are. A manager puts the company's base (yard or office) on a map under **Settings**, and each customer site on the customer's page: click or tap the map, drag the pin, use the device's location, or type the coordinates. A job is where its equipment's site is.
+
+**Planning a day (managers).** **Routes**, then a technician and a day. The plan takes that technician's unfinished jobs due on or before the day (or with no due date, or already under way) whose site has a pin. Visits with a booked time keep their times and are listed apart; jobs whose site has no pin are listed under **Not on the map**. The order: the nearest stop first, then any stretch of the route reversed while that shortens it (2-opt), which for a day's handful of stops is at or near the best. The day starts where the technician was last seen (clocked in, with a position from the last 2 hours), else at the base, else at the first stop, and ends at the last stop. The page shows the stops numbered on a map, each leg's distance and time, and what the order saves against the order the jobs are in now. **Use this order** saves it: the technician gets a notification, their Today's jobs follow it with **Stop 1**, **Stop 2**…, and **Today's route in Maps** opens the stops in order in Google Maps (the first 10: map apps take no more in one link). Every job's page has **Directions** to its site.
+
+**Drive times.** With `ROUTING_API_KEY` set (a free key from [openrouteservice.org](https://openrouteservice.org/dev/#/signup): 500 route matrices a day), distances and times are real driving ones. Without a key, distances are straight lines × 1.3 driven at `ROUTE_AVERAGE_KMH` (25 km/h, city traffic): good enough to order the stops, but the times are rough and the page says so. If the service fails or is slow (8 seconds), the plan falls back to straight lines and says that too.
+
+**Job costing (managers).** On the **Technicians** page, **Pay rate** sets what an hour of each technician's time costs the company. On a job's page, **Costs and margin** lists each technician's time on the job (from the worksheet) × their pay rate, each part × its unit cost (typed there), the total, what the customer was charged, and the margin. Anything without a rate or a cost is left out of the total and listed, so a gap never looks free. Amounts are in the company's currency (KSh), typed like `1500` or `1500.50`. Technicians and customers never see costs, rates or margins. The Excel download of **Insights** has each completed job's labour, parts, charged and margin columns.
+
+In the demo data, routes start from DK Engineering's workshop in Industrial Area, every site has a pin, Mitch has the generator job under way and the compressor job due today, and the technicians' pay rates are KSh 600, 650 and 550 an hour. The conveyor inspection was charged KSh 12,000 and the mixer inspection KSh 6,500; the generator's thermostat has no cost yet.
 
 ## Checks
 
@@ -209,6 +237,9 @@ All backend settings live in `backend/.env` (see `backend/.env.example`).
 | `CRON_SECRET` | | A long random value that turns on `/api/cron/daily` for a scheduler. See [Daily clean-up](#daily-clean-up) |
 | `TWO_FACTOR_REQUIRED` | on | `0` turns two-step sign-in off outside production. Always on in production |
 | `EXPORT_RATE_LIMIT` | `3 per hour` | "Export your data" downloads per company |
+| `ROUTING_API_KEY` | | Optional. An OpenRouteService key for real drive times in route plans; without it, straight-line estimates. See [Routes and job costing](#routes-and-job-costing) |
+| `ROUTING_PROVIDER` | `openrouteservice` | The routing service (the only one for now) |
+| `ROUTE_AVERAGE_KMH` | `25` | The speed straight-line estimates assume |
 
 Live positions taken during jobs are deleted after 30 days. The app removes old ones whenever new positions arrive; in production, also run the [daily clean-up](#daily-clean-up).
 

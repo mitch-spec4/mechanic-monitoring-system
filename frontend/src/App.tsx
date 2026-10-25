@@ -28,7 +28,7 @@ import { LegalPage } from "./components/Legal";
 import TwoFactorSetupPage from "./components/TwoFactor";
 import { DeletionBanner } from "./components/CompanyData";
 import { clearSession, logout as endSession, me, saveSession, SESSION_EXPIRED_EVENT, TWO_FACTOR_SETUP_EVENT, type User } from "./services/api";
-import { setTimeZone, setUnits } from "./lib/format";
+import { setCurrency, setTimeZone, setUnits } from "./lib/format";
 import { LANGUAGE_CHANGED_EVENT, setLanguage, t } from "./i18n";
 import "./style.css";
 import "./components/DashboardShell.css";
@@ -71,8 +71,9 @@ function Screens() {
     if (!user) return;
     setTimeZone(user.timezone);
     setUnits(user.units);
+    setCurrency(user.currency);
     if (user.language) setLanguage(user.language);
-  }, [user?.language, user?.timezone, user?.units]);
+  }, [user?.language, user?.timezone, user?.units, user?.currency]);
   // Technicians work offline too: their changes wait on the phone (see src/offline/).
   useEffect(() => {
     if (user?.role === "mechanic") void startOffline(user);

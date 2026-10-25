@@ -5,12 +5,14 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Clock,
+  Coins,
   Camera,
   Download,
   Film,
   FileText,
   History,
   MapPin,
+  Navigation,
   Package,
   Pause,
   Play,
@@ -21,7 +23,7 @@ import {
   Truck,
   Wrench,
 } from "lucide-react";
-import { jobDetail, apiUrl, downloadReport } from "../services/api";
+import { jobDetail, apiUrl, downloadReport, saveCosting } from "../services/api";
 import {
   queueCheck,
   queueEntry,
@@ -39,10 +41,11 @@ import SignatureModal, { type SignOff } from "../components/SignatureModal";
 import { uploadMedia } from "../lib/media";
 import { changeJobStatus } from "../components/Shift";
 import { mapLink } from "../lib/location";
-import { asDate, errorMessage, formatDate, formatDay as dayOf, formatDistance, formatTime as timeOf, formatVisit, fromZoneInput } from "../lib/format";
+import { directionsLink } from "../lib/directions";
+import { asDate, currencyName, errorMessage, formatDate, formatDay as dayOf, formatDistance, formatMoney, formatTime as timeOf, formatVisit, fromZoneInput } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
 import type { User } from "../services/api";
-import type { ChecklistItem, JobDetail, JobEvent, JobFile, LocationPoint, Part, Payload, WorkEntry } from "../services/types";
+import type { ChecklistItem, Costing, JobDetail, JobEvent, JobFile, LocationPoint, Part, Payload, WorkEntry } from "../services/types";
 import { mark, t } from "../i18n";
 import { Trans } from "../i18n/Trans";
 import "./JobPage.css";
@@ -291,7 +294,18 @@ export default function JobPage({ jobId, user, onBack, onOpenMachine }: Props) {
               </dd>
             </div>
           )}
-          <Meta label={t("Site")} value={job.location || t("Not set")} icon={<MapPin size={13} />} />
+          <div>
+            <dt>{t("Site")}</dt>
+            <dd>
+              <MapPin size={13} />
+              {job.location || t("Not set")}
+              {job.position && !isCustomer && (
+                <a className="listAction jobDirections" href={directionsLink(job.position)} target="_blank" rel="noreferrer">
+                  <Navigation size={12} /> {t("Directions")}
+                </a>
+              )}
+            </dd>
+          </div>
           {job.scheduled_start ? (
             <Meta label={t("Booked visit")} value={formatVisit(job.scheduled_start, job.scheduled_end)} icon={<CalendarClock size={13} />} />
           ) : (
@@ -496,6 +510,8 @@ export default function JobPage({ jobId, user, onBack, onOpenMachine }: Props) {
         </Card>
 
         <MediaCard job={job} busy={busy} run={run} />
+
+        {job.costing && <CostingCard job={job} costing={job.costing} onSaved={load} />}
 
         {job.signature && (
           <Card title={t("Customer sign-off")} icon={<PenLine size={16} />}>
@@ -728,6 +744,125 @@ function ReportActions({ job, url: reportUrl, onError }: { job: JobDetail; url: 
         <Download size={16} /> {t("Download PDF")}
       </a>
     </div>
+  );
+}
+
+// Amounts typed in the company's currency ("1500" or "1500.50"); the server keeps cents.
+const asTyped = (cents: number | null) => (cents == null ? "" : String(cents / 100));
+const amount = (cents: number | null) => (cents == null ? "—" : formatMoney(cents));
+
+/** Managers: what the job cost (time × pay rate, parts × unit cost), what the customer was charged,
+ *  and the margin. Gaps (no pay rate, no part cost) are listed, not counted as free. */
+function CostingCard({ job, costing, onSaved }: { job: JobDetail; costing: Costing; onSaved: () => Promise<unknown> }) {
+  const [saving, setSaving] = useState(false);
+  const [problem, setProblem] = useState("");
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const typed = (name: string) => String(form.get(name) ?? "").trim() || null;
+    setProblem("");
+    setSaving(true);
+    try {
+      await saveCosting(job.id, { charged: typed("charged"), parts: costing.parts.map((part) => ({ id: part.id, unit_cost: typed(`part-${part.id}`) })) });
+      toast(t("Costs saved"));
+      await onSaved();
+    } catch (e) {
+      setProblem(errorMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+  const margin = costing.margin_cents;
+  // A fresh form when the saved amounts change, so it shows them.
+  const saved = [costing.charged_cents, ...costing.parts.map((part) => part.unit_cost_cents)].join();
+  return (
+    <Card title={t("Costs and margin")} icon={<Coins size={16} />} badge={margin == null ? undefined : formatMoney(margin)} wide>
+      <form className="costing" onSubmit={submit} key={saved}>
+        {problem && <div className="error">{problem}</div>}
+        <table className="costingTable">
+          <thead>
+            <tr>
+              <th scope="col">{t("Cost")}</th>
+              <th scope="col">{t("Amount")}</th>
+              <th scope="col">{t("Rate or unit cost ({currency})", { currency: currencyName() })}</th>
+              <th scope="col">{t("Total")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {costing.labour.length === 0 && (
+              <tr>
+                <td colSpan={4} className="muted">
+                  {t("No time recorded yet.")}
+                </td>
+              </tr>
+            )}
+            {costing.labour.map((row) => (
+              <tr key={`labour-${row.mechanic_id}`}>
+                <th scope="row">{t("Labour: {name}", { name: row.name ?? t("Former technician") })}</th>
+                <td>{duration(row.hours)}</td>
+                <td>{row.rate_cents == null ? <em className="costingGap">{t("No pay rate")}</em> : t("{amount} an hour", { amount: formatMoney(row.rate_cents) })}</td>
+                <td>{amount(row.cost_cents)}</td>
+              </tr>
+            ))}
+            {costing.parts.map((part) => (
+              <tr key={`part-${part.id}`}>
+                <th scope="row">{part.name}</th>
+                <td>×{part.quantity}</td>
+                <td>
+                  <input
+                    name={`part-${part.id}`}
+                    inputMode="decimal"
+                    defaultValue={asTyped(part.unit_cost_cents)}
+                    placeholder={t("Unit cost")}
+                    aria-label={t("Unit cost of {name} ({currency})", { name: part.name, currency: currencyName() })}
+                  />
+                </td>
+                <td>{amount(part.cost_cents)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row" colSpan={3}>
+                {t("Total cost")}
+              </th>
+              <td>{formatMoney(costing.cost_cents)}</td>
+            </tr>
+          </tfoot>
+        </table>
+        <div className="costingResult">
+          <Field label={t("Charged to the customer ({currency})", { currency: currencyName() })} optional>
+            <input id={`charged-${job.id}`} name="charged" inputMode="decimal" defaultValue={asTyped(costing.charged_cents)} />
+          </Field>
+          <div className={`costingMargin ${margin == null ? "unknown" : margin < 0 ? "loss" : ""}`} role="status">
+            <span>{t("Margin")}</span>
+            <strong>{margin == null ? "—" : formatMoney(margin)}</strong>
+            <small>
+              {margin == null
+                ? t("Add what you charged to see the margin.")
+                : costing.margin_percent == null
+                  ? ""
+                  : t("{percent}% of what you charged", { percent: costing.margin_percent })}
+            </small>
+          </div>
+        </div>
+        {(costing.missing_rates.length > 0 || costing.missing_costs.length > 0) && (
+          <ul className="costingGaps">
+            {costing.missing_rates.length > 0 && (
+              <li>
+                {t("Not counted, no pay rate yet: time by {names}. Set pay rates on the Technicians page.", {
+                  names: costing.missing_rates.map((name) => name ?? t("Former technician")).join(", "),
+                })}
+              </li>
+            )}
+            {costing.missing_costs.length > 0 && <li>{t("Not counted, no unit cost yet: {parts}.", { parts: costing.missing_costs.join(", ") })}</li>}
+          </ul>
+        )}
+        <button className="primary costingSave" disabled={saving}>
+          {saving ? t("Saving…") : t("Save costs")}
+        </button>
+      </form>
+    </Card>
   );
 }
 

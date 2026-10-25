@@ -13,7 +13,9 @@ from app.models.machine import Machine
 from app.models.service_record import ServiceRecord
 from app.models.user import User
 from app.models.worksheet import JobChecklistItem, JobEvent, JobPart, WorkEntry
+from app.services.costing import job_costing
 from app.services.location import point_out
+from app.services.routing import site_positions
 from app.services.sync import happened_at, synced_late
 from app.services.worksheet import (
     FINISHED,
@@ -26,8 +28,8 @@ from app.services.worksheet import (
 )
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
-from app.utils.validation import ValidationError, json_body, text
-from app.i18n import _, local_time
+from app.utils.validation import ValidationError, integer, json_body, money, text
+from app.i18n import N_, _, local_time
 
 bp = Blueprint("worksheet", __name__)
 MAX_ENTRY_HOURS = 24
@@ -258,8 +260,18 @@ def job_detail(job, user):
         can_upload=user.role == "mechanic" and job.status in ("In Progress", "Paused"),
         media_limits=media_limits(),
         completion_blockers=completion_problems(job) if job.status not in FINISHED else [],
+        # Where it is (its equipment's site), for directions.
+        position=job_position(job),
     )
+    if user.role == "boss":
+        # What it cost and what it made: managers only.
+        detail["costing"] = job_costing(job, now)
     return detail
+
+
+def job_position(job):
+    position = site_positions([job]).get(job.id)
+    return {"latitude": position[0], "longitude": position[1]} if position else None
 
 
 def signature_out(job, files):
@@ -423,6 +435,29 @@ def remove_part(jid, pid):
         return jsonify(job=job_detail(job, user))
     record_event(job, user, "part_removed", note=f"{part.name} ×{format_quantity(part.quantity)}")
     db.session.delete(part)
+    db.session.commit()
+    return jsonify(job=job_detail(job, user))
+
+
+@bp.patch("/<int:jid>/costing")
+@roles("boss")
+def update_costing(jid):
+    """What the customer is charged ({charged}), and what parts cost ({parts: [{id, unit_cost}]})."""
+    user = current_user()
+    job = load_job(jid)
+    data = json_body()
+    if "charged" in data:
+        job.charged_cents = money(data, "charged", N_("Charged"))
+    if "parts" in data:
+        rows = data["parts"]
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            raise ValidationError(_("Send the parts as a list."))
+        parts = {part.id: part for part in JobPart.query.filter_by(job_id=job.id).all()}
+        for row in rows:
+            part = parts.get(integer(row, "id", "Part", required=True))
+            if not part:
+                raise ValidationError(_("Part not found"), 404)
+            part.unit_cost_cents = money(row, "unit_cost", N_("Cost of one"))
     db.session.commit()
     return jsonify(job=job_detail(job, user))
 

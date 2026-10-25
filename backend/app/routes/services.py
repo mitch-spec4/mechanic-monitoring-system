@@ -1,7 +1,8 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint
 
 from app.models.service_record import ServiceRecord
 from app.utils.auth import current_user, roles
+from app.utils.pages import listing, searched
 
 bp = Blueprint("services", __name__)
 
@@ -32,7 +33,8 @@ def list_services():
         query = query.filter_by(mechanic_id=user.id)
     if user.role == "customer":
         query = query.filter_by(customer_id=user.customer_id)
-    return jsonify(records=[out(record) for record in query.order_by(ServiceRecord.id.desc()).all()])
+    columns = [ServiceRecord.service_type, ServiceRecord.problem, ServiceRecord.work_done, ServiceRecord.parts_replaced, ServiceRecord.solution, ServiceRecord.advice]
+    return listing(searched(query, columns).order_by(ServiceRecord.id.desc()), "records", out)
 
 
 # Service records are created and edited through a job's worksheet (PUT /api/jobs/<id>/record)
