@@ -12,11 +12,13 @@ from app.models.job import Job
 from app.models.machine import Machine
 from app.models.media import JobFile
 from app.models.request import ServiceRequest
+from app.models.service import ServiceTemplate
 from app.models.service_record import ServiceRecord
 from app.models.user import User
 from app.routes.jobs import assign_mechanic, change_status
 from app.services import booking
 from app.services.billing import state, subscription_for
+from app.services.catalog import find_service, service_job_type, service_summary
 from app.services.equipment import site_label
 from app.services.notifications import notify, notify_bosses
 from app.services.worksheet import record_event
@@ -43,6 +45,9 @@ def request_out(service_request):
         "status": service_request.status,
         "created_at": service_request.created_at.isoformat(),
         "updated_at": iso(service_request.updated_at),
+        # The service from the catalog, if one was picked, and whether it's booked directly.
+        "service": service_summary(service_request),
+        "booking": service_request.booking,
     }
 
 
@@ -119,14 +124,19 @@ def create_request():
     machine = Machine.query.filter_by(id=machine_id, customer_id=user.customer_id, company_id=user.company_id).first()
     if not machine:
         raise ValidationError(_("Equipment not found"), 404)
+    # A service from the catalog names the request; the customer's words are optional then.
+    service_id = integer(data, "service_id", "Service")
+    service = find_service(user.company_id, service_id, machine, bookable=True) if service_id else None
 
     service_request = ServiceRequest(
         customer_id=user.customer_id,
         company_id=user.company_id,
         machine_id=machine.id,
-        subject=text(data, "subject", "Subject", required=True, max_length=180),
-        description=text(data, "description", "Description", required=True),
+        subject=text(data, "subject", "Subject", required=not service, max_length=180) or service.name,
+        description=text(data, "description", "Description", required=not service) or service.description or service.name,
         priority=choice(data, "priority", PRIORITIES, default=DEFAULT_PRIORITY),
+        service_id=service.id if service else None,
+        booking="direct" if service and service.booking == "direct" else "inspection",
     )
     db.session.add(service_request)
     notify_bosses(user.company_id, N_("New customer service request"), N_("{subject} was submitted."), "request", subject=service_request.subject)
@@ -212,12 +222,16 @@ def book(rid):
         if job.mechanic_id not in slot.technicians:
             assign_mechanic(job, booking.pick_technician(company, slot), user)
     else:
+        service = db.session.get(ServiceTemplate, service_request.service_id) if service_request.service_id else None
         job = Job(
             company_id=company.id,
             title=service_request.subject,
             description=service_request.description,
             priority=service_request.priority,
-            job_type="Inspection" if visit == "inspection" else "Repair",
+            # The work gets the service's checklist; an inspection, the inspection checklist.
+            job_type="Inspection" if visit == "inspection" else service_job_type(service) or "Repair",
+            service_id=service.id if service else None,
+            estimated_minutes=minutes,
             due_date=booking.visit_day(company, slot.start),
             location=visit_site(service_request),
             customer_id=service_request.customer_id,

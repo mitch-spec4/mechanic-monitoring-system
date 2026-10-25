@@ -37,8 +37,10 @@ type Props = {
 
 // The steps of a request, in order (the server's statuses).
 const STEPS: string[] = [mark("Submitted"), mark("Inspection booked"), mark("Inspected"), mark("Repair booked"), mark("Completed")];
+// A service from the catalog booked directly: no inspection.
+const DIRECT_STEPS: string[] = [mark("Submitted"), mark("Service booked"), mark("Completed")];
 const CLOSED = ["Completed", "Declined", "Cancelled"];
-const VISIT_NAMES: Record<Visit, string> = { inspection: mark("Inspection"), repair: mark("Repair") };
+const VISIT_NAMES: Record<Visit, string> = { inspection: mark("Inspection"), repair: mark("Repair"), service: mark("Service visit") };
 const NOT_STARTED = ["Pending", "Assigned", "Accepted"];
 
 /**
@@ -114,7 +116,7 @@ export default function RequestPage({ requestId, user, onBack, onOpenJob, onOpen
         </dl>
       </section>
 
-      <Steps status={request.status} />
+      <Steps status={request.status} steps={request.booking === "direct" ? DIRECT_STEPS : STEPS} />
       {(request.status === "Declined" || request.status === "Cancelled") && (
         <p className="requestClosed" role="status">
           <Ban size={16} />
@@ -171,12 +173,13 @@ function BackButton({ onBack }: { onBack: () => void }) {
   );
 }
 
-/** Where the request is: Submitted → Inspection booked → Inspected → Repair booked → Completed. */
-function Steps({ status }: { status: string }) {
-  const reached = STEPS.indexOf(status);
+/** Where the request is: Submitted → Inspection booked → Inspected → Repair booked → Completed,
+ *  or for a service booked directly, Submitted → Service booked → Completed. */
+function Steps({ status, steps }: { status: string; steps: string[] }) {
+  const reached = steps.indexOf(status);
   return (
     <ol className="requestSteps" aria-label={t("Steps")}>
-      {STEPS.map((step, index) => {
+      {steps.map((step, index) => {
         const state = reached < 0 ? "" : index < reached || status === "Completed" ? "done" : index === reached ? "current" : "";
         return (
           <li key={step} className={state} aria-current={state === "current" ? "step" : undefined}>
@@ -309,7 +312,13 @@ function SlotPicker({ request, onBooked, onOpenMessages }: { request: RequestDet
     }
   };
 
-  const title = moving ? t("Move the visit") : visit === "repair" ? t("Pick a time for the repair") : t("Pick a time for the inspection");
+  const title = moving
+    ? t("Move the visit")
+    : visit === "repair"
+      ? t("Pick a time for the repair")
+      : visit === "service"
+        ? t("Pick a time for the service")
+        : t("Pick a time for the inspection");
   return (
     <section className="jobCard wide slotPicker" aria-labelledby="slot-picker-title">
       <div className="jobCardHead">
@@ -424,7 +433,8 @@ function ManagerActions({ request, onDone }: { request: RequestDetail; onDone: (
     });
     if (ok) await change({ status }, status === "Declined" ? t("Request declined") : t("Request cancelled"));
   };
-  const repairAhead = !["Repair booked", "Completed"].includes(request.status);
+  const repairAhead = !["Repair booked", "Service booked", "Completed"].includes(request.status);
+  const direct = request.booking === "direct";
   return (
     <section className="jobCard">
       <div className="jobCardHead">
@@ -437,10 +447,13 @@ function ManagerActions({ request, onDone }: { request: RequestDetail; onDone: (
           className="form requestRepairLength"
           onSubmit={(event) => {
             event.preventDefault();
-            void change({ repair_minutes: Number(repairMinutes) }, t("Repair length saved"));
+            void change({ repair_minutes: Number(repairMinutes) }, direct ? t("Visit length saved") : t("Repair length saved"));
           }}
         >
-          <Field label={t("Repair length (minutes)")} hint={t("The customer is offered times that fit it. Set it after the inspection.")}>
+          <Field
+            label={direct ? t("Visit length (minutes)") : t("Repair length (minutes)")}
+            hint={direct ? t("The customer is offered times that fit it. It starts at the service's usual time.") : t("The customer is offered times that fit it. Set it after the inspection.")}
+          >
             <input id="field-repair-minutes" type="number" min={30} max={1440} step={15} value={repairMinutes} onChange={(e) => setRepairMinutes(e.target.value)} required />
           </Field>
           <button className="secondary" disabled={busy}>

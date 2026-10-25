@@ -34,6 +34,7 @@ from app.models import (
     Review,
     ServiceRecord,
     ServiceRequest,
+    ServiceTemplate,
     Shift,
     Site,
     Subscription,
@@ -60,6 +61,16 @@ CHECKLISTS = {
     "Inspection": [("Visual inspection for leaks and damage", True), ("Check fluid levels", True), ("Photograph the machine's condition", False)],
     "Preventive maintenance": [("Change oil and filters", True), ("Check belts and hoses", True), ("Update the service sticker", False)],
 }
+
+SERVICES = (
+    (
+        "Generator 500-hour service", "Oil, filters, coolant and belts, a load test, and a check of the batteries and alternator.",
+        "Generator", "Preventive maintenance", 180, ("Generators", "Electrical"), "direct",
+    ),
+    ("Compressor full service", "Oil, air and separator filters, belts, and a leak and pressure test.", "Compressor", "Preventive maintenance", 120, ("Compressors",), "direct"),
+    ("Breakdown call-out", "Something has stopped working and you're not sure why.", None, "Repair", 120, (), "inspection"),
+    ("Conveyor belt replacement", "Remove the worn belt, fit and align the new one, and test run under load.", "Conveyor", "Repair", 240, ("Conveyors", "Welding"), "none"),
+)
 
 
 def populate(company, tag=None, password=None):
@@ -143,12 +154,25 @@ def populate(company, tag=None, password=None):
         ]
     )
 
+    checklists = {}
     for job_type, items in CHECKLISTS.items():
         template = ChecklistTemplate(company_id=company.id, job_type=job_type)
         db.session.add(template)
         db.session.flush()
+        checklists[job_type] = template.id
         for position, (label, required) in enumerate(items):
             db.session.add(ChecklistTemplateItem(template_id=template.id, label=label, required=required, position=position))
+
+    # The services DK Engineering offers: customers book the generator and compressor services
+    # directly, a breakdown with an inspection first; belt replacements are planned by managers.
+    services = {}
+    for name, description, kind, checklist, minutes, skills, booking in SERVICES:
+        services[name] = ServiceTemplate(
+            company_id=company.id, name=name, description=description, equipment_type=kind, checklist_id=checklists.get(checklist),
+            duration_minutes=minutes, skills=list(skills), booking=booking,
+        )
+        db.session.add(services[name])
+    db.session.flush()
 
     def job(title, description, priority, status, due_in_days, customer, record, mechanic, job_type):
         # At its equipment's site, as a new job is unless another place is typed.
@@ -168,6 +192,10 @@ def populate(company, tag=None, password=None):
     pump_job = job("Repair Hydraulic Pump H-21", "Investigate oil leak near the main seal.", "High", "Pending", 7, kenya, pump, None, "Repair")
     conveyor_job = job("Conveyor Line CL-4 inspection", "Routine belt alignment and safety inspection.", "Low", "Completed", -3, xyz, conveyor, brian, "Inspection")
     mixer_job = job("Industrial Mixer MX-08 repair", "Mixer produces abnormal vibration under load.", "High", "Paused", 5, xyz, mixer, brian, "Repair")
+    # Mitch's day: the compressor's service (from the catalog, 2 hours) and the generator (about 2½).
+    compressor_job.service_id = services["Compressor full service"].id
+    compressor_job.estimated_minutes = services["Compressor full service"].duration_minutes
+    generator_job.estimated_minutes = 150
 
     def worksheet(record, entries=(), parts=(), ticked=0, statuses=()):
         """A job's history, time entries, parts and checklist."""

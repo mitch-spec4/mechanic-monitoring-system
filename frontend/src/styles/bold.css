@@ -603,7 +603,7 @@ body {
 .appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus):is(.pending, .submitted) {
   --st: var(--st-pending);
 }
-.appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus):is(.assigned, .received, .reviewing, .mechanicassigned, .scheduled, .inspectionbooked, .repairbooked) {
+.appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus):is(.assigned, .received, .reviewing, .mechanicassigned, .scheduled, .inspectionbooked, .repairbooked, .servicebooked) {
   --st: var(--st-assigned);
 }
 .appShell :is(.status, .jobStatus, .dataStatus, .jobStatusPill, .machineStatus):is(.accepted, .approved, .inspected) {

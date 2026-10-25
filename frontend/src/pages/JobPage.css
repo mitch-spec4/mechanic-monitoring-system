@@ -837,3 +837,11 @@
   font-size: 13px;
   font-weight: 700;
 }
+
+/* The service a job was made from, with the skills it needs. */
+.jobService {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}

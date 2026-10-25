@@ -159,6 +159,46 @@ To change or add wording, wrap the English in `t("...")` (or `mark("...")` for l
 
 In the demo data, routes start from DK Engineering's workshop in Industrial Area, every site has a pin, Mitch has the generator job under way and the compressor job due today, and the technicians' pay rates are KSh 600, 650 and 550 an hour. The conveyor inspection was charged KSh 12,000 and the mixer inspection KSh 6,500; the generator's thermostat has no cost yet.
 
+## Services you offer
+
+**The catalog (managers).** Under **Settings → Services you offer**, a company lists the work it does most, for example "Generator 500-hour service". Each service has:
+
+- a name and description;
+- the type of equipment it's for (empty for any equipment);
+- a checklist from the **Checklists** page;
+- its usual time;
+- the skills the work needs (shown on its jobs; matching technicians to them comes later);
+- how customers book it.
+
+There are no prices: quotes stay in the chat.
+
+**A job from a service.** On a piece of equipment's page, **Start a job** lists the services that fit it. One tap creates the job, unassigned, with the service's name, description, checklist and time, and opens it to assign a technician. The **Create job** form has **Start from a service**, which fills in the same fields; anything typed there wins. A job made from a service shows the service, its skills and the estimated time. Managers can change the estimate when editing the job.
+
+**Customers booking a service.** On **Request service**, after choosing the equipment, a customer sees the services they can book for it, plus **Something else**:
+
+| Booking | What happens |
+| --- | --- |
+| Managers only | Customers don't see it. |
+| Customers book an inspection first | As for any request: a technician inspects, then the customer books the work. The work's length is the service's time unless a manager sets another. |
+| Customers book it directly | No inspection: the customer picks a time for the work itself, as long as the service takes (Submitted → Service booked → Completed). |
+
+The job for the work gets the service's checklist.
+
+**Scheduling.** Times offered for a service's visit are as long as the service. On **Routes**, each stop shows its estimated time. The plan adds up the day's work (the stops' estimates and booked visits) plus the driving, and warns when that's more than the working day (the booking hours under **Settings → Online booking**).
+
+**Changing or removing a service.** Changes apply to new jobs and requests only. A service that jobs or requests were made from can't be deleted: turn it off instead, so it stops being offered and its jobs keep it. Deleting a checklist leaves its services without one.
+
+**In the demo data:**
+
+| Service | Booking | Time | Checklist | Skills |
+| --- | --- | --- | --- | --- |
+| Generator 500-hour service | Directly | 3 h | Preventive maintenance | Generators, Electrical |
+| Compressor full service | Directly | 2 h | Preventive maintenance | Compressors |
+| Breakdown call-out | Inspection first | 2 h of work | Repair | |
+| Conveyor belt replacement | Managers only | 4 h | Repair | Conveyors, Welding |
+
+Mitch's compressor job was made from the compressor service. With the generator job (2½ h), his route for today shows about 4½ h of work.
+
 ## Checks
 
 ```bash

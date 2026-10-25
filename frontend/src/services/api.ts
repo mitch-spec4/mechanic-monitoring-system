@@ -1,6 +1,8 @@
 import { language, t } from "../i18n";
 import type {
   AuditEvent,
+  BookableService,
+  CatalogService,
   ChatMessage,
   Checklist,
   Company,
@@ -368,6 +370,14 @@ export const checklists = () => api<{ checklists: Checklist[] }>("/checklists");
 export const createChecklist = (data: ChecklistDraft) => post<{ checklist: Checklist }>("/checklists", data);
 export const updateChecklist = (id: number, data: Partial<ChecklistDraft>) => patch<{ checklist: Checklist }>(`/checklists/${id}`, data);
 export const deleteChecklist = (id: number) => remove(`/checklists/${id}`);
+
+// The service catalog: managers keep it; customers see what they can book for a piece of equipment
+export type ServiceDraft = Partial<Omit<CatalogService, "id" | "checklist" | "jobs">> & { checklist_id?: number | null };
+export const catalog = () => api<{ services: CatalogService[] }>("/catalog");
+export const bookableServices = (machineId: number) => api<{ services: BookableService[] }>(`/catalog?machine_id=${machineId}`);
+export const createService = (data: ServiceDraft) => post<{ service: CatalogService }>("/catalog", data);
+export const updateService = (id: number, data: ServiceDraft) => patch<{ service: CatalogService }>(`/catalog/${id}`, data);
+export const deleteService = (id: number) => remove(`/catalog/${id}`);
 
 // Clock in/out and location
 export const shiftStatus = () => api<ShiftStatus>("/shifts/current");

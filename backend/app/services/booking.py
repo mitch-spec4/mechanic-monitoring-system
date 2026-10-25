@@ -2,7 +2,9 @@
 
 The steps of a request: Submitted → the customer books an inspection ("Inspection booked") → the
 technician inspects and completes that visit ("Inspected": the findings and photos are shared)
-→ the customer books the repair ("Repair booked") → it is completed ("Completed"). Quotes and
+→ the customer books the repair ("Repair booked") → it is completed ("Completed"). A request for a
+service from the catalog that's booked directly skips the inspection: Submitted → the customer
+books the service visit ("Service booked") → it is completed. Quotes and
 payments stay out of the app: customers ask the managers in the chat. A manager can decline or
 cancel a request, or set a step by hand.
 
@@ -29,6 +31,7 @@ from app.models.constants import ACTIVE_JOB_STATUSES, CLOSED_REQUEST_STATUSES
 from app.models.customer import Customer
 from app.models.job import Job
 from app.models.request import ServiceRequest
+from app.models.service import ServiceTemplate
 from app.models.user import User
 from app.services.email import app_link, layout, send_email
 from app.services.notifications import notify, notify_bosses
@@ -43,11 +46,11 @@ STARTED = ("In Progress", "Paused")
 REPAIR_REMINDER_AFTER = timedelta(days=3)
 FOLLOW_UP_AFTER = timedelta(days=1)
 # The words for a visit, inside sentences ("Your inspection for ... is booked").
-VISIT_WORDS = {"inspection": N_("inspection"), "repair": N_("repair")}
+VISIT_WORDS = {"inspection": N_("inspection"), "repair": N_("repair"), "service": N_("service visit")}
 # The status a request is at once a visit is booked, done, or cancelled before it started.
-BOOKED = {"inspection": "Inspection booked", "repair": "Repair booked"}
-DONE = {"inspection": "Inspected", "repair": "Completed"}
-WAITING = {"inspection": "Submitted", "repair": "Inspected"}
+BOOKED = {"inspection": "Inspection booked", "repair": "Repair booked", "service": "Service booked"}
+DONE = {"inspection": "Inspected", "repair": "Completed", "service": "Completed"}
+WAITING = {"inspection": "Submitted", "repair": "Inspected", "service": "Submitted"}
 
 
 @dataclass
@@ -68,9 +71,12 @@ def working_minutes(company):
 
 
 def visit_minutes(company, service_request, visit):
-    if visit == "repair":
-        return service_request.repair_minutes or company.repair_minutes
-    return company.inspection_minutes
+    """An inspection takes the company's inspection length; the work takes what the manager set
+    for this request, else the service's usual time, else the company's repair length."""
+    if visit == "inspection":
+        return company.inspection_minutes
+    service = db.session.get(ServiceTemplate, service_request.service_id) if service_request.service_id else None
+    return service_request.repair_minutes or (service.duration_minutes if service else None) or company.repair_minutes
 
 
 def visits_of(service_request):
@@ -87,9 +93,10 @@ def visit_in_progress(service_request):
 
 
 def visit_to_book(service_request):
-    """What the customer books next: an inspection for a new request, the repair once inspected."""
+    """What the customer books next: an inspection for a new request (or the service itself, when
+    it's booked directly), the repair once inspected."""
     if service_request.status == "Submitted":
-        return "inspection"
+        return "service" if service_request.booking == "direct" else "inspection"
     if service_request.status == "Inspected":
         return "repair"
     return None
@@ -290,8 +297,10 @@ def visit_moved(job, old_status, new_status):
                 button=N_("See the findings"),
                 **values,
             )
-        else:
+        elif job.visit == "repair":
             tell_customer(service_request, N_("Repair completed"), N_("The repair for {subject} is done."), "status", **values)
+        else:
+            tell_customer(service_request, N_("Work completed"), N_("The work on {subject} is done."), "status", **values)
     elif new_status == "Cancelled" and old_status in NOT_STARTED and service_request.status == BOOKED[job.visit]:
         # Cancelled by the company before it started: the customer picks another time.
         set_status(service_request, WAITING[job.visit])

@@ -42,7 +42,7 @@ import { uploadMedia } from "../lib/media";
 import { changeJobStatus } from "../components/Shift";
 import { mapLink } from "../lib/location";
 import { directionsLink } from "../lib/directions";
-import { asDate, currencyName, errorMessage, formatDate, formatDay as dayOf, formatDistance, formatMoney, formatTime as timeOf, formatVisit, fromZoneInput } from "../lib/format";
+import { asDate, currencyName, errorMessage, formatDate, formatDay as dayOf, formatDistance, formatMinutes, formatMoney, formatTime as timeOf, formatVisit, fromZoneInput } from "../lib/format";
 import { usePolling } from "../lib/usePolling";
 import type { User } from "../services/api";
 import type { ChecklistItem, Costing, JobDetail, JobEvent, JobFile, LocationPoint, Part, Payload, WorkEntry } from "../services/types";
@@ -51,6 +51,7 @@ import { Trans } from "../i18n/Trans";
 import "./JobPage.css";
 import { Loading } from "../components/States";
 import Field from "../components/Field";
+import { SkillTags } from "../components/ServiceCatalog";
 
 type Props = { jobId: number; user: User; onBack: () => void; onOpenMachine?: (id: number) => void };
 
@@ -81,6 +82,7 @@ const EDITED_FIELDS: Record<string, string> = {
   location: mark("site"),
   "due date": mark("due date"),
   machine: mark("equipment"),
+  "estimated minutes": mark("estimated time"),
 };
 const FILE_KINDS: Record<string, string> = {
   "before photo": mark("a before photo"),
@@ -312,6 +314,16 @@ export default function JobPage({ jobId, user, onBack, onOpenMachine }: Props) {
             <Meta label={t("Due")} value={formatDate(job.due_date) || t("Not set")} />
           )}
           {!isMechanic && <Meta label={t("Technician")} value={job.mechanic?.name || t("Not assigned")} />}
+          {job.estimated_minutes ? <Meta label={t("Estimated time")} value={formatMinutes(job.estimated_minutes)} icon={<Clock size={13} />} /> : null}
+          {job.service && !isCustomer && (
+            <div>
+              <dt>{t("Service")}</dt>
+              <dd className="jobService">
+                {job.service.name}
+                <SkillTags skills={job.service.skills} />
+              </dd>
+            </div>
+          )}
         </dl>
 
         {!isCustomer && (

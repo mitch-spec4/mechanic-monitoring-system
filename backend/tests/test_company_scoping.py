@@ -23,6 +23,7 @@ from app.models import (
     Payment,
     Review,
     ServiceRequest,
+    ServiceTemplate,
     Shift,
     User,
     WorkEntry,
@@ -71,7 +72,8 @@ def acme_records(data):
     document = JobFile(
         company_id=acme, machine_id=data["machine"], uploaded_by=data["boss"], kind="document", content_type="application/pdf", storage_key="acme/manual.pdf", status="ready"
     )
-    db.session.add_all([item, entry, part, request, notification, review, file, payment, site, plan, document])
+    service = ServiceTemplate(company_id=acme, name="Annual service", checklist_id=template.id, duration_minutes=90, skills=["Electrical"], booking="direct")
+    db.session.add_all([item, entry, part, request, notification, review, file, payment, site, plan, document, service])
     db.session.commit()
     return {
         "tid": template.id,
@@ -91,6 +93,7 @@ def acme_records(data):
         "site": site.id,
         "plan": plan.id,
         "document": document.id,
+        "service": service.id,
     }
 
 
@@ -103,6 +106,8 @@ def attempts(ids):
         ("POST", f"/api/billing/payments/{ids['reference']}/confirm", None),
         ("PATCH", f"/api/checklists/{ids['tid']}", {"job_type": "Stolen"}),
         ("DELETE", f"/api/checklists/{ids['tid']}", None),
+        ("PATCH", f"/api/catalog/{ids['service']}", {"name": "Stolen"}),
+        ("DELETE", f"/api/catalog/{ids['service']}", None),
         ("GET", f"/api/customers/{ids['cid']}", None),
         ("PATCH", f"/api/customers/{ids['cid']}", {"name": "Stolen"}),
         ("DELETE", f"/api/customers/{ids['cid']}", None),
@@ -186,6 +191,7 @@ def test_people_from_another_company_can_reach_none_of_its_records(client, data,
     assert db.session.get(Site, acme_records["site"]).name == "Main plant"
     assert db.session.get(MaintenancePlan, acme_records["plan"]).title == "Oil change"
     assert db.session.get(JobFile, acme_records["document"]) is not None
+    assert db.session.get(ServiceTemplate, acme_records["service"]).name == "Annual service"
 
 
 def test_every_id_route_is_covered(app, data, acme_records):

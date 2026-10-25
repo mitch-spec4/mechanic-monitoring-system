@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -17,9 +17,11 @@ import {
   Trash2,
   Upload,
   UserRound,
+  Wrench,
 } from "lucide-react";
-import { apiUrl, createPlan, createPlanJob, deleteDocument, deletePlan, machineDetail, updatePlan, uploadDocument, type User } from "../services/api";
-import type { EquipmentDetail, MaintenancePlan } from "../services/types";
+import { apiUrl, catalog, createJob, createPlan, createPlanJob, deleteDocument, deletePlan, machineDetail, updatePlan, uploadDocument, type User } from "../services/api";
+import type { CatalogService, EquipmentDetail, MaintenancePlan } from "../services/types";
+import { servicesFor } from "../components/JobForms";
 import { can } from "../lib/plan";
 import PlanLocked from "../components/PlanLocked";
 import { confirmAction, toast } from "../components/Feedback";
@@ -27,7 +29,7 @@ import { EditMachine } from "../components/MachineForms";
 import Modal from "../components/Modal";
 import Field from "../components/Field";
 import { Loading } from "../components/States";
-import { errorMessage, formatBytes, formatDate, formatDateTime, toZoneInput } from "../lib/format";
+import { errorMessage, formatBytes, formatDate, formatDateTime, formatMinutes, toZoneInput } from "../lib/format";
 import { statusClass } from "../lib/labels";
 import { usePolling } from "../lib/usePolling";
 import { mark, t } from "../i18n";
@@ -160,6 +162,7 @@ export default function EquipmentPage({ machineId, user, onBack, onOpenJob, onOp
 
       <div className="jobGrid">
         {(machine.can_edit || machine.plans.length > 0) && <PlansCard machine={machine} user={user} onChanged={setMachine} onOpenJob={onOpenJob} openable={openable} />}
+        {machine.can_edit && <ServiceShortcuts machine={machine} onOpenJob={onOpenJob} />}
         <DocumentsCard machine={machine} user={user} onChanged={setMachine} />
         {machine.faults.length > 0 && (
           <section className="jobCard">
@@ -632,6 +635,51 @@ function DocumentsCard({ machine, user, onChanged }: { machine: EquipmentDetail;
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+/** Managers: a job from a service in the catalog, for this equipment, in one tap. */
+function ServiceShortcuts({ machine, onOpenJob }: { machine: EquipmentDetail; onOpenJob: (id: number) => void }) {
+  const [services, setServices] = useState<CatalogService[]>([]);
+  const [busy, setBusy] = useState<number | null>(null);
+  useEffect(() => {
+    catalog()
+      .then((data) => setServices(data.services))
+      .catch(() => setServices([]));
+  }, []);
+  const fitting = servicesFor(services, machine);
+  if (!fitting.length) return null;
+  const start = async (service: CatalogService) => {
+    setBusy(service.id);
+    try {
+      const { job } = await createJob({ service_id: service.id, machine_id: machine.id });
+      toast(t("Job created: {title}", { title: job.title }));
+      onOpenJob(job.id);
+    } catch (problem) {
+      toast(errorMessage(problem), "error");
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <section className="jobCard" aria-labelledby="equipment-start-job">
+      <div className="jobCardHead">
+        <h2 id="equipment-start-job">
+          <Wrench size={16} /> {t("Start a job")}
+        </h2>
+      </div>
+      <p className="muted">{t("One tap creates the job from the service, for this equipment. Assign a technician on the job's page.")}</p>
+      <div className="serviceShortcuts">
+        {fitting.map((service) => (
+          <button key={service.id} type="button" className="serviceShortcut" disabled={busy !== null} onClick={() => start(service)}>
+            <b>{busy === service.id ? t("Creating…") : service.name}</b>
+            <small>
+              {[formatMinutes(service.duration_minutes), service.checklist ? t("Checklist: {name}", { name: service.checklist.job_type }) : null].filter(Boolean).join(" · ")}
+            </small>
+          </button>
+        ))}
+      </div>
     </section>
   );
 }

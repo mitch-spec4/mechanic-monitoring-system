@@ -27,6 +27,7 @@ from app.services.worksheet import (
     reassigned_problem,
     record_event,
 )
+from app.services.catalog import service_summary
 from app.utils.auth import current_user, roles
 from app.utils.time import utcnow
 from app.utils.validation import ValidationError, integer, json_body, money, text
@@ -170,6 +171,9 @@ def job_detail(job, user):
         "scheduled_start": iso(job.scheduled_start),
         "scheduled_end": iso(job.scheduled_end),
         "on_the_way_at": iso(job.on_the_way_at),
+        # The service it was made from (with the skills the work needs) and how long it should take.
+        "service": service_summary(job),
+        "estimated_minutes": job.estimated_minutes,
         "customer": {"id": customer.id, "name": customer.name} if customer else None,
         "machine": {"id": machine.id, "name": machine.name, "serial_no": machine.serial_no} if machine else None,
         "mechanic": {"id": job.mechanic_id, "name": names.get(job.mechanic_id)} if job.mechanic_id else None,

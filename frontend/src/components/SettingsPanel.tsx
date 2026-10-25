@@ -22,6 +22,7 @@ import { TwoFactorSettings } from "./TwoFactor";
 import { CompanyDataSettings } from "./CompanyData";
 import Field from "./Field";
 import MapPicker from "./MapPicker";
+import ServiceCatalog from "./ServiceCatalog";
 
 type Props = { user: User; onUserChanged: (user: User) => void };
 
@@ -67,6 +68,7 @@ export default function SettingsPanel({ user, onUserChanged }: Props) {
       <AppearancePicker />
       {user.role === "boss" && <CompanySettingsForm user={user} onUserChanged={onUserChanged} />}
       {user.role === "boss" && <BookingSettingsForm />}
+      {user.role === "boss" && <ServiceCatalog />}
       {user.role === "mechanic" && <LocationSettings />}
       <ChangePassword />
       <TwoFactorSettings user={user} onUserChanged={onUserChanged} />
