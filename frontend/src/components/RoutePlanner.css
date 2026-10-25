@@ -42,6 +42,10 @@
 .routeSummary small {
   color: #5b6b80;
 }
+.routeWork.over {
+  color: var(--st-urgent);
+  font-weight: 700;
+}
 .routeLayout {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr);

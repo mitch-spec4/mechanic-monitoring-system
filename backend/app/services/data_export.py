@@ -37,6 +37,7 @@ from app.models import (
     Review,
     ServiceRecord,
     ServiceRequest,
+    ServiceTemplate,
     Shift,
     Site,
     Subscription,
@@ -73,6 +74,7 @@ def _tables(company_id):
         "job_checklists": (JobChecklistItem, JobChecklistItem.query.filter(JobChecklistItem.job_id.in_(jobs))),
         "checklist_templates": (ChecklistTemplate, ChecklistTemplate.query.filter_by(company_id=company_id)),
         "checklist_template_items": (ChecklistTemplateItem, ChecklistTemplateItem.query.filter(ChecklistTemplateItem.template_id.in_(templates))),
+        "services": (ServiceTemplate, ServiceTemplate.query.filter_by(company_id=company_id)),
         "service_records": (ServiceRecord, ServiceRecord.query.filter_by(company_id=company_id)),
         "service_requests": (ServiceRequest, ServiceRequest.query.filter_by(company_id=company_id)),
         "customer_messages": (CustomerMessage, CustomerMessage.query.filter_by(company_id=company_id)),
@@ -133,7 +135,8 @@ def build_export(company_id):
             writer = csv.DictWriter(text, fieldnames=columns)
             writer.writeheader()
             for row in everything[name]:
-                writer.writerow(row)
+                # Lists (a service's skills) as "Electrical; Welding" in a spreadsheet cell.
+                writer.writerow({key: "; ".join(map(str, value)) if isinstance(value, list) else value for key, value in row.items()})
             # The byte order mark makes Excel read the file as UTF-8 (names like "Wanjirū").
             zipped.writestr(f"{name}.csv", "﻿" + text.getvalue())
         zipped.writestr(

@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import Modal from "./Modal";
-import { checklists, createJob, customers, machines, mechanics } from "../services/api";
-import type { Customer, Machine, Mechanic } from "../services/types";
+import { catalog, checklists, createJob, customers, machines, mechanics } from "../services/api";
+import type { CatalogService, Customer, Machine, Mechanic } from "../services/types";
 import { errorMessage } from "../lib/format";
 import { PRIORITIES } from "../lib/labels";
 import { t } from "../i18n";
@@ -26,28 +26,52 @@ export function JobTypeSelect({ types, value, ...control }: JobTypeProps) {
 
 type Preset = { customer_id?: number; machine_id?: number; title?: string; description?: string };
 
-/** The manager's "Create service job" form. A preset fills in the customer and equipment. */
+/** Services that fit a piece of equipment: for its type, or for any equipment. */
+export function servicesFor(services: CatalogService[], machine?: Pick<Machine, "equipment_type"> | null) {
+  const kind = (machine?.equipment_type || "").trim().toLowerCase();
+  return services.filter((service) => service.active && (!service.equipment_type || !machine || service.equipment_type.trim().toLowerCase() === kind));
+}
+
+/** The manager's "Create service job" form. A preset fills in the customer and equipment; a
+ *  service from the catalog fills in the title, description, checklist and time. */
 export function CreateJobModal({ preset = {}, onClose, onCreated }: { preset?: Preset; onClose: () => void; onCreated: () => void }) {
   const [customerList, setCustomerList] = useState<Customer[]>([]);
   const [mechanicList, setMechanicList] = useState<Mechanic[]>([]);
   const [machineList, setMachineList] = useState<Machine[]>([]);
   const [jobTypes, setJobTypes] = useState<string[]>([]);
+  const [serviceList, setServiceList] = useState<CatalogService[]>([]);
   const [customerId, setCustomerId] = useState(preset.customer_id ? String(preset.customer_id) : "");
   const [machineId, setMachineId] = useState(preset.machine_id ? String(preset.machine_id) : "");
+  const [serviceId, setServiceId] = useState("");
+  const [title, setTitle] = useState(preset.title ?? "");
+  const [description, setDescription] = useState(preset.description ?? "");
+  const [jobType, setJobType] = useState("");
+  const [minutes, setMinutes] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    Promise.all([customers(), mechanics(), machines(), checklists()])
-      .then(([c, m, mc, cl]) => {
+    Promise.all([customers(), mechanics(), machines(), checklists(), catalog()])
+      .then(([c, m, mc, cl, sv]) => {
         setCustomerList(c.customers);
         setMechanicList(m.mechanics);
         setMachineList(mc.machines);
         setJobTypes(cl.checklists.map((template) => template.job_type));
+        setServiceList(sv.services);
       })
       .catch((e) => setError(errorMessage(e)));
   }, []);
 
   const customerMachines = machineList.filter((m) => !customerId || String(m.customer_id) === customerId);
+  const offered = servicesFor(serviceList, machineList.find((m) => String(m.id) === machineId));
+  const pickService = (id: string) => {
+    setServiceId(id);
+    const service = serviceList.find((s) => String(s.id) === id);
+    if (!service) return;
+    setTitle(service.name);
+    setDescription(service.description || service.name);
+    setJobType(service.checklist?.job_type ?? "");
+    setMinutes(String(service.duration_minutes));
+  };
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
@@ -63,11 +87,23 @@ export function CreateJobModal({ preset = {}, onClose, onCreated }: { preset?: P
     <Modal title={t("Create service job")} onClose={onClose}>
       <form className="form" onSubmit={submit}>
         {error && <div className="error">{error}</div>}
+        {offered.length > 0 && (
+          <Field label={t("Start from a service")} optional hint={t("Fills in the title, description, checklist and time.")}>
+            <select id="field-service" name="service_id" value={serviceId} onChange={(e) => pickService(e.target.value)}>
+              <option value="">{t("No service")}</option>
+              {offered.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
         <Field label={t("Job title")}>
-          <input name="title" placeholder={t("Job title")} defaultValue={preset.title} required />
+          <input name="title" placeholder={t("Job title")} value={title} onChange={(e) => setTitle(e.target.value)} required />
         </Field>
         <Field label={t("Problem / job description")}>
-          <textarea name="description" placeholder={t("Problem / job description")} defaultValue={preset.description} required />
+          <textarea name="description" placeholder={t("Problem / job description")} value={description} onChange={(e) => setDescription(e.target.value)} required />
         </Field>
         <div className="row">
           <Field label={t("Customer")}>
@@ -127,9 +163,14 @@ export function CreateJobModal({ preset = {}, onClose, onCreated }: { preset?: P
             <input name="due_date" type="date" />
           </Field>
         </div>
-        <Field label={t("Job type")}>
-          <JobTypeSelect types={jobTypes} />
-        </Field>
+        <div className="row">
+          <Field label={t("Job type")}>
+            <JobTypeSelect key={serviceId} types={jobTypes} value={jobType} />
+          </Field>
+          <Field label={t("Estimated time (minutes)")} optional>
+            <input name="estimated_minutes" type="number" min={5} max={1440} step={5} value={minutes} onChange={(e) => setMinutes(e.target.value)} />
+          </Field>
+        </div>
         <button className="primary">{t("Create & notify technician")}</button>
       </form>
     </Modal>

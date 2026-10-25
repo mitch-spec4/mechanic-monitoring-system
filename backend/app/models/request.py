@@ -23,6 +23,10 @@ class ServiceRequest(db.Model):
     # the day after the work is done.
     repair_reminder_sent_at = db.Column(db.DateTime)
     follow_up_sent_at = db.Column(db.DateTime)
+    # The service the customer picked, and how it's booked (fixed when the request is made):
+    # "inspection" first (also every request without a service), or "direct".
+    service_id = db.Column(db.Integer, db.ForeignKey("service_template.id"), nullable=True, index=True)
+    booking = db.Column(db.String(20), nullable=False, default="inspection", server_default="inspection")
 
 
 class CustomerMessage(db.Model):

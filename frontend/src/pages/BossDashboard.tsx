@@ -276,9 +276,14 @@ export default function BossDashboard({ u, onOpenJob, onOpenCustomer, onOpenRequ
                 <input name="due_date" type="date" defaultValue={editingJob.due_date || ""} />
               </Field>
             </div>
-            <Field label={t("Job type")}>
-              <JobTypeSelect types={jobTypes} value={editingJob.job_type} />
-            </Field>
+            <div className="row">
+              <Field label={t("Job type")}>
+                <JobTypeSelect types={jobTypes} value={editingJob.job_type} />
+              </Field>
+              <Field label={t("Estimated time (minutes)")} optional>
+                <input name="estimated_minutes" type="number" min={5} max={1440} step={5} defaultValue={editingJob.estimated_minutes ?? ""} />
+              </Field>
+            </div>
             <button className="primary">{t("Save changes")}</button>
           </form>
         </Modal>

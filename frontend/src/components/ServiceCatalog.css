@@ -1,0 +1,88 @@
+/* Settings → Services you offer, its editor, and the skill tags shown on jobs. */
+.serviceCatalogHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.serviceCatalogHead h3 {
+  margin: 0;
+}
+.appMain .serviceCatalogHead button.secondary {
+  width: auto;
+}
+.serviceList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.serviceList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.serviceList li.serviceOff {
+  background: var(--surface-2);
+}
+.serviceList li.serviceOff strong {
+  color: var(--muted);
+}
+.serviceText {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.serviceText strong {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.serviceMeta {
+  color: var(--muted);
+  font-size: 12px;
+}
+.serviceOffTag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.skillTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.skillTag {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+.serviceEditorActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.serviceEditorActions .primary {
+  flex: 1;
+}
+@media (max-width: 560px) {
+  .serviceList li {
+    align-items: flex-start;
+  }
+}

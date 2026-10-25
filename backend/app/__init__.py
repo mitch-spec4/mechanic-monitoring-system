@@ -266,6 +266,7 @@ def create_app(overrides=None):
     from app import models  # noqa: F401  (register models for migrations)
     from app.routes.auth import bp as auth
     from app.routes.billing import bp as billing
+    from app.routes.catalog import bp as catalog
     from app.routes.checklists import bp as checklists
     from app.routes.company import bp as company
     from app.routes.customers import bp as customers
@@ -294,6 +295,7 @@ def create_app(overrides=None):
     app.register_blueprint(jobs, url_prefix="/api/jobs")
     app.register_blueprint(worksheet, url_prefix="/api/jobs")
     app.register_blueprint(checklists, url_prefix="/api/checklists")
+    app.register_blueprint(catalog, url_prefix="/api/catalog")
     app.register_blueprint(customers, url_prefix="/api/customers")
     app.register_blueprint(requests, url_prefix="/api/customers/requests")
     app.register_blueprint(messages, url_prefix="/api/messages")

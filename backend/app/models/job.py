@@ -29,6 +29,9 @@ class Job(db.Model):
     reminder_sent_at = db.Column(db.DateTime)
     # Made by a maintenance plan: completing it moves the plan's next due date on.
     plan_id = db.Column(db.Integer, db.ForeignKey("maintenance_plan.id"), nullable=True, index=True)
+    # Made from a service in the catalog, and how long the work should take (from the service).
+    service_id = db.Column(db.Integer, db.ForeignKey("service_template.id"), nullable=True, index=True)
+    estimated_minutes = db.Column(db.Integer)
     # Its place in its technician's planned route for route_date (app/services/routing.py). Where
     # it is comes from its equipment's site.
     route_date = db.Column(db.Date)

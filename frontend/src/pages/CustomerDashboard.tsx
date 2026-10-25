@@ -1,15 +1,15 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { CalendarClock, CheckCircle2, ClipboardList, MessageSquare, Plus, Star, Wrench } from "lucide-react";
-import { createRequest, createReview, jobs, machines, requests, reviews, services, type User } from "../services/api";
+import { bookableServices, createRequest, createReview, jobs, machines, requests, reviews, services, type User } from "../services/api";
 import Notifications from "../components/Notifications";
 import Modal from "../components/Modal";
 import { toast } from "../components/Feedback";
-import { errorMessage, formatVisit } from "../lib/format";
+import { errorMessage, formatMinutes, formatVisit } from "../lib/format";
 import { PRIORITIES, statusClass } from "../lib/labels";
 import { usePolling } from "../lib/usePolling";
 import { mark, t } from "../i18n";
 import Field from "../components/Field";
-import type { Job, Machine, Review, ServiceRecord, ServiceRequest } from "../services/types";
+import type { BookableService, Job, Machine, Review, ServiceRecord, ServiceRequest } from "../services/types";
 
 // The request form, or the review form for one service visit.
 type ModalState = null | "request" | ServiceRecord;
@@ -60,18 +60,11 @@ export default function CustomerDashboard({ u, onOpenJob, onOpenRequest, onOpenM
       setFormError(errorMessage(error));
     }
   };
-  // A new request opens its page, to pick a time for the inspection.
-  const sendRequest = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setFormError("");
-    try {
-      const { id } = await createRequest(Object.fromEntries(new FormData(e.currentTarget)));
-      setModal(null);
-      toast(t("Request sent. Now pick a time for the inspection."));
-      onOpenRequest(id);
-    } catch (error) {
-      setFormError(errorMessage(error));
-    }
+  // A new request opens its page, to pick a time for the inspection (or the service itself).
+  const requestSent = (id: number, direct: boolean) => {
+    setModal(null);
+    toast(direct ? t("Request sent. Now pick a time for the service.") : t("Request sent. Now pick a time for the inspection."));
+    onOpenRequest(id);
   };
   const openJobs = jobList.filter((x) => !FINISHED.includes(x.status));
   const activeRequests = requestList.filter((x) => !FINISHED.includes(x.status));
@@ -232,36 +225,7 @@ export default function CustomerDashboard({ u, onOpenJob, onOpenRequest, onOpenM
       </main>
       {modal === "request" && (
         <Modal title={t("Request a service")} onClose={() => setModal(null)}>
-          <form className="form" onSubmit={sendRequest}>
-            {formError && <div className="error">{formError}</div>}
-            {equipment.length === 0 && <p className="muted">{t("No equipment is registered to your account yet. Ask your service company to add it.")}</p>}
-            <Field label={t("Equipment")}>
-              <select name="machine_id" required>
-                <option value="">{t("Select equipment")}</option>
-                {equipment.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label={t("What do you need?")}>
-              <input name="subject" placeholder={t("What do you need?")} required />
-            </Field>
-            <Field label={t("Describe the issue")}>
-              <textarea name="description" placeholder={t("Describe the issue")} required />
-            </Field>
-            <Field label={t("Priority")}>
-              <select name="priority" defaultValue="Medium">
-                {PRIORITIES.map((priority) => (
-                  <option key={priority} value={priority}>
-                    {t(priority)}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <button className="primary">{t("Send request")}</button>
-          </form>
+          <RequestForm equipment={equipment} onSent={requestSent} />
         </Modal>
       )}
       {modal && modal !== "request" && (
@@ -308,5 +272,107 @@ function Header({ u }: { u: User }) {
         </button>
       </div>
     </header>
+  );
+}
+
+/** A new request: the equipment, then one of the services the company lets customers book for it
+ *  (booked directly, or after an inspection), or something else, described in their own words. */
+function RequestForm({ equipment, onSent }: { equipment: Machine[]; onSent: (id: number, direct: boolean) => void }) {
+  const [machineId, setMachineId] = useState("");
+  const [offered, setOffered] = useState<BookableService[]>([]);
+  const [serviceId, setServiceId] = useState("");
+  const [error, setError] = useState("");
+  useEffect(() => {
+    setServiceId("");
+    if (!machineId) {
+      setOffered([]);
+      return;
+    }
+    let current = true;
+    bookableServices(Number(machineId))
+      .then((data) => current && setOffered(data.services))
+      .catch(() => current && setOffered([]));
+    return () => {
+      current = false;
+    };
+  }, [machineId]);
+  const chosen = offered.find((service) => String(service.id) === serviceId);
+
+  const send = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError("");
+    try {
+      const { id } = await createRequest(Object.fromEntries(new FormData(e.currentTarget)));
+      onSent(id, chosen?.booking === "direct");
+    } catch (problem) {
+      setError(errorMessage(problem));
+    }
+  };
+
+  return (
+    <form className="form" onSubmit={send}>
+      {error && <div className="error">{error}</div>}
+      {equipment.length === 0 && <p className="muted">{t("No equipment is registered to your account yet. Ask your service company to add it.")}</p>}
+      <Field label={t("Equipment")}>
+        <select name="machine_id" required value={machineId} onChange={(e) => setMachineId(e.target.value)}>
+          <option value="">{t("Select equipment")}</option>
+          {equipment.map((x) => (
+            <option key={x.id} value={x.id}>
+              {x.name}
+            </option>
+          ))}
+        </select>
+      </Field>
+      {offered.length > 0 && (
+        <fieldset className="choiceCards">
+          <legend>{t("Pick a service")}</legend>
+          {offered.map((service) => (
+            <label key={service.id} className={chosen?.id === service.id ? "chosen" : ""}>
+              <input type="radio" name="service_id" value={service.id} checked={chosen?.id === service.id} onChange={() => setServiceId(String(service.id))} />
+              <span>
+                <b>{service.name}</b>
+                {service.description && <small>{service.description}</small>}
+                <small>
+                  {service.booking === "direct"
+                    ? t("About {time}. You pick a time for the work.", { time: formatMinutes(service.duration_minutes) })
+                    : t("A technician inspects it first; then you pick a time for the work (about {time}).", { time: formatMinutes(service.duration_minutes) })}
+                </small>
+              </span>
+            </label>
+          ))}
+          <label className={chosen ? "" : "chosen"}>
+            <input type="radio" name="service_id" value="" checked={!chosen} onChange={() => setServiceId("")} />
+            <span>
+              <b>{t("Something else")}</b>
+              <small>{t("Describe what you need. A technician inspects it first.")}</small>
+            </span>
+          </label>
+        </fieldset>
+      )}
+      {!chosen && (
+        <Field label={t("What do you need?")}>
+          <input name="subject" placeholder={t("What do you need?")} required />
+        </Field>
+      )}
+      {chosen ? (
+        <Field label={t("Anything we should know?")} optional>
+          <textarea name="description" placeholder={t("Where it is, what you've noticed…")} />
+        </Field>
+      ) : (
+        <Field label={t("Describe the issue")}>
+          <textarea name="description" placeholder={t("Describe the issue")} required />
+        </Field>
+      )}
+      <Field label={t("Priority")}>
+        <select name="priority" defaultValue="Medium">
+          {PRIORITIES.map((priority) => (
+            <option key={priority} value={priority}>
+              {t(priority)}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <button className="primary">{t("Send request")}</button>
+    </form>
   );
 }

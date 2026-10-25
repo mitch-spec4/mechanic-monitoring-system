@@ -286,8 +286,12 @@ export function flush(): Promise<void> {
       watchers.delete(outcome.item.id);
       if (outcome.type === "refused") {
         watcher.reject(new ApiError(outcome.data.error || outcome.data.message || t("This change was refused."), outcome.status, outcome.data));
+      } else if (outcome.type === "sent") {
+        // The change has left the queue: the list the screens overlay is read again before the
+        // server's copy reaches the screen, so the change isn't shown on top of it a second time.
+        void refreshItems().then(() => watcher.resolve(outcome.data));
       } else {
-        watcher.resolve(outcome.type === "sent" ? outcome.data : undefined);
+        watcher.resolve(undefined);
       }
     };
     const hooks: Hooks = {

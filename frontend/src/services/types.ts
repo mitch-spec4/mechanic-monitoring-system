@@ -25,12 +25,39 @@ export type Job = {
   /** Its place in the technician's planned route for route_date. */
   route_date?: string | null;
   route_order?: number | null;
+  /** The service it was made from, and how long the work should take. */
+  service?: JobService | null;
+  estimated_minutes?: number | null;
   /** Changed on this phone, not yet on the server. */
   pending_status?: boolean;
 };
 
-/** A booked visit: the inspection, or the repair after it. */
-export type Visit = "inspection" | "repair";
+/** A booked visit: the inspection, the repair after it, or a service booked directly. */
+export type Visit = "inspection" | "repair" | "service";
+
+/** The service a job or request was made from, with the skills the work needs. */
+export type JobService = { id: number; name: string; skills: string[] };
+
+/** How customers book a service: not at all, an inspection first, or the service directly. */
+export type BookingType = "none" | "inspection" | "direct";
+
+/** A service in the company's catalog (app/routes/catalog.py). */
+export type CatalogService = {
+  id: number;
+  name: string;
+  description: string | null;
+  equipment_type: string | null;
+  checklist: { id: number; job_type: string; items: number } | null;
+  duration_minutes: number;
+  skills: string[];
+  booking: BookingType;
+  active: boolean;
+  /** How many jobs were made from it. */
+  jobs: number;
+};
+
+/** What a customer sees of a service they can book. */
+export type BookableService = Pick<CatalogService, "id" | "name" | "description" | "equipment_type" | "duration_minutes" | "booking">;
 
 /** Why a piece of equipment needs work: an open job or request, or its status. */
 export type WorkReason =
@@ -154,6 +181,9 @@ export type ServiceRequest = {
   status: string;
   created_at: string;
   updated_at?: string | null;
+  /** The service picked from the catalog, and whether it's booked directly or after an inspection. */
+  service?: JobService | null;
+  booking?: "inspection" | "direct";
 };
 
 /** A visit as a request's page shows it; findings and photos once it's done. */
@@ -316,6 +346,8 @@ export type JobDetail = {
   scheduled_start?: string | null;
   scheduled_end?: string | null;
   on_the_way_at?: string | null;
+  service?: JobService | null;
+  estimated_minutes?: number | null;
   customer: { id: number; name: string } | null;
   machine: { id: number; name: string; serial_no: string } | null;
   mechanic: { id: number; name: string | null } | null;
@@ -497,6 +529,7 @@ export type RouteStop = {
   priority: string;
   due_date: string | null;
   scheduled_start: string | null;
+  estimated_minutes: number | null;
   latitude: number | null;
   longitude: number | null;
   /** On planned stops: its number and the drive to it. */
@@ -509,6 +542,8 @@ export type RouteStop = {
 export type RoutePlan = {
   date: string;
   mechanic: { id: number; name: string };
+  /** The day's work (estimates and booked visits) against the working day, in minutes. */
+  work: { minutes: number; unestimated: number; day_minutes: number };
   start: { kind: "position" | "base" | "first_stop"; latitude: number | null; longitude: number | null };
   estimate: "straight_line" | "openrouteservice";
   fell_back: boolean;

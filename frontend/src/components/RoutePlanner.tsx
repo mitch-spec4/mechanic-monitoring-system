@@ -111,6 +111,7 @@ export default function RoutePlanner({ onOpenJob }: { onOpenJob?: (id: number) =
                     : t("This is already the shortest order found.")}{" "}
                   {t(START_WORDS[plan.start.kind], { name: plan.mechanic.name })}
                 </span>
+                <WorkLine plan={plan} />
                 {plan.estimate === "straight_line" && (
                   <small>
                     {plan.fell_back
@@ -137,7 +138,11 @@ export default function RoutePlanner({ onOpenJob }: { onOpenJob?: (id: number) =
                           ) : (
                             <strong>{stop.title}</strong>
                           )}
-                          <small>{[stop.customer, stop.location].filter(Boolean).join(" · ")}</small>
+                          <small>
+                            {[stop.customer, stop.location, stop.estimated_minutes ? t("about {time} of work", { time: formatMinutes(stop.estimated_minutes) }) : null]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </small>
                           {index > 0 || plan.start.kind !== "first_stop" ? (
                             <small className="routeLeg">
                               {t("{distance}, about {time}", { distance: formatDistance(stop.leg_metres ?? 0), time: minutes(stop.leg_seconds ?? 0) })}
@@ -249,4 +254,20 @@ function RouteMap({ plan }: { plan: RoutePlan }) {
   }, [plan]);
 
   return <div className="routeMap" ref={holder} role="img" aria-label={t("Map of the route, stops numbered in order")} />;
+}
+
+/** The day's work (job estimates and booked visits) and driving, against the working day. Only
+ *  shown when some job has an estimate (from its service, or set on the job). */
+function WorkLine({ plan }: { plan: RoutePlan }) {
+  const { minutes: work, unestimated, day_minutes: day } = plan.work;
+  if (!work) return null;
+  const driving = Math.round(plan.suggested.seconds / 60);
+  const over = work + driving > day;
+  return (
+    <span className={over ? "routeWork over" : "routeWork"}>
+      {t("Work: about {work}, plus {driving} driving.", { work: formatMinutes(work), driving: formatMinutes(Math.max(1, driving)) })}{" "}
+      {unestimated > 0 && (unestimated === 1 ? t("1 job has no time estimate.") : t("{count} jobs have no time estimate.", { count: unestimated }))}{" "}
+      {over && t("That's more than the working day ({day}).", { day: formatMinutes(day) })}
+    </span>
+  );
 }
